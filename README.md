@@ -85,14 +85,21 @@ Diktera hittar den automatiskt och använder den för att städa dikterad text o
 sammanfatta möten. Utan Ollama används enkla regler, och sammanfattningen märks
 som automatisk grovsammanfattning.
 
-## Bygga en app
+## Färdig app (dmg)
+
+Varje push bygger appen på GitHubs Mac-maskiner och lägger en dmg under
+**Releases** i repot. Ladda ner den som passar din Mac (arm64 = Apple Silicon,
+x64 = Intel), dra Diktera till Program och kör sedan en gång i Terminal:
 
 ```bash
-npm run dist
+xattr -cr /Applications/Diktera.app
 ```
 
-Ger en `.dmg` i `dist/` för Apple Silicon och Intel. Appen är osignerad, så första
-starten kräver högerklick → Öppna.
+Det behövs för att appen är osignerad. Annars säger macOS att den är skadad.
+Sedan: starta appen, gå till Inställningar i menyraden, ladda ner modellerna och
+ge behörigheterna.
+
+Bygga själv på en Mac: `npm run dist` ger en dmg i `dist/`.
 
 ## Utveckling
 

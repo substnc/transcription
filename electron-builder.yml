@@ -33,3 +33,6 @@ mac:
 dmg:
   writeUpdateInfo: false
 publish: null
+# Native moduler (uiohook, sherpa) har färdiga N-API-binärer; bygg inte om dem.
+npmRebuild: false
+
