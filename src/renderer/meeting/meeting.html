@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
+<title>Mötesläge</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .modal { background: var(--panel); border-radius: 14px; padding: 22px 24px; width: 460px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
+  .modal ul { padding-left: 18px; margin: 8px 0 14px; }
+  .level { height: 10px; background: var(--chip); border-radius: 5px; overflow: hidden; flex: 1; }
+  .level > i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .1s; }
+  .timer { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; min-width: 90px; }
+  .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: .35 } }
+  .segments { -webkit-user-select: text; }
+  .seg { display: grid; grid-template-columns: 62px 130px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .seg .t { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 3px; }
+  .seg .sp { font-weight: 600; font-size: 13px; padding-top: 2px; }
+  .seg .lang { font-size: 10px; color: var(--muted); margin-left: 4px; font-weight: 400; }
+  .seg textarea { min-height: 0; padding: 3px 6px; background: transparent; border-color: transparent; }
+  .seg textarea:focus { border-color: var(--line); background: var(--bg); }
+  .speakers { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .speakers label { margin: 0; }
+  .radio { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--text); }
+  .radio small { display: block; color: var(--muted); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .steps .chip.active { background: var(--accent); color: #fff; }
+  .steps .chip.done { color: var(--ok); }
+</style></head>
+<body>
+<div class="drag"></div>
+<h1>Mötesläge</h1>
+<p class="sub">Spela in eller ladda upp ett möte. Allt transkriberas och sammanfattas lokalt på den här datorn.</p>
+<div id="errorBox" class="card hidden" style="border-color: var(--bad)"><div class="row between"><span id="errorText" style="color: var(--bad)"></span><button id="errorClose">Stäng</button></div></div>
+
+<!-- Steg 1: start -->
+<section id="idle" class="card">
+  <div class="field"><label for="title">Mötets titel (valfritt)</label><input type="text" id="title" placeholder="t.ex. Kickoff Delicato"></div>
+  <div class="row">
+    <button class="primary" id="btnRecord">● Spela in</button>
+    <button id="btnUpload">Ladda upp ljudfil…</button>
+    <span class="status">Inspelning använder Mac-mikrofonen. Ljud från andra i ett videomöte fångas via högtalarna.</span>
+  </div>
+</section>
+
+<!-- Steg 2: inspelning -->
+<section id="recording" class="card hidden">
+  <div class="row">
+    <span class="rec-dot"></span><span class="timer" id="timer">00:00</span>
+    <div class="level"><i id="level"></i></div>
+    <button class="primary" id="btnStop">Stoppa och transkribera</button>
+    <button id="btnCancel" class="danger">Avbryt</button>
+  </div>
+  <p class="status" style="margin:10px 0 0">Ljudet sparas löpande till en lokal fil så att inget går förlorat om något går fel.</p>
+</section>
+
+<!-- Steg 3: bearbetning -->
+<section id="processing" class="card hidden">
+  <div class="steps">
+    <span class="chip" data-step="load">Laddar</span><span class="chip" data-step="convert">Konverterar</span>
+    <span class="chip" data-step="diarize">Talare</span><span class="chip" data-step="transcribe">Transkriberar</span><span class="chip" data-step="summarize">Sammanfattar</span>
+  </div>
+  <div class="bar"><i id="progressBar"></i></div>
+  <p class="status" id="progressText" style="margin:8px 0 0">Startar…</p>
+</section>
+
+<!-- Steg 4: resultat -->
+<section id="result" class="hidden">
+  <div class="card">
+    <div class="row between"><h2 style="margin:0">Talare</h2><span class="status" id="meta"></span></div>
+    <p class="status">Döp om talarna. Namnen slår igenom i transkript och anteckning.</p>
+    <div class="speakers" id="speakers"></div>
+  </div>
+
+  <div class="card">
+    <div class="row between"><h2 style="margin:0">Sammanfattning</h2><div class="row"><span class="status" id="summaryBy"></span><button id="btnResummarize">Skapa om</button></div></div>
+    <div class="field" style="margin-top:10px"><label for="summary">Sammanfattning</label><textarea id="summary"></textarea></div>
+    <div class="two">
+      <div class="field"><label for="decisions">Beslut (en per rad)</label><textarea id="decisions"></textarea></div>
+      <div class="field"><label for="todos">Att göra (en per rad, "uppgift @namn")</label><textarea id="todos"></textarea></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Transkript</h2>
+    <div class="segments" id="segments"></div>
+  </div>
+
+  <div class="card">
+    <h2>Spara som Obsidian-anteckning</h2>
+    <div id="inboxes"></div>
+    <div class="radio"><input type="radio" name="inbox" id="inboxCustom" value="custom"><label for="inboxCustom" style="margin:0">Annan mapp… <small id="customPath"></small></label><button id="btnChoose">Välj</button></div>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnSave">Spara anteckning</button>
+      <button id="btnNew">Nytt möte</button>
+      <span class="status" id="saveStatus"></span>
+    </div>
+  </div>
+</section>
+
+<!-- Samtycke -->
+<div id="consent" class="modal-bg hidden">
+  <div class="modal">
+    <h2>Innan du spelar in</h2>
+    <p>Berätta för alla i mötet att det spelas in och transkriberas. Ljud och text stannar på den här datorn, men de andra behöver ändå få veta och säga ja.</p>
+    <ul>
+      <li>Säg tydligt att inspelning startar.</li>
+      <li>Fråga om någon har invändningar.</li>
+      <li>Stoppa om någon säger nej.</li>
+    </ul>
+    <label class="check"><input type="checkbox" id="consentCheck"> Jag har informerat deltagarna och alla har sagt ja</label>
+    <div class="row" style="justify-content:flex-end;margin-top:14px">
+      <button id="consentCancel">Avbryt</button>
+      <button class="primary" id="consentOk" disabled>Starta inspelning</button>
+    </div>
+  </div>
+</div>
+
+<script src="meeting.js"></script>
+</body></html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
+<title>Inställningar</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .model { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .model:last-child { border-bottom: 0; }
+  .model .name { font-weight: 600; }
+  .model .note { font-size: 12px; color: var(--muted); }
+  .model .bar { margin-top: 4px; }
+  .perm { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+</style></head>
+<body>
+<div class="drag"></div>
+<h1>Inställningar</h1>
+<p class="sub">Allt körs på den här datorn. Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>
+
+<section class="card">
+  <h2>Behörigheter</h2>
+  <div class="perm"><span>Mikrofon</span><span class="row"><span class="chip" id="permMic">–</span><button id="btnMic">Be om åtkomst</button></span></div>
+  <div class="perm"><span>Tillgänglighet (för ⌘V och håll-in-tangent)</span><span class="row"><span class="chip" id="permAcc">–</span><button id="btnAcc">Öppna systeminställningar</button></span></div>
+  <div class="perm"><span>Inmatningsövervakning (håll-in-tangent)</span><span class="row"><span class="chip" id="permHook">–</span><button id="btnInput">Öppna systeminställningar</button></span></div>
+  <p class="status">Om håll-in-tangenten inte fungerar: ge Diktera Tillgänglighet och Inmatningsövervakning i Systeminställningar → Integritet och säkerhet, och starta om appen. Genvägen <span id="toggleShortcut"></span> fungerar alltid som av/på-knapp.</p>
+</section>
+
+<section class="card">
+  <h2>Diktering</h2>
+  <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="field"><label for="hotkey">Tangent att hålla in</label><select id="hotkey"></select></div>
+    <div class="field"><label for="hotkeyMode">Beteende</label><select id="hotkeyMode"><option value="hold">Håll in för att prata</option><option value="toggle">Tryck en gång för av/på</option></select></div>
+    <div class="field"><label for="language">Språk</label><select id="language"><option value="auto">Svenska och engelska, även blandat</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
+    <div class="field"><label for="primary">Huvudspråk vid osäkerhet</label><select id="primary"><option value="sv">Svenska</option><option value="en">Engelska</option></select></div>
+  </div>
+  <label class="check"><input type="checkbox" id="autoPaste"> Klistra in automatiskt där markören står (⌘V)</label>
+  <label class="check"><input type="checkbox" id="restoreClipboard"> Återställ urklippet efteråt</label>
+  <label class="check"><input type="checkbox" id="voiceCommands"> Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph"</label>
+  <div class="row" style="margin-top:8px"><button id="btnTest">Testa: spela in 3 sekunder</button><span class="status" id="testStatus"></span></div>
+</section>
+
+<section class="card">
+  <h2>Taligenkänning (whisper)</h2>
+  <p class="status">Välj vilken modell som används. Större modell ger bättre svenska men tar längre tid. Modellerna sparas i <code id="modelsDir"></code>.</p>
+  <div id="whisperList"></div>
+</section>
+
+<section class="card">
+  <h2>Mötesläge</h2>
+  <div id="auxList"></div>
+  <label class="check" style="margin-top:10px"><input type="checkbox" id="diarize"> Separera talare (kräver modellerna ovan)</label>
+  <label class="check"><input type="checkbox" id="keepRecordings"> Behåll ljudfilen efter att anteckningen sparats</label>
+  <div class="field" style="margin-top:8px"><label>Mappar att spara anteckningar i</label><div id="inboxList" class="stack"></div></div>
+</section>
+
+<section class="card">
+  <h2>Textstädning och sammanfattning (Ollama)</h2>
+  <p class="status">Om <a id="ollamaLink" href="#">Ollama</a> körs på datorn används en lokal språkmodell för att städa dikterad text och sammanfatta möten. Annars används enkla regler. Tips: <code>ollama pull qwen2.5:7b</code> eller <code>ollama pull gemma3:4b</code>.</p>
+  <label class="check"><input type="checkbox" id="useLlm"> Använd lokal språkmodell när den finns</label>
+  <label class="check"><input type="checkbox" id="llmDictation"> Även vid diktering (bättre städning, men några sekunder långsammare)</label>
+  <div class="row" style="margin-top:8px">
+    <span class="chip" id="llmStatus">–</span>
+    <select id="ollamaModel" style="width:auto;min-width:220px"></select>
+    <button id="btnLlmRefresh">Uppdatera</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Allmänt</h2>
+  <label class="check"><input type="checkbox" id="launchAtLogin"> Starta Diktera när jag loggar in</label>
+  <div class="row" style="margin-top:8px"><button id="btnMeeting">Öppna mötesläge</button><button id="btnRecordings">Visa inspelningar</button></div>
+</section>
+<script src="settings.js"></script>
+</body></html>

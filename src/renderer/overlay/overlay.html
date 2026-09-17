@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; }
+  .pill { display: flex; align-items: center; gap: 10px; margin: 4px auto; width: max-content; max-width: 210px; padding: 8px 16px 8px 12px;
+    border-radius: 999px; background: rgba(28, 28, 30, 0.92); color: #fff; font-size: 13px; font-weight: 500; box-shadow: 0 4px 18px rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #ff453a; flex: none; }
+  .listening .dot { animation: pulse 1s ease-in-out infinite; }
+  .processing .dot { background: #ffd60a; animation: spin 1s linear infinite; border-radius: 2px; }
+  .done .dot { background: #30d158; }
+  .error .dot { background: #ff453a; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.5); opacity: .5 } }
+  @keyframes spin { to { transform: rotate(360deg) } }
+</style></head>
+<body><div id="pill" class="pill listening"><span class="dot"></span><span id="text">Lyssnar…</span></div>
+<script src="overlay.js"></script></body></html>

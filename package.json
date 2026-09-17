@@ -1,0 +1,30 @@
+{
+  "name": "diktera",
+  "productName": "Diktera",
+  "version": "0.1.0",
+  "description": "Lokal AI-diktering och mötestranskribering för Mac. Inget ljud eller text lämnar datorn.",
+  "main": "src/main/main.js",
+  "private": true,
+  "license": "MIT",
+  "author": "sub.stnc",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "models": "node scripts/download-models.js",
+    "icons": "node scripts/make-icons.js",
+    "pack": "electron-builder --mac --dir",
+    "dist": "electron-builder --mac"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.3.0",
+    "sherpa-onnx-node": "^1.13.8",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
