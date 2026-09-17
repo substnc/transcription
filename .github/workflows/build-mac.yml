@@ -37,11 +37,14 @@ jobs:
         with:
           path: out
       - name: Publicera som release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          TAG="build-${{ github.run_number }}"
-          gh release create "$TAG" out/*/*.dmg out/*/*.zip \
-            --repo "${{ github.repository }}" --prerelease \
-            --title "Diktera bygge ${{ github.run_number }}" \
-            --notes "Osignerad testversion. Byggd för Apple Silicon (M1 och senare). Efter installation: kör \`xattr -cr /Applications/Diktera.app\` i Terminal en gång, annars säger macOS att appen är skadad."
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Diktera bygge ${{ github.run_number }}
+          prerelease: true
+          files: |
+            out/*/*.dmg
+            out/*/*.zip
+          body: |
+            Osignerad testversion för Apple Silicon (M1 och senare).
+            Efter installation: kör `xattr -cr /Applications/Diktera.app` i Terminal en gång, annars säger macOS att appen är skadad.
