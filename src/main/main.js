@@ -20,7 +20,8 @@ const userData = app.getPath('userData');
 const settings = new Settings(path.join(userData, 'settings.json'));
 const modelsDir = process.env.DIKTERA_MODELS_DIR || path.join(userData, 'models');
 const recordingsDir = path.join(userData, 'recordings');
-const engine = new EngineClient();
+const logsDir = path.join(userData, 'logs');
+const engine = new EngineClient(path.join(logsDir, 'engine.log'));
 const hotkey = new Hotkey();
 
 let tray = null;
@@ -175,6 +176,7 @@ function registerIpc() {
     return after;
   });
   ipcMain.handle('models:status', () => engine.call('status'));
+  ipcMain.handle('open:logs', () => shell.openPath(logsDir));
   ipcMain.handle('models:install', (_e, { kind, name }) => {
     const method = kind === 'whisper' ? 'installWhisper' : 'installAux';
     const params = kind === 'whisper' ? { name } : { key: name };

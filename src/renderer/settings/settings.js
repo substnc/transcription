@@ -167,5 +167,6 @@ function renderInboxes() {
 
 $('btnMeeting').onclick = () => api.open.meeting();
 $('btnRecordings').onclick = () => api.open.path(S.recordingsDir);
+$('btnLogs').onclick = () => api.open.logs();
 
 load();

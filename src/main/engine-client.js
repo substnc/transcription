@@ -4,9 +4,12 @@ const { utilityProcess } = require('electron');
 const path = require('path');
 const EventEmitter = require('events');
 
+const fs = require('fs');
+
 class EngineClient extends EventEmitter {
-  constructor() {
+  constructor(logFile) {
     super();
+    this.logFile = logFile;
     this.proc = null;
     this.pending = new Map();
     this.n = 0;
@@ -16,7 +19,16 @@ class EngineClient extends EventEmitter {
   start() {
     if (this.proc) return this.ready;
     const entry = path.join(__dirname, '..', 'engine', 'server.js');
-    this.proc = utilityProcess.fork(entry, [], { serviceName: 'diktera-engine', stdio: 'inherit' });
+    this.proc = utilityProcess.fork(entry, [], { serviceName: 'diktera-engine', stdio: 'pipe' });
+    // Allt motorn skriver hamnar i en loggfil så att krascher går att felsöka.
+    if (this.logFile) {
+      fs.mkdirSync(path.dirname(this.logFile), { recursive: true });
+      const out = fs.createWriteStream(this.logFile, { flags: 'a' });
+      out.write(`\n===== motor startad ${new Date().toISOString()} =====\n`);
+      this.proc.stdout.on('data', (d) => out.write(d));
+      this.proc.stderr.on('data', (d) => out.write(d));
+      this.proc.on('exit', (code) => out.end(`===== motor avslutad, kod ${code} =====\n`));
+    }
     this.ready = new Promise((resolve) => {
       this.proc.on('message', (m) => {
         if (m && m.ready) return resolve();
@@ -28,7 +40,8 @@ class EngineClient extends EventEmitter {
       });
     });
     this.proc.on('exit', (code) => {
-      for (const p of this.pending.values()) p.reject(new Error(`Motorn avslutades (kod ${code})`));
+      const tail = this.logTail();
+      for (const p of this.pending.values()) p.reject(new Error(`Motorn kraschade (kod ${code}). ${tail}`));
       this.pending.clear();
       this.proc = null;
       this.ready = null;
@@ -44,6 +57,16 @@ class EngineClient extends EventEmitter {
       this.pending.set(id, { resolve, reject, onProgress });
       this.proc.postMessage({ id, method, params });
     });
+  }
+
+  logTail() {
+    try {
+      const lines = fs.readFileSync(this.logFile, 'utf8').trim().split('\n').filter((l) => !/^=====/.test(l));
+      const last = lines.slice(-4).join(' | ').slice(-400);
+      return last ? `Senaste loggrader: ${last} (hela loggen: ${this.logFile})` : `Se loggen: ${this.logFile}`;
+    } catch {
+      return '';
+    }
   }
 
   stop() {

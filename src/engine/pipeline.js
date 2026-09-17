@@ -11,6 +11,20 @@ const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
 const MAX_CHUNK_SEC = 28; // whisper klarar 30 s per anrop
 
+// Ett trasigt modellfil får onnxruntime att avsluta hela processen. Kontrollera innan.
+function checkModelFile(file, label) {
+  const fs = require('fs');
+  if (!fs.existsSync(file)) throw new Error(`${label}: filen saknas (${file}). Ladda ner modellen igen i Inställningar.`);
+  const st = fs.statSync(file);
+  if (st.size < 100000) throw new Error(`${label}: filen är trasig eller ofullständig (${st.size} byte). Ta bort och ladda ner igen.`);
+  const fd = fs.openSync(file, 'r');
+  const head = Buffer.alloc(8);
+  fs.readSync(fd, head, 0, 8, 0);
+  fs.closeSync(fd);
+  const text = head.toString('latin1');
+  if (/^(<|Not Found|\{)/.test(text)) throw new Error(`${label}: filen innehåller inte en modell. Ta bort och ladda ner igen.`);
+}
+
 function loadSherpa() {
   // Kräver den plattformsspecifika binären (sherpa-onnx-darwin-arm64 på Apple Silicon).
   return require('sherpa-onnx-node');
@@ -50,6 +64,9 @@ class Pipeline {
     if (this.recognizer) return this.recognizer;
     const files = models.whisperFiles(this.modelsDir, this.whisperName);
     if (!files) throw new Error(`Whisper-modellen "${this.whisperName}" är inte nedladdad. Öppna Inställningar och ladda ner den.`);
+    checkModelFile(files.encoder, 'Whisper encoder');
+    checkModelFile(files.decoder, 'Whisper decoder');
+    console.error(`[motor] laddar whisper-${this.whisperName} (${this.numThreads} trådar)`);
     this.config = {
       featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
       modelConfig: {
@@ -70,6 +87,7 @@ class Pipeline {
     if (this.vad) return this.vad;
     const model = models.auxPath(this.modelsDir, 'vad');
     if (!require('fs').existsSync(model)) throw new Error('Röstdetektorn (Silero VAD) är inte nedladdad. Öppna Inställningar.');
+    checkModelFile(model, 'Röstdetektor');
     this.vad = new this.s.Vad({
       sileroVad: { model, threshold: 0.5, minSilenceDuration: 0.5, minSpeechDuration: 0.25, windowSize: VAD_WINDOW, maxSpeechDuration: MAX_CHUNK_SEC },
       sampleRate: SAMPLE_RATE, numThreads: 1, provider: 'cpu', debug: 0,
@@ -81,6 +99,9 @@ class Pipeline {
     if (this.diarizer) return this.diarizer;
     const st = models.status(this.modelsDir);
     if (!st.aux.segmentation.installed || !st.aux.embedding.installed) throw new Error('Talarmodellerna är inte nedladdade. Öppna Inställningar.');
+    checkModelFile(models.auxPath(this.modelsDir, 'segmentation'), 'Talarsegmentering');
+    checkModelFile(models.auxPath(this.modelsDir, 'embedding'), 'Talarigenkänning');
+    console.error('[motor] laddar talarmodeller');
     this.diarizer = new this.s.OfflineSpeakerDiarization({
       segmentation: { pyannote: { model: models.auxPath(this.modelsDir, 'segmentation') }, numThreads: this.numThreads, debug: 0, provider: 'cpu' },
       embedding: { model: models.auxPath(this.modelsDir, 'embedding'), numThreads: this.numThreads, debug: 0, provider: 'cpu' },
@@ -168,6 +189,7 @@ class Pipeline {
     // Egen WAV-läsare: sherpas readWave ger externa buffertar som Electrons utility-process inte tillåter.
     const samples = typeof input === 'string' ? audio.readWav(input).samples : input;
     const durationSec = samples.length / SAMPLE_RATE;
+    console.error(`[motor] möte: ${durationSec.toFixed(1)} s ljud, talarseparering=${diarize}`);
     let turns;
     if (diarize) {
       if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });

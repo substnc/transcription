@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('diktera', {
     path: (p) => ipcRenderer.invoke('open:path', p),
     folder: (p) => ipcRenderer.invoke('open:folder', p),
     meeting: () => ipcRenderer.invoke('open:meeting'),
+    logs: () => ipcRenderer.invoke('open:logs'),
   },
   test: {
     dictate: () => ipcRenderer.invoke('test:dictate'),

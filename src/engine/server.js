@@ -90,8 +90,12 @@ const methods = {
   },
 };
 
+process.on('uncaughtException', (e) => console.error('uncaughtException', e && e.stack ? e.stack : e));
+process.on('unhandledRejection', (e) => console.error('unhandledRejection', e && e.stack ? e.stack : e));
+
 async function handle(msg) {
   const { id, method, params } = msg || {};
+  console.error(`[motor] ${method}${params && params.wavPath ? ' ' + params.wavPath : ''}`);
   if (!method || !methods[method]) return send({ id, error: `Okänd metod: ${method}` });
   try {
     const result = await methods[method](params || {}, id);
