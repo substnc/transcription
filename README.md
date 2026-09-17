@@ -87,8 +87,13 @@ som automatisk grovsammanfattning.
 
 ## Färdig app (dmg)
 
-Varje push bygger appen på GitHubs Mac-maskiner och lägger en dmg under
-**Releases** i repot. Den är byggd för Apple Silicon (M1 och senare). Dra Diktera till Program och kör sedan en gång i Terminal:
+Varje push bygger appen på GitHubs Mac-maskiner. Hämta den så här:
+
+1. Gå till fliken **Actions** i repot och öppna det senaste gröna bygget.
+2. Ladda ner artefakten **Diktera-arm64** längst ner på sidan (kräver att du är inloggad).
+3. Packa upp, öppna dmg:n och dra Diktera till Program.
+
+Den är byggd för Apple Silicon (M1 och senare). Kör sedan en gång i Terminal:
 
 ```bash
 xattr -cr /Applications/Diktera.app

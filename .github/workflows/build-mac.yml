@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -28,23 +28,3 @@ jobs:
           path: |
             dist/*.dmg
             dist/*.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          path: out
-      - name: Publicera som release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: build-${{ github.run_number }}
-          name: Diktera bygge ${{ github.run_number }}
-          prerelease: true
-          files: |
-            out/*/*.dmg
-            out/*/*.zip
-          body: |
-            Osignerad testversion för Apple Silicon (M1 och senare).
-            Efter installation: kör `xattr -cr /Applications/Diktera.app` i Terminal en gång, annars säger macOS att appen är skadad.
