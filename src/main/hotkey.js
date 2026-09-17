@@ -5,6 +5,7 @@ const { globalShortcut } = require('electron');
 const EventEmitter = require('events');
 
 const KEY_LABELS = {
+  Alt: 'Vänster ⌥ (Option)', Meta: 'Vänster ⌘ (Command)', Ctrl: 'Vänster ⌃ (Control)',
   AltRight: 'Höger ⌥ (Option)', MetaRight: 'Höger ⌘ (Command)', CtrlRight: 'Höger ⌃ (Control)', ShiftRight: 'Höger ⇧ (Shift)',
   F13: 'F13', F14: 'F14', F15: 'F15', F16: 'F16', F17: 'F17', F18: 'F18', F19: 'F19', CapsLock: 'Caps Lock',
 };
