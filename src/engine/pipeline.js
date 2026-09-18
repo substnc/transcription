@@ -178,8 +178,16 @@ class Pipeline {
   }
 
   // Diktering: kort ljud, ingen talarseparering.
+  // Under 28 s skickas hela klippet i ett stycke: whisper blir tydligt bättre med hela sammanhanget.
   dictate(samples, { policy } = {}) {
-    const segs = this.transcribeChunk(samples, { policy });
+    let segs;
+    if (samples.length <= MAX_CHUNK_SEC * SAMPLE_RATE) {
+      const r = this.decodeWithPolicy(samples, policy);
+      const text = tidy(r.text);
+      segs = isHallucination(text) ? [] : [{ start: 0, end: samples.length / SAMPLE_RATE, text, lang: r.lang }];
+    } else {
+      segs = this.transcribeChunk(samples, { policy });
+    }
     const langs = [...new Set(segs.map((s) => s.lang).filter(Boolean))];
     return { text: segs.map((s) => s.text).join(' ').trim(), languages: langs, segments: segs };
   }
