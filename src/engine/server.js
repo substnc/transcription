@@ -101,7 +101,8 @@ async function handle(msg) {
     const result = await methods[method](params || {}, id);
     send({ id, result });
   } catch (e) {
-    send({ id, error: `${method}: ${e && e.stack ? e.stack : String(e)}` });
+    console.error(`[motor] fel i ${method}:`, e && e.stack ? e.stack : e);
+    send({ id, error: e && e.message ? e.message : String(e) });
   }
 }
 
