@@ -47,7 +47,7 @@ Kräver macOS 13 eller senare och Node 20 eller senare för att bygga.
 
 ```bash
 npm install
-npm run models          # laddar ner whisper-small + röst- och talarmodeller (ca 650 MB)
+npm run models          # laddar ner whisper-small + röst- och talarmodeller (ca 1 GB)
 npm start
 ```
 
@@ -66,10 +66,12 @@ Väljs i Inställningar. Svenska behöver minst `small`. Rekommendation för App
 
 | Modell | Storlek | Kommentar |
 |---|---|---|
-| small | 600 MB | Rimlig svenska, snabb |
-| turbo | 560 MB | Large-v3 turbo. Bäst balans |
-| medium | 1.5 GB | Bra, långsammare |
-| large-v3 | 1.9 GB | Bäst kvalitet, långsammast |
+| small | 1 GB | Rimlig svenska, snabb |
+| turbo | 1.6 GB | Large-v3 turbo. Bäst balans |
+| medium | 3 GB | Bra, långsammare |
+| large-v3 | 6 GB | Bäst kvalitet, långsammast |
+
+Modellerna körs i full precision. Det tar mer plats men ger märkbart bättre svenska än de komprimerade varianterna.
 
 `npm run models -- turbo` laddar ner en annan modell från terminalen.
 

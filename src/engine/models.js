@@ -12,10 +12,10 @@ const RELEASES = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
 const WHISPER_MODELS = {
   tiny: { size: '110 MB', note: 'Bara för test. Dålig på svenska.' },
   base: { size: '150 MB', note: 'Snabb, osäker på svenska.' },
-  small: { size: '600 MB', note: 'Rimlig kvalitet på svenska. Bra start.' },
-  medium: { size: '1.5 GB', note: 'Bra kvalitet, långsammare.' },
-  turbo: { size: '560 MB', note: 'Large-v3 turbo. Bäst balans mellan kvalitet och fart.' },
-  'large-v3': { size: '1.9 GB', note: 'Bäst kvalitet, långsammast.' },
+  small: { size: '1 GB', note: 'Rimlig kvalitet på svenska. Bra start.' },
+  medium: { size: '3 GB', note: 'Bra kvalitet, långsammare.' },
+  turbo: { size: '1.6 GB', note: 'Large-v3 turbo. Bäst balans mellan kvalitet och fart.' },
+  'large-v3': { size: '6 GB', note: 'Bäst kvalitet, långsammast.' },
 };
 
 const AUX_MODELS = {
@@ -54,11 +54,12 @@ function findFile(dir, patterns) {
   return null;
 }
 
-// Hittar encoder/decoder/tokens för en whisper-modell. Föredrar int8 (mindre och snabbare på CPU).
+// Hittar encoder/decoder/tokens för en whisper-modell. Föredrar full precision (bättre svenska),
+// int8 används bara om fp32-filerna saknas.
 function whisperFiles(modelsDir, name) {
   const dir = whisperDir(modelsDir, name);
-  const encoder = findFile(dir, [/-encoder\.int8\.onnx$/, /-encoder\.onnx$/]);
-  const decoder = findFile(dir, [/-decoder\.int8\.onnx$/, /-decoder\.onnx$/]);
+  const encoder = findFile(dir, [/-encoder\.onnx$/, /-encoder\.int8\.onnx$/]);
+  const decoder = findFile(dir, [/-decoder\.onnx$/, /-decoder\.int8\.onnx$/]);
   const tokens = findFile(dir, [/-tokens\.txt$/]);
   if (!encoder || !decoder || !tokens) return null;
   return { encoder, decoder, tokens };
@@ -129,10 +130,10 @@ async function installWhisper(modelsDir, name, onProgress) {
   if (onProgress) onProgress({ phase: 'extract' });
   await extractTarBz2(archive, modelsDir);
   fs.rmSync(archive, { force: true });
-  // Ta bort fp32-varianter om int8 finns, för att spara plats.
+  // Behåll full precision, ta bort int8-varianten och testfiler för att spara plats.
   const dir = whisperDir(modelsDir, name);
   for (const f of fs.readdirSync(dir)) {
-    if (/-(encoder|decoder)\.onnx$/.test(f) && fs.existsSync(path.join(dir, f.replace('.onnx', '.int8.onnx')))) {
+    if (/-(encoder|decoder)\.int8\.onnx$/.test(f) && fs.existsSync(path.join(dir, f.replace('.int8.onnx', '.onnx')))) {
       fs.rmSync(path.join(dir, f));
     }
     if (f === 'test_wavs') fs.rmSync(path.join(dir, f), { recursive: true, force: true });
