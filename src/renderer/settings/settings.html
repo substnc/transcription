@@ -1,15 +1,14 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; script-src 'self'; connect-src 'none'">
 <title>Speak – Inställningar</title>
 <link rel="stylesheet" href="../shared.css">
 <style>
-  .model { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
-  .model input[type=radio] { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0 8px 0 0; border: 1.5px solid var(--text); border-radius: 50%; vertical-align: -3px; display: inline-grid; place-items: center; }
+  .model { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; }
+  .model input[type=radio] { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0 8px 0 0; border: 1px solid var(--text); border-radius: 50%; vertical-align: -3px; display: inline-grid; place-items: center; }
   .model input[type=radio]:checked::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--text); }
   .model input[type=radio]:disabled { opacity: .35; }
-  .perm { padding: 12px 0; border-bottom: 1px solid var(--line); }
-  .perm:last-of-type { border-bottom: 0; }
+  .perm { padding: 10px 0; }
   section.card h2 { margin-bottom: 4px; }
   .model:last-child { border-bottom: 0; }
   .model .name { font-weight: 600; }
@@ -19,8 +18,8 @@
 </style></head>
 <body>
 <div class="drag"></div>
-<div class="label">sub.stnc® Speak</div>
-<h1>Inställningar</h1>
+<img class="brand" src="../../../assets/substnc-logo.svg" alt="sub.stnc®">
+<h1>Inställningar.</h1>
 <p class="sub">Allt körs på den här datorn. Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>
 
 <section class="card">

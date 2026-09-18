@@ -1,17 +1,18 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
 <style>
-  html, body { margin: 0; background: transparent; overflow: hidden; font-family: -apple-system, system-ui, sans-serif; -webkit-user-select: none; }
-  .pill { display: flex; align-items: center; gap: 10px; margin: 4px auto; width: max-content; max-width: 210px; height: 36px; padding: 0 18px 0 14px;
-    border-radius: 999px; background: rgba(28, 27, 24, 0.94); border: 1px solid #2A2925; color: #F2EFE8; font-size: 13px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #E05A3C; flex: none; }
+  @import url("../fonts/fonts.css");
+  html, body { margin: 0; background: transparent; overflow: hidden; font-family: 'Inter', -apple-system, system-ui, sans-serif; -webkit-user-select: none; }
+  .pill { display: flex; align-items: center; gap: 12px; margin: 4px auto; width: max-content; max-width: 210px; height: 36px; padding: 0 18px 0 14px;
+    background: #0A0A0A; color: #BBB2AB; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 8px; height: 8px; background: #BBB2AB; flex: none; }
   .listening .dot { animation: pulse 1s ease-in-out infinite; }
-  .processing .dot { background: transparent; border: 2px solid #8E8A80; border-top-color: #F2EFE8; box-sizing: border-box; width: 12px; height: 12px; animation: spin .9s linear infinite; }
-  .done .dot { background: #5DBA5D; }
-  .error .dot { background: #E05A3C; }
-  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.6); opacity: .5 } }
-  @keyframes spin { to { transform: rotate(360deg) } }
+  .processing .dot { animation: blink .7s steps(2) infinite; }
+  .done .dot, .error .dot { background: #BBB2AB; }
+  .error { background: #642828; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.5); opacity: .5 } }
+  @keyframes blink { to { opacity: 0 } }
 </style></head>
 <body><div id="pill" class="pill listening"><span class="dot"></span><span id="text">Lyssnar…</span></div>
 <script src="overlay.js"></script></body></html>

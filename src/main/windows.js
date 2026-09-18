@@ -8,7 +8,7 @@ const PRELOAD = R('preload.js');
 function base(extra = {}) {
   return {
     show: false,
-    backgroundColor: '#121210',
+    backgroundColor: '#BBB2AB',
     webPreferences: { preload: PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: false, backgroundThrottling: false },
     ...extra,
   };

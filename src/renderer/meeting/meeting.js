@@ -134,7 +134,6 @@ function showResult(r) {
   const d = new Date(state.startedAt || Date.now());
   $('meta').textContent = `${d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })} · ${fmt(r.durationSec)} · ${r.speakers.length} talare · ${(r.languages || []).join(', ') || '–'} · ${r.model}`;
   renderSpeakers();
-  renderTimeline();
   renderSegments();
   fillSummary(r.summary);
   renderInboxes();
@@ -151,6 +150,7 @@ function renderSpeakers() {
     const dot = document.createElement('span');
     dot.className = 'dot';
     dot.style.background = speakerColor(s);
+    dot.style.width = '12px'; dot.style.height = '12px';
     const input = document.createElement('input');
     input.type = 'text';
     input.value = state.speakerNames[s];
@@ -166,43 +166,6 @@ function renderSpeakers() {
   el.appendChild(span);
 }
 
-// Tidslinje: ett block per segment, bredd efter längd, färg efter talare. Klick hoppar till raden.
-function renderTimeline() {
-  const el = $('timeline');
-  el.innerHTML = '';
-  const total = Math.max(1, state.result.durationSec);
-  let cursor = 0;
-  state.result.segments.forEach((seg, i) => {
-    if (seg.start > cursor + 0.5) {
-      const gap = document.createElement('i');
-      gap.style.flexGrow = String(seg.start - cursor);
-      gap.style.background = 'transparent';
-      gap.style.cursor = 'default';
-      el.appendChild(gap);
-    }
-    const b = document.createElement('i');
-    b.style.flexGrow = String(Math.max(0.5, seg.end - seg.start));
-    b.style.background = speakerColor(seg.speaker);
-    b.title = `${fmt(seg.start)} ${state.speakerNames[seg.speaker] || seg.speaker}`;
-    b.onclick = () => {
-      const row = document.querySelector(`.seg[data-i="${i}"]`);
-      if (!row) return;
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      row.classList.add('flash');
-      setTimeout(() => row.classList.remove('flash'), 1200);
-    };
-    el.appendChild(b);
-    cursor = Math.max(cursor, seg.end);
-  });
-  if (cursor < total - 0.5) {
-    const tail = document.createElement('i');
-    tail.style.flexGrow = String(total - cursor);
-    tail.style.background = 'transparent';
-    tail.style.cursor = 'default';
-    el.appendChild(tail);
-  }
-}
-
 function renderSegments() {
   const el = $('segments');
   el.innerHTML = '';
@@ -211,14 +174,20 @@ function renderSegments() {
     row.className = 'seg';
     row.dataset.i = String(i);
     const t = document.createElement('div'); t.className = 't'; t.textContent = fmt(seg.start);
+    // Vertikal tidsaxel: en färgad stapel per replik, höjd efter längd.
+    const lane = document.createElement('div'); lane.className = 'lane';
+    lane.style.background = speakerColor(seg.speaker);
+    lane.style.minHeight = `${Math.max(44, Math.min(160, Math.round((seg.end - seg.start) * 6)))}px`;
+    lane.title = `${fmt(seg.start)} – ${fmt(seg.end)}`;
+    const body = document.createElement('div'); body.className = 'body';
     const sp = document.createElement('div'); sp.className = 'sp';
-    const dot = document.createElement('span'); dot.className = 'dot'; dot.style.width = '7px'; dot.style.height = '7px'; dot.style.background = speakerColor(seg.speaker);
     const name = document.createElement('span'); name.textContent = state.speakerNames[seg.speaker] || seg.speaker;
-    sp.append(dot, name);
+    sp.append(name);
     if (seg.lang) { const l = document.createElement('span'); l.className = 'lang'; l.textContent = seg.lang; sp.appendChild(l); }
-    const ta = document.createElement('textarea'); ta.value = seg.text; ta.rows = Math.max(1, Math.ceil(seg.text.length / 90));
+    const ta = document.createElement('textarea'); ta.value = seg.text; ta.rows = Math.max(1, Math.ceil(seg.text.length / 80));
     ta.oninput = () => (state.result.segments[i].text = ta.value);
-    row.append(t, sp, ta);
+    body.append(sp, ta);
+    row.append(t, lane, body);
     el.appendChild(row);
   });
 }
@@ -252,7 +221,7 @@ $('btnCopy').onclick = async () => {
   $('btnCopy').textContent = 'Kopierat';
   setTimeout(() => ($('btnCopy').textContent = 'Kopiera som text'), 1200);
 };
-$('btnSaveTop').onclick = () => document.querySelector('#result .card:last-of-type').scrollIntoView({ behavior: 'smooth' });
+$('btnSaveTop').onclick = () => $('btnSave').click();
 
 // ---- Spara ----
 async function renderInboxes() {
