@@ -1,5 +1,5 @@
 'use strict';
-// Diktera: menyradsapp för lokal diktering och mötestranskribering.
+// sub.stnc® - Speak: menyradsapp för lokal diktering och mötestranskribering.
 const { app, Tray, Menu, nativeImage, ipcMain, dialog, shell, systemPreferences, Notification, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -16,7 +16,12 @@ const { WHISPER_MODELS } = require('../engine/models');
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
+// Appen hette Diktera tidigare. Flytta med modeller och inställningar om de ligger kvar under det gamla namnet.
 const userData = app.getPath('userData');
+try {
+  const oldData = path.join(path.dirname(userData), 'Diktera');
+  if (!fs.existsSync(userData) && fs.existsSync(oldData)) fs.renameSync(oldData, userData);
+} catch (e) { console.error('Kunde inte flytta gamla data:', e.message); }
 const settings = new Settings(path.join(userData, 'settings.json'));
 const modelsDir = process.env.DIKTERA_MODELS_DIR || path.join(userData, 'models');
 const recordingsDir = path.join(userData, 'recordings');
@@ -284,7 +289,7 @@ function buildTray() {
   if (!tray) {
     try {
       tray = new Tray(trayIcon());
-      tray.setToolTip('Diktera');
+      tray.setToolTip('sub.stnc® - Speak');
     } catch (e) {
       console.error('Kunde inte skapa menyradsikon:', e.message);
       return;
@@ -302,7 +307,7 @@ function buildTray() {
     { label: `Modell: whisper-${s.whisper}`, enabled: false },
     { label: `Allt körs lokalt${s.useLlm && s.ollamaModel ? ` · Ollama: ${s.ollamaModel}` : ''}`, enabled: false },
     { type: 'separator' },
-    { label: 'Avsluta Diktera', role: 'quit' },
+    { label: 'Avsluta Speak', role: 'quit' },
   ]);
   tray.setContextMenu(menu);
 }
@@ -312,7 +317,7 @@ async function firstRunCheck() {
   const s = settings.get();
   if (!st.whisper[s.whisper] || !st.whisper[s.whisper].installed || !st.aux.vad.installed) {
     openSettings();
-    notify('Diktera behöver modeller', 'Ladda ner en whisper-modell och röstdetektorn i Inställningar innan du kan diktera.');
+    notify('Speak behöver modeller', 'Ladda ner en whisper-modell och röstdetektorn i Inställningar innan du kan diktera.');
   } else {
     engine.call('warmup').catch((e) => console.error('warmup', e.message));
   }
@@ -348,7 +353,7 @@ app.whenReady().then(async () => {
   await firstRunCheck();
 
   engine.on('exit', () => {
-    notify('Diktera', 'Transkriberingsmotorn startade om.');
+    notify('Speak', 'Transkriberingsmotorn startade om.');
     engine.start().then(() => engine.call('init', engineSettings())).catch(console.error);
   });
 });

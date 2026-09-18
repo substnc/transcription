@@ -43,14 +43,14 @@ function positionOverlay(w) {
 }
 
 function createMeeting() {
-  const w = new BrowserWindow(base({ width: 1000, height: 780, minWidth: 760, minHeight: 560, title: 'Diktera – Mötesläge', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
+  const w = new BrowserWindow(base({ width: 1000, height: 780, minWidth: 760, minHeight: 560, title: 'Speak – Mötesläge', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
   w.loadFile(R('meeting', 'meeting.html'));
   w.once('ready-to-show', () => w.show());
   return w;
 }
 
 function createSettings() {
-  const w = new BrowserWindow(base({ width: 700, height: 820, minWidth: 580, minHeight: 500, title: 'Diktera – Inställningar', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
+  const w = new BrowserWindow(base({ width: 700, height: 820, minWidth: 580, minHeight: 500, title: 'Speak – Inställningar', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
   w.loadFile(R('settings', 'settings.html'));
   w.once('ready-to-show', () => w.show());
   return w;

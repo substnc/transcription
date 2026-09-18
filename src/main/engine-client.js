@@ -19,7 +19,7 @@ class EngineClient extends EventEmitter {
   start() {
     if (this.proc) return this.ready;
     const entry = path.join(__dirname, '..', 'engine', 'server.js');
-    this.proc = utilityProcess.fork(entry, [], { serviceName: 'diktera-engine', stdio: 'pipe' });
+    this.proc = utilityProcess.fork(entry, [], { serviceName: 'speak-engine', stdio: 'pipe' });
     // Allt motorn skriver hamnar i en loggfil så att krascher går att felsöka.
     if (this.logFile) {
       fs.mkdirSync(path.dirname(this.logFile), { recursive: true });

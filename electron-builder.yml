@@ -1,5 +1,6 @@
-appId: se.substnc.diktera
-productName: Diktera
+appId: se.substnc.speak
+productName: sub.stnc® - Speak
+artifactName: Speak-${version}-${arch}.${ext}
 copyright: sub.stnc
 directories:
   output: dist
@@ -28,8 +29,8 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     LSUIElement: true
-    NSMicrophoneUsageDescription: Diktera behöver mikrofonen för att transkribera ditt tal lokalt på datorn.
-    NSAppleEventsUsageDescription: Diktera använder System Events för att klistra in dikterad text med ⌘V.
+    NSMicrophoneUsageDescription: Speak behöver mikrofonen för att transkribera ditt tal lokalt på datorn.
+    NSAppleEventsUsageDescription: Speak använder System Events för att klistra in dikterad text med ⌘V.
 dmg:
   writeUpdateInfo: false
 publish: null

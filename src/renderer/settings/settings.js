@@ -145,7 +145,7 @@ async function renderLlm() {
   if (!S.ollamaModel && st.models[0]) api.settings.set({ ollamaModel: st.models[0] });
 }
 $('btnLlmRefresh').onclick = renderLlm;
-$('ollamaLink').onclick = (e) => { e.preventDefault(); alert('Ollama laddas ner från ollama.com. Diktera öppnar inga webbsidor själv.'); };
+$('ollamaLink').onclick = (e) => { e.preventDefault(); alert('Ollama laddas ner från ollama.com. Speak öppnar inga webbsidor själv.'); };
 
 // ---- Inkorgar ----
 function renderInboxes() {

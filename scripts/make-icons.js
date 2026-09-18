@@ -86,12 +86,12 @@ function appIcon(x, y, s) {
 fs.writeFileSync(path.join(out, 'icon.png'), png(1024, appIcon));
 
 // Vektorlogotyp: märke + ordmärke
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="96" viewBox="0 0 360 96">
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="96" viewBox="0 0 360 96">
   <rect x="0" y="0" width="96" height="96" rx="20" fill="#121210"/>
   <rect x="26.4" y="35" width="8" height="26" rx="4" fill="#F2EFE8"/>
   <rect x="44" y="22" width="8" height="52" rx="4" fill="#E05A3C"/>
   <rect x="61.6" y="29" width="8" height="38" rx="4" fill="#F2EFE8"/>
-  <text x="120" y="66" font-family="'Instrument Serif', Georgia, serif" font-size="56" fill="#121210">Diktera</text>
+  <text x="120" y="66" font-family="'Instrument Serif', Georgia, serif" font-size="56" fill="#121210">Speak</text>
 </svg>
 `;
 fs.writeFileSync(path.join(out, 'logo.svg'), svg);

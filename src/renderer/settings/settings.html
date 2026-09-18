@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'none'">
-<title>Inställningar</title>
+<title>Speak – Inställningar</title>
 <link rel="stylesheet" href="../shared.css">
 <style>
   .model { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -19,7 +19,7 @@
 </style></head>
 <body>
 <div class="drag"></div>
-<div class="label">Diktera</div>
+<div class="label">sub.stnc® Speak</div>
 <h1>Inställningar</h1>
 <p class="sub">Allt körs på den här datorn. Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>
 
@@ -28,7 +28,7 @@
   <div class="perm"><span>Mikrofon</span><span class="row"><span class="chip" id="permMic">–</span><button id="btnMic">Be om åtkomst</button></span></div>
   <div class="perm"><span>Tillgänglighet (för ⌘V och håll-in-tangent)</span><span class="row"><span class="chip" id="permAcc">–</span><button id="btnAcc">Öppna systeminställningar</button></span></div>
   <div class="perm"><span>Inmatningsövervakning (håll-in-tangent)</span><span class="row"><span class="chip" id="permHook">–</span><button id="btnInput">Öppna systeminställningar</button></span></div>
-  <p class="status">Om håll-in-tangenten inte fungerar: ge Diktera Tillgänglighet och Inmatningsövervakning i Systeminställningar → Integritet och säkerhet, och starta om appen. Genvägen <span id="toggleShortcut"></span> fungerar alltid som av/på-knapp.</p>
+  <p class="status">Om håll-in-tangenten inte fungerar: ge Speak Tillgänglighet och Inmatningsövervakning i Systeminställningar → Integritet och säkerhet, och starta om appen. Genvägen <span id="toggleShortcut"></span> fungerar alltid som av/på-knapp.</p>
 </section>
 
 <section class="card">
@@ -73,7 +73,7 @@
 
 <section class="card">
   <h2>Allmänt</h2>
-  <label class="check"><input type="checkbox" id="launchAtLogin"> Starta Diktera när jag loggar in</label>
+  <label class="check"><input type="checkbox" id="launchAtLogin"> Starta Speak när jag loggar in</label>
   <div class="row" style="margin-top:8px"><button id="btnMeeting">Öppna mötesläge</button><button id="btnRecordings">Visa inspelningar</button><button id="btnLogs">Visa loggar</button></div>
 </section>
 <script src="settings.js"></script>

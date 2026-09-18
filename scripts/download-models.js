@@ -7,7 +7,7 @@ const models = require('../src/engine/models');
 
 const args = process.argv.slice(2);
 const dirIdx = args.indexOf('--dir');
-const modelsDir = dirIdx >= 0 ? args[dirIdx + 1] : path.join(os.homedir(), 'Library', 'Application Support', 'Diktera', 'models');
+const modelsDir = dirIdx >= 0 ? args[dirIdx + 1] : path.join(os.homedir(), 'Library', 'Application Support', 'sub.stnc® - Speak', 'models');
 const whisper = args.find((a) => models.WHISPER_MODELS[a]) || 'small';
 
 function bar(name) {

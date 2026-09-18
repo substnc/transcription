@@ -1,4 +1,4 @@
-# Diktera
+# sub.stnc® - Speak
 
 Lokal AI-diktering och mötestranskribering för Mac, som en app i menyraden.
 Håll in en tangent, prata, släpp. Texten städas och klistras in där markören står.
@@ -58,7 +58,7 @@ Första gången ber macOS om tre behörigheter. Alla behövs:
 3. **Inmatningsövervakning**: för att märka när du håller in tangenten.
 
 Om håll-in-tangenten inte reagerar: öppna Systeminställningar → Integritet och säkerhet,
-lägg till Diktera under både Tillgänglighet och Inmatningsövervakning, och starta om appen.
+lägg till Speak under både Tillgänglighet och Inmatningsövervakning, och starta om appen.
 
 ### Modeller
 
@@ -83,7 +83,7 @@ Installera [Ollama](https://ollama.com) och hämta en modell, till exempel:
 ollama pull qwen2.5:7b
 ```
 
-Diktera hittar den automatiskt och använder den för att städa dikterad text och
+Speak hittar den automatiskt och använder den för att städa dikterad text och
 sammanfatta möten. Utan Ollama används enkla regler, och sammanfattningen märks
 som automatisk grovsammanfattning.
 
@@ -92,13 +92,13 @@ som automatisk grovsammanfattning.
 Varje push bygger appen på GitHubs Mac-maskiner. Hämta den så här:
 
 1. Gå till fliken **Actions** i repot och öppna det senaste gröna bygget.
-2. Ladda ner artefakten **Diktera-arm64** längst ner på sidan (kräver att du är inloggad).
-3. Packa upp, öppna dmg:n och dra Diktera till Program.
+2. Ladda ner artefakten **Speak-arm64** längst ner på sidan (kräver att du är inloggad).
+3. Packa upp, öppna dmg:n och dra Speak till Program.
 
 Den är byggd för Apple Silicon (M1 och senare). Kör sedan en gång i Terminal:
 
 ```bash
-xattr -cr /Applications/Diktera.app
+xattr -cr "/Applications/sub.stnc® - Speak.app"
 ```
 
 Det behövs för att appen är osignerad. Annars säger macOS att den är skadad.
@@ -141,6 +141,6 @@ Motorn körs i en egen process så att appen aldrig hänger under transkribering
 
 ## Integritet
 
-- Ljud sparas som WAV i `~/Library/Application Support/Diktera/recordings` så att inget går förlorat om något kraschar. Kan stängas av i Inställningar.
+- Ljud sparas som WAV i `~/Library/Application Support/sub.stnc® - Speak/recordings` så att inget går förlorat om något kraschar. Kan stängas av i Inställningar.
 - Inga loggar innehåller transkriberad text.
 - Ingen telemetri, ingen uppdateringskontroll, inga externa anrop.

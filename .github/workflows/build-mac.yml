@@ -24,7 +24,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
       - uses: actions/upload-artifact@v4
         with:
-          name: Diktera-arm64
+          name: Speak-arm64
           path: |
             dist/*.dmg
             dist/*.zip
