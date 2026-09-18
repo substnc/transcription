@@ -8,6 +8,7 @@ const PRELOAD = R('preload.js');
 function base(extra = {}) {
   return {
     show: false,
+    backgroundColor: '#121210',
     webPreferences: { preload: PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: false, backgroundThrottling: false },
     ...extra,
   };
@@ -23,7 +24,7 @@ function createCapture() {
 // Liten "pill" som visar status vid diktering.
 function createOverlay() {
   const w = new BrowserWindow(base({
-    width: 220, height: 44, frame: false, transparent: true, alwaysOnTop: true, resizable: false, movable: false,
+    width: 220, height: 44, frame: false, transparent: true, backgroundColor: '#00000000', alwaysOnTop: true, resizable: false, movable: false,
     focusable: false, skipTaskbar: true, hasShadow: false, type: 'panel',
   }));
   w.setIgnoreMouseEvents(true);
@@ -42,14 +43,14 @@ function positionOverlay(w) {
 }
 
 function createMeeting() {
-  const w = new BrowserWindow(base({ width: 960, height: 760, minWidth: 720, minHeight: 520, title: 'Diktera – Mötesläge', titleBarStyle: 'hiddenInset' }));
+  const w = new BrowserWindow(base({ width: 1000, height: 780, minWidth: 760, minHeight: 560, title: 'Diktera – Mötesläge', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
   w.loadFile(R('meeting', 'meeting.html'));
   w.once('ready-to-show', () => w.show());
   return w;
 }
 
 function createSettings() {
-  const w = new BrowserWindow(base({ width: 680, height: 780, minWidth: 560, minHeight: 500, title: 'Diktera – Inställningar', titleBarStyle: 'hiddenInset' }));
+  const w = new BrowserWindow(base({ width: 700, height: 820, minWidth: 580, minHeight: 500, title: 'Diktera – Inställningar', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
   w.loadFile(R('settings', 'settings.html'));
   w.once('ready-to-show', () => w.show());
   return w;

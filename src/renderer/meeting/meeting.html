@@ -1,96 +1,106 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'none'">
 <title>Mötesläge</title>
 <link rel="stylesheet" href="../shared.css">
 <style>
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 10; }
-  .modal { background: var(--panel); border-radius: 14px; padding: 22px 24px; width: 460px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,.4); }
-  .modal ul { padding-left: 18px; margin: 8px 0 14px; }
-  .level { height: 10px; background: var(--chip); border-radius: 5px; overflow: hidden; flex: 1; }
-  .level > i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .1s; }
-  .timer { font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; min-width: 90px; }
-  .rec-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--bad); animation: pulse 1s infinite; }
-  @keyframes pulse { 50% { opacity: .35 } }
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .modal { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 26px 28px; width: 480px; max-width: 90vw; }
+  .modal ul { padding-left: 18px; margin: 8px 0 16px; }
+  .timer { font-family: var(--serif); font-size: 140px; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .bars { display: flex; align-items: flex-end; gap: 5px; height: 64px; }
+  .bars i { display: block; width: 4px; border-radius: 2px; background: var(--muted); height: 8px; transition: height .12s; }
+  .bars i.hot { background: var(--accent); }
+  .legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .legend .sp { display: flex; align-items: center; gap: 6px; }
+  .legend input { width: 130px; background: transparent; border: 0; border-bottom: 1px solid transparent; border-radius: 0; padding: 2px 0; font-weight: 600; }
+  .legend input:focus { border-bottom-color: var(--muted); }
+  .timeline { display: flex; gap: 3px; height: 10px; }
+  .timeline i { display: block; height: 100%; border-radius: 3px; min-width: 2px; cursor: pointer; opacity: .9; }
+  .timeline i:hover { opacity: 1; height: 14px; margin-top: -2px; }
+  .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .three textarea { background: transparent; border-color: transparent; padding: 0; min-height: 90px; font-size: 14px; color: var(--text); }
+  .three textarea:focus { border-color: var(--line); background: var(--soft); padding: 8px; }
   .segments { -webkit-user-select: text; }
-  .seg { display: grid; grid-template-columns: 62px 130px 1fr; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); align-items: start; }
+  .seg { display: grid; grid-template-columns: 52px 110px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: start; }
   .seg .t { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; padding-top: 3px; }
-  .seg .sp { font-weight: 600; font-size: 13px; padding-top: 2px; }
-  .seg .lang { font-size: 10px; color: var(--muted); margin-left: 4px; font-weight: 400; }
-  .seg textarea { min-height: 0; padding: 3px 6px; background: transparent; border-color: transparent; }
-  .seg textarea:focus { border-color: var(--line); background: var(--bg); }
-  .speakers { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-  .speakers label { margin: 0; }
-  .radio { display: flex; align-items: center; gap: 8px; margin: 6px 0; color: var(--text); }
-  .radio small { display: block; color: var(--muted); }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-  .steps .chip.active { background: var(--accent); color: #fff; }
+  .seg .sp { font-weight: 600; padding-top: 1px; display: flex; align-items: center; gap: 6px; }
+  .seg .sp .lang { font-size: 10px; color: var(--muted); font-weight: 400; }
+  .seg textarea { min-height: 0; padding: 0; background: transparent; border-color: transparent; border-radius: 0; }
+  .seg textarea:focus { border-bottom-color: var(--muted); }
+  .seg.flash { background: var(--soft); }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .steps .chip.active { background: var(--text); color: var(--bg); }
   .steps .chip.done { color: var(--ok); }
+  .hero { font-family: var(--serif); font-size: 60px; line-height: 1.05; margin: 0 0 10px; }
+  .hero em { font-style: italic; }
+  .titleinput { font-family: var(--serif); font-size: 24px; background: transparent; border: 0; border-bottom: 1px solid var(--text); border-radius: 0; padding: 8px 0; max-width: 520px; }
+  .titleinput:focus { border-bottom-color: var(--accent); }
+  .list .item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .list .item:last-child { border-bottom: 0; }
 </style></head>
 <body>
 <div class="drag"></div>
-<h1>Mötesläge</h1>
-<p class="sub">Spela in eller ladda upp ett möte. Allt transkriberas och sammanfattas lokalt på den här datorn.</p>
-<div id="errorBox" class="card hidden" style="border-color: var(--bad)"><div class="row between"><span id="errorText" style="color: var(--bad)"></span><button id="errorClose">Stäng</button></div></div>
+<div id="errorBox" class="card hidden" style="border-color: var(--accent)"><div class="row between"><span id="errorText" style="color: var(--accent)"></span><button id="errorClose" class="small">Stäng</button></div></div>
 
 <!-- Steg 1: start -->
-<section id="idle" class="card">
-  <div class="field"><label for="title">Mötets titel (valfritt)</label><input type="text" id="title" placeholder="t.ex. Kickoff Delicato"></div>
+<section id="idle">
+  <div class="label">Nytt möte</div>
+  <div class="hero">Vad ska vi <em>lyssna</em> på?</div>
+  <p class="sub">Spela in via mikrofonen eller ladda upp en fil. Talare, tidsstämplar och sammanfattning görs på den här datorn.</p>
+  <div class="field"><input type="text" id="title" class="titleinput" placeholder="Mötets titel"></div>
   <div class="row">
     <button class="primary" id="btnRecord">● Spela in</button>
-    <button id="btnUpload">Ladda upp ljudfil…</button>
-    <span class="status">Inspelning använder Mac-mikrofonen. Ljud från andra i ett videomöte fångas via högtalarna.</span>
+    <button id="btnUpload">Ladda upp fil</button>
+    <span class="status">Ljud från andra i ett videomöte fångas via högtalarna.</span>
   </div>
 </section>
 
 <!-- Steg 2: inspelning -->
-<section id="recording" class="card hidden">
-  <div class="row">
-    <span class="rec-dot"></span><span class="timer" id="timer">00:00</span>
-    <div class="level"><i id="level"></i></div>
+<section id="recording" class="hidden">
+  <div class="row"><span class="dot"></span><span class="label">Spelar in</span></div>
+  <div class="timer" id="timer">00:00</div>
+  <div class="bars" id="bars"></div>
+  <div class="row" style="margin-top: 28px">
     <button class="primary" id="btnStop">Stoppa och transkribera</button>
     <button id="btnCancel" class="danger">Avbryt</button>
+    <span class="status" style="margin-left: auto">Sparas löpande till fil så att inget går förlorat.</span>
   </div>
-  <p class="status" style="margin:10px 0 0">Ljudet sparas löpande till en lokal fil så att inget går förlorat om något går fel.</p>
 </section>
 
 <!-- Steg 3: bearbetning -->
-<section id="processing" class="card hidden">
+<section id="processing" class="hidden">
+  <h1>Arbetar…</h1>
   <div class="steps">
     <span class="chip" data-step="load">Laddar</span><span class="chip" data-step="convert">Konverterar</span>
     <span class="chip" data-step="diarize">Talare</span><span class="chip" data-step="transcribe">Transkriberar</span><span class="chip" data-step="summarize">Sammanfattar</span>
   </div>
   <div class="bar"><i id="progressBar"></i></div>
-  <p class="status" id="progressText" style="margin:8px 0 0">Startar…</p>
+  <p class="status" id="progressText" style="margin:10px 0 0">Startar…</p>
 </section>
 
 <!-- Steg 4: resultat -->
 <section id="result" class="hidden">
-  <div class="card">
-    <div class="row between"><h2 style="margin:0">Talare</h2><span class="status" id="meta"></span></div>
-    <p class="status">Döp om talarna. Namnen slår igenom i transkript och anteckning.</p>
-    <div class="speakers" id="speakers"></div>
+  <div class="row between" style="margin-bottom: 14px">
+    <div><h1 id="resultTitle">Möte</h1><div class="status" id="meta"></div></div>
+    <div class="row"><button id="btnCopy">Kopiera som text</button><button class="primary" id="btnSaveTop">Spara till Obsidian</button></div>
+  </div>
+  <div class="legend" id="speakers"></div>
+  <div class="timeline" id="timeline" style="margin: 14px 0 20px"></div>
+
+  <div class="three">
+    <div class="card"><div class="row between"><span class="label">Sammanfattning</span><button class="small" id="btnResummarize">Skapa om</button></div><textarea id="summary"></textarea><div class="status" id="summaryBy"></div></div>
+    <div class="card"><span class="label">Beslut</span><p class="status" style="margin:4px 0 6px">En per rad</p><textarea id="decisions"></textarea></div>
+    <div class="card"><span class="label">Att göra</span><p class="status" style="margin:4px 0 6px">En per rad, "uppgift @namn"</p><textarea id="todos"></textarea></div>
   </div>
 
-  <div class="card">
-    <div class="row between"><h2 style="margin:0">Sammanfattning</h2><div class="row"><span class="status" id="summaryBy"></span><button id="btnResummarize">Skapa om</button></div></div>
-    <div class="field" style="margin-top:10px"><label for="summary">Sammanfattning</label><textarea id="summary"></textarea></div>
-    <div class="two">
-      <div class="field"><label for="decisions">Beslut (en per rad)</label><textarea id="decisions"></textarea></div>
-      <div class="field"><label for="todos">Att göra (en per rad, "uppgift @namn")</label><textarea id="todos"></textarea></div>
-    </div>
-  </div>
+  <div class="label" style="margin: 10px 0 4px">Transkript</div>
+  <div class="segments" id="segments"></div>
 
-  <div class="card">
-    <h2>Transkript</h2>
-    <div class="segments" id="segments"></div>
-  </div>
-
-  <div class="card">
-    <h2>Spara som Obsidian-anteckning</h2>
-    <div id="inboxes"></div>
-    <div class="radio"><input type="radio" name="inbox" id="inboxCustom" value="custom"><label for="inboxCustom" style="margin:0">Annan mapp… <small id="customPath"></small></label><button id="btnChoose">Välj</button></div>
+  <div class="card" style="margin-top: 20px">
+    <span class="label">Spara till Obsidian</span>
+    <div id="inboxes" style="margin-top: 8px"></div>
+    <div class="radio"><input type="radio" name="inbox" id="inboxCustom" value="custom"><label for="inboxCustom">Annan mapp… <small id="customPath"></small></label><button class="small" id="btnChoose">Välj</button></div>
     <div class="row" style="margin-top:12px">
       <button class="primary" id="btnSave">Spara anteckning</button>
       <button id="btnNew">Nytt möte</button>
@@ -102,15 +112,16 @@
 <!-- Samtycke -->
 <div id="consent" class="modal-bg hidden">
   <div class="modal">
-    <h2>Innan du spelar in</h2>
-    <p>Berätta för alla i mötet att det spelas in och transkriberas. Ljud och text stannar på den här datorn, men de andra behöver ändå få veta och säga ja.</p>
+    <div class="label">Innan du spelar in</div>
+    <h2>Säg till alla i mötet.</h2>
+    <p>Berätta att det spelas in och transkriberas. Ljud och text stannar på den här datorn, men de andra behöver få veta och säga ja.</p>
     <ul>
       <li>Säg tydligt att inspelning startar.</li>
       <li>Fråga om någon har invändningar.</li>
       <li>Stoppa om någon säger nej.</li>
     </ul>
     <label class="check"><input type="checkbox" id="consentCheck"> Jag har informerat deltagarna och alla har sagt ja</label>
-    <div class="row" style="justify-content:flex-end;margin-top:14px">
+    <div class="row" style="justify-content:flex-end;margin-top:16px">
       <button id="consentCancel">Avbryt</button>
       <button class="primary" id="consentOk" disabled>Starta inspelning</button>
     </div>

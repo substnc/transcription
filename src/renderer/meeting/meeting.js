@@ -1,5 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const api = window.diktera;
+const SPEAKER_COLORS = ['var(--sp1)', 'var(--sp2)', 'var(--sp3)', 'var(--sp4)', 'var(--sp5)', 'var(--sp6)'];
 
 const state = { result: null, speakerNames: {}, customFolder: null, settings: null, audioPath: null, consent: false, startedAt: null };
 let timerHandle = null;
@@ -23,6 +24,28 @@ function fail(msg) {
 }
 $('errorClose').onclick = () => $('errorBox').classList.add('hidden');
 
+function speakerColor(name) {
+  const i = state.result ? state.result.speakers.indexOf(name) : 0;
+  return SPEAKER_COLORS[Math.max(0, i) % SPEAKER_COLORS.length];
+}
+
+// ---- Nivåmätare: 40 staplar som "rullar" ----
+const BAR_COUNT = 40;
+const levels = new Array(BAR_COUNT).fill(0);
+(function buildBars() {
+  const el = $('bars');
+  for (let i = 0; i < BAR_COUNT; i++) el.appendChild(document.createElement('i'));
+})();
+function pushLevel(level) {
+  levels.shift();
+  levels.push(level);
+  const bars = $('bars').children;
+  for (let i = 0; i < BAR_COUNT; i++) {
+    bars[i].style.height = `${8 + Math.round(levels[i] * 56)}px`;
+    bars[i].classList.toggle('hot', levels[i] > 0.6);
+  }
+}
+
 // ---- Samtycke ----
 $('btnRecord').onclick = () => {
   $('consentCheck').checked = false;
@@ -37,6 +60,7 @@ $('consentOk').onclick = async () => {
   try {
     state.audioPath = await api.meeting.start();
     state.startedAt = Date.now();
+    levels.fill(0);
     show('recording');
     timerHandle = setInterval(() => ($('timer').textContent = fmt((Date.now() - state.startedAt) / 1000)), 500);
   } catch (e) {
@@ -45,7 +69,7 @@ $('consentOk').onclick = async () => {
 };
 
 // ---- Inspelning ----
-api.meeting.onLevel(({ level }) => ($('level').style.width = `${Math.round(level * 100)}%`));
+api.meeting.onLevel(({ level }) => pushLevel(level));
 api.meeting.onError((msg) => fail('Mikrofonfel: ' + msg));
 
 $('btnStop').onclick = async () => {
@@ -53,8 +77,7 @@ $('btnStop').onclick = async () => {
   show('processing');
   setProgress({ phase: 'load', text: 'Laddar modeller…' });
   try {
-    const r = await api.meeting.stop();
-    showResult(r);
+    showResult(await api.meeting.stop());
   } catch (e) {
     fail('Transkriberingen misslyckades: ' + e.message);
   }
@@ -74,6 +97,7 @@ $('btnUpload').onclick = async () => {
     const r = await api.meeting.upload();
     if (!r) return show('idle');
     state.audioPath = r.wavPath;
+    state.startedAt = Date.now();
     showResult(r);
   } catch (e) {
     fail('Kunde inte läsa filen: ' + e.message);
@@ -106,8 +130,11 @@ api.meeting.onProgress(setProgress);
 function showResult(r) {
   state.result = r;
   state.speakerNames = Object.fromEntries(r.speakers.map((s) => [s, s]));
-  $('meta').textContent = `${fmt(r.durationSec)} · ${r.speakers.length} talare · språk: ${(r.languages || []).join(', ') || '–'} · ${r.model}`;
+  $('resultTitle').textContent = $('title').value.trim() || 'Möte';
+  const d = new Date(state.startedAt || Date.now());
+  $('meta').textContent = `${d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })} · ${fmt(r.durationSec)} · ${r.speakers.length} talare · ${(r.languages || []).join(', ') || '–'} · ${r.model}`;
   renderSpeakers();
+  renderTimeline();
   renderSegments();
   fillSummary(r.summary);
   renderInboxes();
@@ -120,13 +147,59 @@ function renderSpeakers() {
   el.innerHTML = '';
   for (const s of state.result.speakers) {
     const wrap = document.createElement('div');
+    wrap.className = 'sp';
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = speakerColor(s);
     const input = document.createElement('input');
     input.type = 'text';
     input.value = state.speakerNames[s];
     input.placeholder = s;
     input.oninput = () => { state.speakerNames[s] = input.value.trim() || s; renderSegments(); };
-    wrap.appendChild(input);
+    wrap.append(dot, input);
     el.appendChild(wrap);
+  }
+  const span = document.createElement('span');
+  span.className = 'status';
+  span.style.marginLeft = 'auto';
+  span.textContent = `00:00 – ${fmt(state.result.durationSec)}`;
+  el.appendChild(span);
+}
+
+// Tidslinje: ett block per segment, bredd efter längd, färg efter talare. Klick hoppar till raden.
+function renderTimeline() {
+  const el = $('timeline');
+  el.innerHTML = '';
+  const total = Math.max(1, state.result.durationSec);
+  let cursor = 0;
+  state.result.segments.forEach((seg, i) => {
+    if (seg.start > cursor + 0.5) {
+      const gap = document.createElement('i');
+      gap.style.flexGrow = String(seg.start - cursor);
+      gap.style.background = 'transparent';
+      gap.style.cursor = 'default';
+      el.appendChild(gap);
+    }
+    const b = document.createElement('i');
+    b.style.flexGrow = String(Math.max(0.5, seg.end - seg.start));
+    b.style.background = speakerColor(seg.speaker);
+    b.title = `${fmt(seg.start)} ${state.speakerNames[seg.speaker] || seg.speaker}`;
+    b.onclick = () => {
+      const row = document.querySelector(`.seg[data-i="${i}"]`);
+      if (!row) return;
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.add('flash');
+      setTimeout(() => row.classList.remove('flash'), 1200);
+    };
+    el.appendChild(b);
+    cursor = Math.max(cursor, seg.end);
+  });
+  if (cursor < total - 0.5) {
+    const tail = document.createElement('i');
+    tail.style.flexGrow = String(total - cursor);
+    tail.style.background = 'transparent';
+    tail.style.cursor = 'default';
+    el.appendChild(tail);
   }
 }
 
@@ -136,8 +209,12 @@ function renderSegments() {
   state.result.segments.forEach((seg, i) => {
     const row = document.createElement('div');
     row.className = 'seg';
+    row.dataset.i = String(i);
     const t = document.createElement('div'); t.className = 't'; t.textContent = fmt(seg.start);
-    const sp = document.createElement('div'); sp.className = 'sp'; sp.textContent = state.speakerNames[seg.speaker] || seg.speaker;
+    const sp = document.createElement('div'); sp.className = 'sp';
+    const dot = document.createElement('span'); dot.className = 'dot'; dot.style.width = '7px'; dot.style.height = '7px'; dot.style.background = speakerColor(seg.speaker);
+    const name = document.createElement('span'); name.textContent = state.speakerNames[seg.speaker] || seg.speaker;
+    sp.append(dot, name);
     if (seg.lang) { const l = document.createElement('span'); l.className = 'lang'; l.textContent = seg.lang; sp.appendChild(l); }
     const ta = document.createElement('textarea'); ta.value = seg.text; ta.rows = Math.max(1, Math.ceil(seg.text.length / 90));
     ta.oninput = () => (state.result.segments[i].text = ta.value);
@@ -169,6 +246,14 @@ function namedSegments() {
   return state.result.segments.map((s) => ({ ...s, speaker: state.speakerNames[s.speaker] || s.speaker }));
 }
 
+$('btnCopy').onclick = async () => {
+  const text = namedSegments().map((s) => `[${fmt(s.start)}] ${s.speaker}: ${s.text}`).join('\n');
+  await navigator.clipboard.writeText(text);
+  $('btnCopy').textContent = 'Kopierat';
+  setTimeout(() => ($('btnCopy').textContent = 'Kopiera som text'), 1200);
+};
+$('btnSaveTop').onclick = () => document.querySelector('#result .card:last-of-type').scrollIntoView({ behavior: 'smooth' });
+
 // ---- Spara ----
 async function renderInboxes() {
   state.settings = await api.settings.get();
@@ -180,7 +265,7 @@ async function renderInboxes() {
     const r = document.createElement('input');
     r.type = 'radio'; r.name = 'inbox'; r.value = String(i); r.id = `inbox${i}`;
     r.checked = i === state.settings.defaultInbox;
-    const l = document.createElement('label'); l.htmlFor = r.id; l.style.margin = '0';
+    const l = document.createElement('label'); l.htmlFor = r.id;
     l.textContent = ib.label;
     const small = document.createElement('small'); small.textContent = ib.path; l.appendChild(small);
     div.append(r, l);
@@ -220,8 +305,8 @@ $('btnSave').onclick = async () => {
   try {
     const p = await api.meeting.save(note, folder);
     $('saveStatus').innerHTML = '';
-    const a = document.createElement('button'); a.textContent = 'Visa i Finder'; a.onclick = () => api.open.folder(p);
-    const b = document.createElement('button'); b.textContent = 'Öppna i Obsidian'; b.onclick = () => api.open.path(p);
+    const a = document.createElement('button'); a.className = 'small'; a.textContent = 'Visa i Finder'; a.onclick = () => api.open.folder(p);
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = 'Öppna i Obsidian'; b.onclick = () => api.open.path(p);
     $('saveStatus').append(`Sparad: ${p.split('/').pop()} `, a, ' ', b);
   } catch (e) {
     $('saveStatus').textContent = 'Kunde inte spara: ' + e.message;

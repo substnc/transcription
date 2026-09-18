@@ -1,10 +1,16 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'none'">
 <title>Inställningar</title>
 <link rel="stylesheet" href="../shared.css">
 <style>
-  .model { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .model { display: grid; grid-template-columns: 110px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .model input[type=radio] { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0 8px 0 0; border: 1.5px solid var(--text); border-radius: 50%; vertical-align: -3px; display: inline-grid; place-items: center; }
+  .model input[type=radio]:checked::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--text); }
+  .model input[type=radio]:disabled { opacity: .35; }
+  .perm { padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .perm:last-of-type { border-bottom: 0; }
+  section.card h2 { margin-bottom: 4px; }
   .model:last-child { border-bottom: 0; }
   .model .name { font-weight: 600; }
   .model .note { font-size: 12px; color: var(--muted); }
@@ -13,6 +19,7 @@
 </style></head>
 <body>
 <div class="drag"></div>
+<div class="label">Diktera</div>
 <h1>Inställningar</h1>
 <p class="sub">Allt körs på den här datorn. Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>
 
@@ -26,7 +33,7 @@
 
 <section class="card">
   <h2>Diktering</h2>
-  <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+  <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px">
     <div class="field"><label for="hotkey">Tangent att hålla in</label><select id="hotkey"></select></div>
     <div class="field"><label for="hotkeyMode">Beteende</label><select id="hotkeyMode"><option value="hold">Håll in för att prata</option><option value="toggle">Tryck en gång för av/på</option></select></div>
     <div class="field"><label for="language">Språk</label><select id="language"><option value="auto">Svenska och engelska, även blandat</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
