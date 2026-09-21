@@ -47,7 +47,10 @@ jobs:
       - name: Exportera till ONNX
         run: |
           mkdir -p out/sherpa-onnx-whisper-kb-$SIZE && cd out/sherpa-onnx-whisper-kb-$SIZE
-          python ../../scripts/kb-whisper/export_onnx_sherpa.py --model kb-$SIZE --checkpoint ../../kb.pt
+          # Två körningar så att bara halva modellen ligger i minnet åt gången (byggservern har 7,8 GB).
+          python ../../scripts/kb-whisper/export_onnx_sherpa.py --model kb-$SIZE --checkpoint ../../kb.pt --part encoder
+          free -h
+          python ../../scripts/kb-whisper/export_onnx_sherpa.py --model kb-$SIZE --checkpoint ../../kb.pt --part decoder
           rm -f ../../kb.pt
           ls -la
       - name: Testkör i sherpa-onnx (svenskt tal från lokal TTS)

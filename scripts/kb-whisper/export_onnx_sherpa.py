@@ -38,6 +38,8 @@ from whisper.model import (
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=str, default=None, help="Lokal .pt-fil (t.ex. från hf_to_openai.py)")
+    parser.add_argument("--part", type=str, default="all", choices=["all", "encoder", "decoder"],
+                        help="Exportera bara en del: håller nere minnet för stora modeller")
     parser.add_argument(
         "--model",
         type=str,
@@ -301,6 +303,70 @@ def convert_tokens(name, model):
             f.write(f"{t} {i}\n")
 
 
+class PartialWhisper:
+    """Ser ut som whisper.model.Whisper för exportskriptet men håller bara encoder eller decoder i minnet."""
+
+    def __init__(self, checkpoint: str, part: str):
+        from whisper.model import AudioEncoder, TextDecoder, ModelDimensions
+        ckpt = torch.load(checkpoint, map_location="cpu", mmap=True, weights_only=True)
+        self.dims = ModelDimensions(**ckpt["dims"])
+        sd = ckpt["model_state_dict"]
+        self.device = torch.device("cpu")
+        self.encoder = None
+        self.decoder = None
+        if part == "encoder":
+            self.encoder = AudioEncoder(self.dims.n_mels, self.dims.n_audio_ctx, self.dims.n_audio_state, self.dims.n_audio_head, self.dims.n_audio_layer)
+            self.encoder.load_state_dict({k[len("encoder."):]: v.float() for k, v in sd.items() if k.startswith("encoder.")})
+            self.encoder.eval()
+            # Encoder-ONNX:en innehåller också decoderns cross-attention key/value-projektioner
+            # (sherpa räknar dem en gång per ljud). Ladda bara dem, inte hela decodern.
+            self.decoder = DecoderStub(self.dims.n_text_layer, self.dims.n_text_state)
+            self.decoder.load_state_dict({k[len("decoder."):]: v.float() for k, v in sd.items() if ".cross_attn.key." in k or ".cross_attn.value." in k})
+            self.decoder.eval()
+        else:
+            self.decoder = TextDecoder(self.dims.n_vocab, self.dims.n_text_ctx, self.dims.n_text_state, self.dims.n_text_head, self.dims.n_text_layer)
+            self.decoder.load_state_dict({k[len("decoder."):]: v.float() for k, v in sd.items() if k.startswith("decoder.")})
+            self.decoder.eval()
+        del sd, ckpt
+        for m in (self.encoder, self.decoder):
+            if m is not None:
+                for p in m.parameters():
+                    p.requires_grad_(False)
+
+    @property
+    def is_multilingual(self):
+        return self.dims.n_vocab >= 51865
+
+    @property
+    def num_languages(self):
+        return self.dims.n_vocab - 51765 - int(self.is_multilingual)
+
+    def eval(self):
+        return self
+
+    def parameters(self):
+        return (self.encoder if self.encoder is not None else self.decoder).parameters()
+
+
+class CrossKV(nn.Module):
+    def __init__(self, d):
+        super().__init__()
+        self.key = nn.Linear(d, d, bias=False)
+        self.value = nn.Linear(d, d, bias=True)
+
+
+class Block(nn.Module):
+    def __init__(self, d):
+        super().__init__()
+        self.cross_attn = CrossKV(d)
+
+
+class DecoderStub(nn.Module):
+    def __init__(self, n, d):
+        super().__init__()
+        self.blocks = nn.ModuleList([Block(d) for _ in range(n)])
+
+
 def load_model(name: str):
     """Load a Whisper model by name.
 
@@ -410,21 +476,13 @@ def main():
 
     opset_version = 17
 
-    model = whisper.load_model(args.checkpoint, device="cpu") if args.checkpoint else load_model(name)
+    part = args.part
+    if part != "all":
+        model = PartialWhisper(args.checkpoint, part)
+    else:
+        model = whisper.load_model(args.checkpoint, device="cpu") if args.checkpoint else load_model(name)
     print(model.dims)
-
-    print(
-        f"number of model parameters: {name}",
-        sum(p.numel() for p in model.parameters()),
-    )
-    print(
-        f"number of encoder parameters: {name}",
-        sum(p.numel() for p in model.encoder.parameters()),
-    )
-    print(
-        f"number of decoder parameters: {name}",
-        sum(p.numel() for p in model.decoder.parameters()),
-    )
+    print(f"number of parameters ({part}): {name}", sum(p.numel() for p in model.parameters()))
 
     convert_tokens(name=name, model=model)
 
@@ -448,9 +506,13 @@ def main():
     batch_size = 1
     assert mel.shape == (batch_size, n_mels, 30 * 100), mel.shape
 
-    encoder = AudioEncoderTensorCache(model.encoder, model.decoder)
-
-    n_layer_cross_k, n_layer_cross_v = encoder(mel)
+    if part == "decoder":
+        # Ingen encoder i minnet: cross-attention-tensorerna får rätt form men slumpat innehåll.
+        shape = (model.dims.n_text_layer, batch_size, model.dims.n_audio_ctx, model.dims.n_text_state)
+        n_layer_cross_k, n_layer_cross_v = torch.randn(shape), torch.randn(shape)
+    else:
+        encoder = AudioEncoderTensorCache(model.encoder, model.decoder)
+        n_layer_cross_k, n_layer_cross_v = encoder(mel)
     assert n_layer_cross_k.shape == (
         model.dims.n_text_layer,
         batch_size,
@@ -465,7 +527,7 @@ def main():
     ), (n_layer_cross_v.shape, model.dims)
 
     encoder_filename = f"{name}-encoder.onnx"
-    torch.onnx.export(
+    if part != "decoder": torch.onnx.export(
         encoder,
         mel,
         encoder_filename,
@@ -515,7 +577,11 @@ def main():
         "no_timestamps": tokenizer.no_timestamps,
     }
     print(f"encoder_meta_data: {encoder_meta_data}")
-    add_meta_data(filename=encoder_filename, meta_data=encoder_meta_data)
+    if part != "decoder": add_meta_data(filename=encoder_filename, meta_data=encoder_meta_data)
+    if part == "encoder":
+        print("Generate int8 quantization models")
+        quantize_dynamic(model_input=encoder_filename, model_output=f"{name}-encoder.int8.onnx", op_types_to_quantize=["MatMul"], weight_type=QuantType.QInt8)
+        return
 
     n_audio = mel.shape[0]
     tokens = torch.tensor([[tokenizer.sot, tokenizer.sot, tokenizer.sot]] * n_audio).to(
@@ -623,13 +689,14 @@ def main():
 
     print("Generate int8 quantization models")
 
-    encoder_filename_int8 = f"{name}-encoder.int8.onnx"
-    quantize_dynamic(
-        model_input=encoder_filename,
-        model_output=encoder_filename_int8,
-        op_types_to_quantize=["MatMul"],
-        weight_type=QuantType.QInt8,
-    )
+    if part == "all":
+        encoder_filename_int8 = f"{name}-encoder.int8.onnx"
+        quantize_dynamic(
+            model_input=encoder_filename,
+            model_output=encoder_filename_int8,
+            op_types_to_quantize=["MatMul"],
+            weight_type=QuantType.QInt8,
+        )
 
     decoder_filename_int8 = f"{name}-decoder.int8.onnx"
     quantize_dynamic(
