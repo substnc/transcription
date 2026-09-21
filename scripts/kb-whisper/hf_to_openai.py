@@ -46,15 +46,14 @@ def dims_from_config(c: WhisperConfig) -> dict:
     }
 
 
-def convert(model: WhisperForConditionalGeneration) -> dict:
+def convert(model: WhisperForConditionalGeneration, dtype=None) -> dict:
+    # Minnessnålt: inga kopior, tensorerna återanvänds. dtype=float16 halverar filen (som OpenAI:s egna .pt).
     sd = {}
     for k, v in model.state_dict().items():
         if k == "proj_out.weight":  # knuten till token_embedding i OpenAI-formatet
             continue
-        if "embed_positions" in k and k.startswith("model.encoder"):
-            # HF sparar sinus-positionerna som en parameter; OpenAI räknar ut dem. Samma värden, tas med ändå.
-            pass
-        sd[hf_key_to_openai(k)] = v.detach().clone().float()
+        t = v.detach()
+        sd[hf_key_to_openai(k)] = t.to(dtype) if dtype is not None else t
     return {"dims": dims_from_config(model.config), "model_state_dict": sd}
 
 
@@ -68,8 +67,10 @@ def main():
         sys.exit(f"Ingen config.json i {src}")
     if not list(src.glob("*.safetensors")):
         sys.exit("Bara safetensors accepteras (säkert format utan körbar kod)")
-    model = WhisperForConditionalGeneration.from_pretrained(str(src), use_safetensors=True, trust_remote_code=False)
-    ckpt = convert(model)
+    # Ladda i halvprecision utan att först skapa en tom fp32-modell: en tredjedel av minnet.
+    model = WhisperForConditionalGeneration.from_pretrained(str(src), use_safetensors=True, trust_remote_code=False,
+                                                            torch_dtype=torch.float16, low_cpu_mem_usage=True)
+    ckpt = convert(model, dtype=torch.float16)
     torch.save(ckpt, a.out)
     print(json.dumps(ckpt["dims"]), "->", a.out, f"({len(ckpt['model_state_dict'])} tensorer)")
 

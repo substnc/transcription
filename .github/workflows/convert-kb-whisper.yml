@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Frigör plats på byggservern
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL && df -h / | tail -1
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL && df -h / | tail -1 && free -h && nproc
       - name: Installera beroenden
         run: pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple -r scripts/kb-whisper/requirements.txt
       - name: Verifiera konverteraren (numerisk kontroll)
@@ -43,7 +43,7 @@ jobs:
       - name: Kontrollera licens
         run: python scripts/kb-whisper/verify_license.py hf
       - name: Konvertera till OpenAI-format
-        run: python scripts/kb-whisper/hf_to_openai.py --src hf --out kb.pt && rm -rf hf ~/.cache/huggingface
+        run: python scripts/kb-whisper/hf_to_openai.py --src hf --out kb.pt && rm -rf hf ~/.cache/huggingface && ls -la kb.pt && free -h
       - name: Exportera till ONNX
         run: |
           mkdir -p out/sherpa-onnx-whisper-kb-$SIZE && cd out/sherpa-onnx-whisper-kb-$SIZE
