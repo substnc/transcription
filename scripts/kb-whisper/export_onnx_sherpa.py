@@ -38,6 +38,7 @@ from whisper.model import (
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=str, default=None, help="Lokal .pt-fil (t.ex. från hf_to_openai.py)")
+    parser.add_argument("--no-int8", action="store_true", help="Hoppa över int8-varianterna (sparar minne för stora modeller)")
     parser.add_argument("--part", type=str, default="all", choices=["all", "encoder", "decoder"],
                         help="Exportera bara en del: håller nere minnet för stora modeller")
     parser.add_argument(
@@ -579,6 +580,8 @@ def main():
     print(f"encoder_meta_data: {encoder_meta_data}")
     if part != "decoder": add_meta_data(filename=encoder_filename, meta_data=encoder_meta_data)
     if part == "encoder":
+        if args.no_int8:
+            return
         print("Generate int8 quantization models")
         quantize_dynamic(model_input=encoder_filename, model_output=f"{name}-encoder.int8.onnx", op_types_to_quantize=["MatMul"], weight_type=QuantType.QInt8)
         return
@@ -687,6 +690,8 @@ def main():
     # Generate int8 quantization models
     # See https://onnxruntime.ai/docs/performance/model-optimizations/quantization.html#data-type-selection
 
+    if args.no_int8:
+        return
     print("Generate int8 quantization models")
 
     if part == "all":
