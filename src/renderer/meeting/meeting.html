@@ -45,6 +45,10 @@
   <div class="hero">Nytt möte.</div>
   <p class="sub">Spela in eller ladda upp. Talare, tidsstämplar och sammanfattning görs på den här datorn.</p>
   <div class="field"><input type="text" id="title" class="titleinput" placeholder="Mötets titel"></div>
+  <div class="row" style="gap: 32px; align-items: flex-end; margin-bottom: 8px">
+    <div class="field" style="width: 260px; margin: 0"><label for="language">Språk i mötet</label><select id="language"><option value="">Som i Inställningar</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option><option value="auto">Svenska och engelska</option></select></div>
+    <div class="field" style="width: 220px; margin: 0"><label for="speakerCount">Antal talare, om du vet</label><input type="text" id="speakerCount" placeholder="t.ex. 25" inputmode="numeric"></div>
+  </div>
   <div class="row">
     <button class="primary" id="btnRecord">Spela in</button>
     <button id="btnUpload">Ladda upp fil</button>

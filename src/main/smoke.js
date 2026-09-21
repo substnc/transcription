@@ -45,7 +45,7 @@ module.exports = async function smoke({ engine, openMeeting, openSettings, trans
       console.log('SMOKE diktering', JSON.stringify(d));
       if (!/deliver/i.test(d.text)) throw new Error('dikteringen gav fel text');
       console.log('SMOKE paste', await pasteText(d.text, { autoPaste: true, restoreClipboard: true }));
-      const r = await transcribeMeeting(process.env.DIKTERA_TEST_WAV);
+      const r = await transcribeMeeting(process.env.DIKTERA_TEST_WAV, { speakerCount: 2 });
       console.log('SMOKE möte', JSON.stringify({ speakers: r.speakers, segments: r.segments.length, languages: r.languages, by: r.summary.by }));
       if (r.speakers.length < 1 || !r.segments.length) throw new Error('transkriberingen gav inget');
       // Skicka resultatet till mötesfönstret och läs av att det renderas.

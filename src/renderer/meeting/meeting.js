@@ -16,6 +16,15 @@ function fmt(sec) {
   return h ? `${p(h)}:${p(m)}:${p(r)}` : `${p(m)}:${p(r)}`;
 }
 
+function speakerCount() {
+  const n = parseInt($('speakerCount').value, 10);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+function meetingOpts() {
+  return { speakerCount: speakerCount(), language: $('language').value || undefined };
+}
+
 function fail(msg) {
   clearInterval(timerHandle);
   $('errorText').textContent = msg;
@@ -77,7 +86,7 @@ $('btnStop').onclick = async () => {
   show('processing');
   setProgress({ phase: 'load', text: 'Laddar modeller…' });
   try {
-    showResult(await api.meeting.stop());
+    showResult(await api.meeting.stop(meetingOpts()));
   } catch (e) {
     fail('Transkriberingen misslyckades: ' + e.message);
   }
@@ -94,7 +103,7 @@ $('btnUpload').onclick = async () => {
   show('processing');
   setProgress({ phase: 'convert', text: 'Väljer fil…' });
   try {
-    const r = await api.meeting.upload();
+    const r = await api.meeting.upload(meetingOpts());
     if (!r) return show('idle');
     state.audioPath = r.wavPath;
     state.startedAt = Date.now();

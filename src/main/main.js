@@ -145,10 +145,12 @@ function stopMeetingRecording() {
   return { wavPath: p, seconds };
 }
 
-async function transcribeMeeting(wavPath) {
+async function transcribeMeeting(wavPath, opts = {}) {
   const s = settings.get();
+  const speakerCount = opts.speakerCount || 0;
+  const policy = { ...settings.policy(), ...(opts.language ? { language: opts.language } : {}) };
   sendToMeeting('meeting:progress', { phase: 'load', text: 'Laddar modeller…' });
-  const r = await engine.call('meeting', { wavPath, policy: settings.policy(), diarize: s.diarize }, (p) => sendToMeeting('meeting:progress', p));
+  const r = await engine.call('meeting', { wavPath, policy, diarize: s.diarize, speakerCount }, (p) => sendToMeeting('meeting:progress', p));
   sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
   const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
   return { ...r, summary, wavPath, model: `whisper-${s.whisper}` };
@@ -213,18 +215,18 @@ function registerIpc() {
 
   // Mötesläge
   ipcMain.handle('meeting:start', () => startMeetingRecording());
-  ipcMain.handle('meeting:stop', async () => {
+  ipcMain.handle('meeting:stop', async (_e, opts) => {
     const r = stopMeetingRecording();
     if (!r) throw new Error('Ingen inspelning pågår');
     if (r.seconds < 1) throw new Error('Inspelningen blev för kort');
-    return transcribeMeeting(r.wavPath);
+    return transcribeMeeting(r.wavPath, opts || {});
   });
   ipcMain.handle('meeting:cancel', () => {
     const r = stopMeetingRecording();
     if (r && !settings.get('keepRecordings')) fs.rmSync(r.wavPath, { force: true });
     return true;
   });
-  ipcMain.handle('meeting:upload', async () => {
+  ipcMain.handle('meeting:upload', async (_e, opts) => {
     const r = await dialog.showOpenDialog(meetingWin, {
       title: 'Välj ljud- eller videofil',
       properties: ['openFile'],
@@ -236,7 +238,7 @@ function registerIpc() {
     fs.mkdirSync(recordingsDir, { recursive: true });
     const out = path.join(recordingsDir, `upload-${Date.now()}.wav`);
     await convertToWav(input, out);
-    const result = await transcribeMeeting(out);
+    const result = await transcribeMeeting(out, opts || {});
     return { ...result, sourceFile: input };
   });
   ipcMain.handle('meeting:summarize', (_e, { segments }) => engine.call('summarize', { segments, useLlm: settings.get('useLlm') }));

@@ -36,9 +36,9 @@ contextBridge.exposeInMainWorld('diktera', {
   },
   meeting: {
     start: () => ipcRenderer.invoke('meeting:start'),
-    stop: () => ipcRenderer.invoke('meeting:stop'),
+    stop: (opts) => ipcRenderer.invoke('meeting:stop', opts),
     cancel: () => ipcRenderer.invoke('meeting:cancel'),
-    upload: () => ipcRenderer.invoke('meeting:upload'),
+    upload: (opts) => ipcRenderer.invoke('meeting:upload', opts),
     summarize: (segments) => ipcRenderer.invoke('meeting:summarize', { segments }),
     chooseFolder: () => ipcRenderer.invoke('meeting:choose-folder'),
     save: (note, folder) => ipcRenderer.invoke('meeting:save', { note, folder }),

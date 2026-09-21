@@ -3,13 +3,17 @@
 
 const path = require('path');
 const models = require('./models');
-const { turnsFromDiarization, relabelSpeakers, coalesce } = require('./merge');
+const { assignSpeakers, relabelSpeakers, coalesce } = require('./merge');
 const { isHallucination, tidy } = require('./cleanup');
 const audio = require('./audio');
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
 const MAX_CHUNK_SEC = 28; // whisper klarar 30 s per anrop
+// Talarseparering: högre tröskel = färre "nya" röster. 0.5 gav 50 talare i ett möte med 25.
+const DIARIZE_THRESHOLD = 0.85;
+// Stycken kortare än så här litar vi inte på för språkdetektering; de får huvudspråket.
+const MIN_AUTO_LANG_SEC = 3;
 
 // Ett trasigt modellfil får onnxruntime att avsluta hela processen. Kontrollera innan.
 function checkModelFile(file, label) {
@@ -95,8 +99,14 @@ class Pipeline {
     return this.vad;
   }
 
-  ensureDiarizer() {
-    if (this.diarizer) return this.diarizer;
+  ensureDiarizer(numClusters = -1) {
+    if (this.diarizer) {
+      if (numClusters !== this.diarizerClusters) {
+        this.diarizer.setConfig({ clustering: { numClusters, threshold: DIARIZE_THRESHOLD } });
+        this.diarizerClusters = numClusters;
+      }
+      return this.diarizer;
+    }
     const st = models.status(this.modelsDir);
     if (!st.aux.segmentation.installed || !st.aux.embedding.installed) throw new Error('Talarmodellerna är inte nedladdade. Öppna Inställningar.');
     checkModelFile(models.auxPath(this.modelsDir, 'segmentation'), 'Talarsegmentering');
@@ -105,10 +115,11 @@ class Pipeline {
     this.diarizer = new this.s.OfflineSpeakerDiarization({
       segmentation: { pyannote: { model: models.auxPath(this.modelsDir, 'segmentation') }, numThreads: this.numThreads, debug: 0, provider: 'cpu' },
       embedding: { model: models.auxPath(this.modelsDir, 'embedding'), numThreads: this.numThreads, debug: 0, provider: 'cpu' },
-      clustering: { numClusters: -1, threshold: 0.5 },
-      minDurationOn: 0.3,
-      minDurationOff: 0.5,
+      clustering: { numClusters, threshold: DIARIZE_THRESHOLD },
+      minDurationOn: 0.5,
+      minDurationOff: 0.8,
     });
+    this.diarizerClusters = numClusters;
     return this.diarizer;
   }
 
@@ -137,6 +148,7 @@ class Pipeline {
   decodeWithPolicy(samples, policy) {
     const { language = 'auto', allowed = ['sv', 'en'], primary = 'sv' } = policy || {};
     if (language !== 'auto') return this.decode(samples, language);
+    if (samples.length < MIN_AUTO_LANG_SEC * SAMPLE_RATE) return this.decode(samples, allowed.includes(primary) ? primary : allowed[0]);
     let r = this.decode(samples, 'auto');
     if (allowed.length && !allowed.includes(r.lang)) r = this.decode(samples, allowed.includes(primary) ? primary : allowed[0]);
     return r;
@@ -192,36 +204,50 @@ class Pipeline {
     return { text: segs.map((s) => s.text).join(' ').trim(), languages: langs, segments: segs };
   }
 
-  // Mötesläge: talarseparering först, sedan whisper per talartur.
-  meeting(input, { policy, diarize = true, onProgress } = {}) {
+  // Mötesläge: dela ljudet i naturliga talstycken (VAD), transkribera dem hela,
+  // och märk talare efteråt utifrån talarsepareringen. Hela stycken ger whisper
+  // sammanhang; korta talarturer gav hallucinationer.
+  meeting(input, { policy, diarize = true, speakerCount = 0, onProgress } = {}) {
     // Egen WAV-läsare: sherpas readWave ger externa buffertar som Electrons utility-process inte tillåter.
     const samples = typeof input === 'string' ? audio.readWav(input).samples : input;
     const durationSec = samples.length / SAMPLE_RATE;
-    console.error(`[motor] möte: ${durationSec.toFixed(1)} s ljud, talarseparering=${diarize}`);
-    let turns;
+    console.error(`[motor] möte: ${durationSec.toFixed(1)} s ljud, talarseparering=${diarize}, antal talare=${speakerCount || 'auto'}`);
+
+    let diar = [];
     if (diarize) {
       if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
-      const d = this.ensureDiarizer().process(samples);
-      turns = turnsFromDiarization(d);
+      diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
       if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
     }
-    if (!turns || !turns.length) turns = [{ start: 0, end: durationSec, speaker: 0 }];
 
+    const pieces = this.splitSpeech(samples);
     let segs = [];
-    turns.forEach((t, i) => {
-      const a = Math.max(0, Math.floor(t.start * SAMPLE_RATE));
-      const b = Math.min(samples.length, Math.ceil(t.end * SAMPLE_RATE));
-      if (b - a < SAMPLE_RATE * 0.3) return;
-      segs.push(...this.transcribeChunk(samples.subarray(a, b), {
-        policy, offset: a / SAMPLE_RATE, speaker: t.speaker, done: i, total: turns.length, onProgress,
-      }));
+    pieces.forEach((p, i) => {
+      const dur = p.samples.length / SAMPLE_RATE;
+      if (dur < 0.6) return; // för kort för att ge riktig text
+      const r = this.decodeWithPolicy(p.samples, policy);
+      const text = tidy(r.text);
+      if (!isHallucination(text) && !isJunk(text, r.lang, dur, policy)) {
+        segs.push({ start: p.start, end: p.start + dur, text, lang: r.lang, speaker: 0 });
+      }
+      if (onProgress) onProgress({ phase: 'transcribe', done: i + 1, total: pieces.length });
     });
-    segs.sort((x, y) => x.start - y.start);
+
+    if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
-    const merged = coalesce(labeled.segments);
+    const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
     return { segments: merged, speakers: labeled.speakers, languages, durationSec };
   }
+}
+
+// Kort stycke på "fel" språk med bara några ord är nästan alltid brus som whisper gissat på.
+function isJunk(text, lang, dur, policy) {
+  const primary = (policy && policy.primary) || 'sv';
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (lang !== primary && dur < 2 && words <= 3) return true;
+  if (words <= 1 && dur < 1.2) return true;
+  return false;
 }
 
 module.exports = { Pipeline, SAMPLE_RATE, audio, modelsDir: (base) => path.join(base, 'models') };

@@ -71,8 +71,8 @@ const methods = {
   },
 
   // Möte: wavPath -> segment med talare och tidsstämplar.
-  async meeting({ wavPath, policy, diarize }, id) {
-    const r = pipeline.meeting(wavPath, { policy, diarize, onProgress: (p) => send({ id, progress: p }) });
+  async meeting({ wavPath, policy, diarize, speakerCount }, id) {
+    const r = pipeline.meeting(wavPath, { policy, diarize, speakerCount, onProgress: (p) => send({ id, progress: p }) });
     return r;
   },
 
