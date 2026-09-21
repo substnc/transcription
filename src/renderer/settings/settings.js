@@ -13,8 +13,9 @@ async function load() {
   hk.value = S.hotkey;
   $('hotkeyMode').value = S.hotkeyMode;
   $('language').value = S.language;
-  $('primary').value = S.primary;
-  for (const id of ['autoPaste', 'restoreClipboard', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'useLlm', 'llmDictation', 'launchAtLogin']) $(id).checked = !!S[id];
+  $('vocabulary').value = S.vocabulary || '';
+  $('llmMode').value = !S.useLlm ? 'off' : S.llmDictation ? 'all' : 'meetings';
+  for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin']) $(id).checked = !!S[id];
   renderInboxes();
   await Promise.all([renderModels(), renderLlm(), renderPerms()]);
 }
@@ -28,8 +29,12 @@ function bindSimple(id, key, type = 'value') {
 bindSimple('hotkey', 'hotkey');
 bindSimple('hotkeyMode', 'hotkeyMode');
 bindSimple('language', 'language');
-bindSimple('primary', 'primary');
-for (const id of ['autoPaste', 'restoreClipboard', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'useLlm', 'llmDictation', 'launchAtLogin']) bindSimple(id, id, 'checked');
+bindSimple('vocabulary', 'vocabulary');
+for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin']) bindSimple(id, id, 'checked');
+$('llmMode').onchange = async () => {
+  const m = $('llmMode').value;
+  S = { ...S, ...(await api.settings.set({ useLlm: m !== 'off', llmDictation: m === 'all' })) };
+};
 $('ollamaModel').onchange = () => api.settings.set({ ollamaModel: $('ollamaModel').value });
 
 // ---- Behörigheter ----
@@ -66,8 +71,22 @@ function progressLine(key) {
   return `${(p.done / 1e6).toFixed(0)} MB`;
 }
 
+// Visar vilken motor den valda modellen körs med. Bra vid felsökning: "Metal" betyder whisper.cpp på grafikkretsen.
+async function renderEngine() {
+  const el = $('engineStatus');
+  try {
+    const info = await api.models.engineInfo();
+    if (info.ggml && info.whisperCli) { el.textContent = 'whisper.cpp på Metal'; el.className = 'chip ok'; }
+    else if (info.ggml) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; }
+    else { el.textContent = 'sherpa-onnx på CPU (ONNX-modell)'; el.className = 'chip warn'; }
+  } catch (e) {
+    el.textContent = 'Kunde inte läsa motorstatus: ' + e.message; el.className = 'chip bad';
+  }
+}
+
 async function renderModels() {
   const st = await api.models.status();
+  renderEngine();
   const wl = $('whisperList');
   wl.innerHTML = '';
   for (const [name, m] of Object.entries(st.whisper)) {
@@ -75,7 +94,7 @@ async function renderModels() {
     row.className = 'model';
     const left = document.createElement('div');
     const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'whisper'; radio.value = name; radio.checked = S.whisper === name; radio.disabled = !m.installed;
-    radio.onchange = async () => { S = await api.settings.set({ whisper: name }); };
+    radio.onchange = async () => { S = await api.settings.set({ whisper: name }); renderEngine(); };
     const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = ' ' + name;
     left.append(radio, nm);
     const mid = document.createElement('div');

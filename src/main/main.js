@@ -12,7 +12,6 @@ const { pasteText, accessibilityGranted } = require('./paste');
 const windows = require('./windows');
 const { WavWriter, convertToWav, concatFloat32 } = require('../engine/audio');
 const { buildMeetingNote } = require('../engine/markdown');
-const { WHISPER_MODELS } = require('../engine/models');
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -105,7 +104,7 @@ async function stopDictation() {
   overlay('processing', 'Bearbetar…');
   try {
     const s = settings.get();
-    const r = await engine.call('dictate', { samples, policy: settings.policy(), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands });
+    const r = await engine.call('dictate', { samples, policy: settings.policy(), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
     if (!r.text) return overlay('hidden');
     const how = await pasteText(r.text, { autoPaste: s.autoPaste, restoreClipboard: s.restoreClipboard });
     overlay('done', how === 'pasted' ? 'Inklistrat' : 'Kopierat till urklipp');
@@ -153,7 +152,7 @@ async function transcribeMeeting(wavPath, opts = {}) {
   const speakerCount = opts.speakerCount || 0;
   const policy = { ...settings.policy(), ...(opts.language ? { language: opts.language } : {}) };
   sendToMeeting('meeting:progress', { phase: 'load', text: 'Laddar modeller…' });
-  const r = await engine.call('meeting', { wavPath, policy, diarize: s.diarize, speakerCount }, (p) => sendToMeeting('meeting:progress', p));
+  const r = await engine.call('meeting', { wavPath, policy, diarize: s.diarize, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
   sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
   const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
   return { ...r, summary, wavPath, model: `whisper-${s.whisper}` };
@@ -186,7 +185,7 @@ function registerIpc() {
     else if (rec.mode === 'meeting') { stopMeetingRecording(); sendToMeeting('meeting:error', msg); }
   });
 
-  ipcMain.handle('settings:get', () => ({ ...settings.get(), keyLabels: KEY_LABELS, toggleShortcut: TOGGLE_SHORTCUT, whisperModels: WHISPER_MODELS, modelsDir, recordingsDir }));
+  ipcMain.handle('settings:get', () => ({ ...settings.get(), keyLabels: KEY_LABELS, toggleShortcut: TOGGLE_SHORTCUT, modelsDir, recordingsDir }));
   ipcMain.handle('settings:set', async (_e, patch) => {
     const before = settings.get();
     const after = settings.set(patch);

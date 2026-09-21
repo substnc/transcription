@@ -16,3 +16,45 @@ test('en obefintlig sökväg används aldrig', () => {
   const b = findBinary('/finns/inte');
   assert.ok(b === null || (typeof b === 'string' && b !== '/finns/inte'));
 });
+
+const { vocabularyPrompt, transcribeWav } = require('../src/engine/whispercpp');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+test('ordlistan blir en kort prompt utan dubbletter', () => {
+  assert.strictEqual(vocabularyPrompt(''), '');
+  assert.strictEqual(vocabularyPrompt(null), '');
+  assert.strictEqual(vocabularyPrompt('sub.stnc\nBerghs\n\n  Berghs \nsonic branding, Anthon'), 'sub.stnc, Berghs, sonic branding, Anthon.');
+  const long = Array.from({ length: 200 }, (_, i) => `Term${i}`).join('\n');
+  const p = vocabularyPrompt(long);
+  assert.ok(p.length <= 601, 'kapas till max 600 tecken');
+  assert.ok(p.startsWith('Term0, Term1'), 'de första orden behålls');
+});
+
+test('ordlistan skickas som --prompt till whisper-cli', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'speak-fake-'));
+  const fake = path.join(dir, 'whisper-cli');
+  // Låtsasbinär: sparar argumenten och skriver en tom JSON-transkribering till -of.
+  fs.writeFileSync(fake, `#!/bin/sh
+out=""
+prev=""
+for a in "$@"; do [ "$prev" = "-of" ] && out="$a"; prev="$a"; done
+printf '%s\\n' "$@" > "\${out}.args"
+echo '{"transcription":[{"offsets":{"from":0,"to":1000},"text":" hej"}]}' > "\${out}.json"
+`);
+  fs.chmodSync(fake, 0o755);
+  const model = path.join(dir, 'ggml-model.bin');
+  fs.writeFileSync(model, 'x');
+  const wav = path.join(dir, 'in.wav');
+  fs.writeFileSync(wav, 'x');
+  const segs = await transcribeWav(wav, { binary: fake, model, language: 'sv', prompt: 'Berghs, sub.stnc.' });
+  assert.deepStrictEqual(segs, [{ start: 0, end: 1, text: 'hej' }]);
+  const argsFile = fs.readdirSync(os.tmpdir()).find((f) => f.startsWith(`speak-${process.pid}-`) && f.endsWith('.args'));
+  assert.ok(argsFile, 'argumentfilen skrevs');
+  const args = fs.readFileSync(path.join(os.tmpdir(), argsFile), 'utf8').split('\n');
+  fs.rmSync(path.join(os.tmpdir(), argsFile));
+  assert.strictEqual(args[args.indexOf('--prompt') + 1], 'Berghs, sub.stnc.');
+  assert.strictEqual(args[args.indexOf('-l') + 1], 'sv');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

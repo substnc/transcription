@@ -37,10 +37,8 @@
     <div class="field"><label for="hotkey">Tangent att hålla in</label><select id="hotkey"></select></div>
     <div class="field"><label for="hotkeyMode">Beteende</label><select id="hotkeyMode"><option value="hold">Håll in för att prata</option><option value="toggle">Tryck en gång för av/på</option></select></div>
     <div class="field"><label for="language">Språk</label><select id="language"><option value="auto">Svenska och engelska, även blandat</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
-    <div class="field"><label for="primary">Huvudspråk vid osäkerhet</label><select id="primary"><option value="sv">Svenska</option><option value="en">Engelska</option></select></div>
   </div>
   <label class="check"><input type="checkbox" id="autoPaste"> Klistra in automatiskt där markören står (⌘V)</label>
-  <label class="check"><input type="checkbox" id="restoreClipboard"> Återställ urklippet efteråt</label>
   <label class="check"><input type="checkbox" id="voiceCommands"> Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph"</label>
   <div class="row" style="margin-top:8px"><button id="btnTest">Testa: spela in 3 sekunder</button><span class="status" id="testStatus"></span></div>
 </section>
@@ -48,8 +46,14 @@
 <section class="card">
   <h2>Taligenkänning (whisper)</h2>
   <p class="status">Alla modeller körs på grafikkretsen. KB-Whisper importeras från konverteringsjobbet i repot, turbo laddas ner direkt. Modellerna sparas i <code id="modelsDir"></code>.</p>
+  <div class="row"><span class="label">Motor</span><span class="chip" id="engineStatus">–</span></div>
   <div id="whisperList"></div>
   <div class="row" style="margin-top: 14px"><button id="btnImport">Importera modell</button><span class="status">Välj .tar.bz2-filen (eller en ggml-*.bin) från Actions → "Konvertera KB-Whisper".</span></div>
+  <div class="field" style="margin-top:18px">
+    <label for="vocabulary">Ordlista: namn och facktermer, ett per rad</label>
+    <textarea id="vocabulary" rows="5" placeholder="sub.stnc&#10;Berghs&#10;Anthon Bäckström&#10;sonic branding"></textarea>
+    <p class="status">Skickas med till whisper som ledtråd så att namn och ovanliga ord stavas rätt. Håll den kort, cirka 30–50 ord räcker. Bara de ord som faktiskt sägs behöver stå här.</p>
+  </div>
 </section>
 
 <section class="card">
@@ -64,8 +68,7 @@
 <section class="card">
   <h2>Textstädning och sammanfattning (Ollama)</h2>
   <p class="status">Om <a id="ollamaLink" href="#">Ollama</a> körs på datorn används en lokal språkmodell för att städa dikterad text och sammanfatta möten. Annars används enkla regler. Tips: <code>ollama pull qwen2.5:7b</code> eller <code>ollama pull gemma3:4b</code>.</p>
-  <label class="check"><input type="checkbox" id="useLlm"> Använd lokal språkmodell när den finns</label>
-  <label class="check"><input type="checkbox" id="llmDictation"> Även vid diktering (bättre städning, men några sekunder långsammare)</label>
+  <div class="field" style="max-width:420px"><label for="llmMode">Använd språkmodellen</label><select id="llmMode"><option value="all">För möten och diktering</option><option value="meetings">Bara för möten (snabbare diktering)</option><option value="off">Aldrig, använd bara regler</option></select></div>
   <div class="row" style="margin-top:8px">
     <span class="chip" id="llmStatus">–</span>
     <select id="ollamaModel" style="width:auto;min-width:220px"></select>

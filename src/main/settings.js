@@ -22,6 +22,7 @@ const DEFAULTS = {
   keepRecordings: true,
   diarize: true,
   captureSystemAudio: true, // ta med datorns ljud (videomöten) i mötesinspelningar
+  vocabulary: '', // ordlista: namn och facktermer, ett per rad, skickas som prompt till whisper
   inboxes: [
     { label: '01_CLAUDE_COWORK / 99_inbox', path: path.join(ICLOUD_OBSIDIAN, '01_CLAUDE_COWORK', '99_inbox') },
     { label: '02_CLAUDE_PRIVATE / 99_inbox', path: path.join(ICLOUD_OBSIDIAN, '02_CLAUDE_PRIVATE', '99_inbox') },

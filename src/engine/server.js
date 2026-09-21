@@ -8,6 +8,7 @@ const llm = require('./llm');
 const { heuristicSummary } = require('./summarize');
 const { transcriptAsText } = require('./markdown');
 const { cleanup } = require('./cleanup');
+const { vocabularyPrompt } = require('./whispercpp');
 
 let pipeline = null;
 let settings = {};
@@ -62,9 +63,10 @@ const methods = {
   },
 
   // Diktering: samples (Float32Array 16 kHz) -> städad text.
-  async dictate({ samples, policy, useLlm, voiceCommands }) {
+  async dictate({ samples, policy, useLlm, voiceCommands, vocabulary }) {
     const f32 = samples instanceof Float32Array ? samples : new Float32Array(samples);
-    const raw = pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy }) : pipeline.dictate(f32, { policy });
+    const prompt = vocabularyPrompt(vocabulary);
+    const raw = pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy, prompt }) : pipeline.dictate(f32, { policy });
     let text = cleanup(raw.text, { voiceCommands });
     let cleanedBy = 'rules';
     if (useLlm && text && settings.ollamaModel) {
@@ -79,10 +81,11 @@ const methods = {
   },
 
   // Möte: wavPath -> segment med talare och tidsstämplar.
-  async meeting({ wavPath, policy, diarize, speakerCount }, id) {
+  async meeting({ wavPath, policy, diarize, speakerCount, vocabulary }, id) {
     const onProgress = (p) => send({ id, progress: p });
+    const prompt = vocabularyPrompt(vocabulary);
     return pipeline.ggmlModel()
-      ? pipeline.meetingCpp(wavPath, { policy, diarize, speakerCount, onProgress })
+      ? pipeline.meetingCpp(wavPath, { policy, diarize, speakerCount, prompt, onProgress })
       : pipeline.meeting(wavPath, { policy, diarize, speakerCount, onProgress });
   },
 

@@ -15,6 +15,7 @@ modellfiler första gången.
 - Tangent och beteende (håll in eller tryck av/på) väljs i Inställningar. Genvägen ⌥⇧D fungerar alltid som av/på.
 - Texten städas: tvekljud bort, skiljetecken och versaler fixas. Med Ollama installerat gör en lokal språkmodell jobbet, annars enkla regler.
 - Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph".
+- Ordlista: skriv in namn och facktermer i Inställningar (ett per rad). De skickas med till whisper som ledtråd så att de stavas rätt, i både diktering och möten.
 
 **Mötesläge**
 - Spela in via mikrofonen, plus datorns eget ljud i videomöten (macOS 14.2+), eller ladda upp en ljud- eller videofil (mp3, m4a, wav, mp4 med flera).
@@ -72,6 +73,11 @@ Alla körs av whisper.cpp på grafikkretsen (Metal). Väljs i Inställningar.
 | turbo | 1,6 GB | OpenAI large-v3 turbo. Laddas ner automatiskt. Reserv. |
 
 Talarmodellerna (röstdetektor, talarsegmentering, röstavtryck, 50 MB) laddas ner med en knapp.
+
+Raden **Motor** i Inställningar visar vad den valda modellen körs med: "whisper.cpp på Metal" är rätt.
+Står det att whisper-cli saknas är appen byggd utan binären; hämta ett nyare bygge. Efter ett möte
+visas tiden det tog och hur många gånger snabbare än realtid det gick, både i mötesfönstret och i loggen
+(Inställningar → Visa loggar, sök på `[motor] klart`).
 
 **KB-Whisper** konverteras av ett GitHub-jobb: Actions → "Konvertera KB-Whisper" → välj storlek →
 ladda ner artefakten `kb-whisper-<storlek>-metal` (eller `-metal-q5`) → Inställningar →

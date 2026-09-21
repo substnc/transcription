@@ -19,6 +19,18 @@ function findBinary(explicit) {
   return candidates.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
 }
 
+// Ordlista -> prompt till whisper.cpp. Whisper tar prompten som "föregående text", så namn och
+// facktermer där gör att modellen stavar dem rätt. Ett ord per rad eller kommaseparerat.
+// Whisper läser bara de sista ~224 tokens, så listan kapas (från slutet) till en rimlig längd.
+const MAX_PROMPT_CHARS = 600;
+function vocabularyPrompt(text) {
+  const terms = String(text || '').split(/[\n,;]+/).map((t) => t.trim()).filter(Boolean);
+  const unique = [...new Set(terms)];
+  let out = unique.join(', ');
+  while (out.length > MAX_PROMPT_CHARS && unique.length > 1) { unique.pop(); out = unique.join(', '); }
+  return out ? out + '.' : '';
+}
+
 // Gör om whisper.cpp:s JSON till våra segment.
 function parseResult(json) {
   const list = (json && json.transcription) || [];
@@ -71,4 +83,4 @@ async function transcribeSamples(samples, opts) {
   }
 }
 
-module.exports = { findBinary, parseResult, transcribeWav, transcribeSamples };
+module.exports = { findBinary, parseResult, vocabularyPrompt, transcribeWav, transcribeSamples };

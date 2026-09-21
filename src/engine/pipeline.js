@@ -201,35 +201,43 @@ class Pipeline {
   }
 
   // ---- whisper.cpp-vägen (Metal) ----
-  async dictateCpp(samples, { policy } = {}) {
+  async dictateCpp(samples, { policy, prompt } = {}) {
     const { language = 'auto', primary = 'sv' } = policy || {};
-    const segs = await whispercpp.transcribeSamples(samples, { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads });
+    const t0 = Date.now();
+    const segs = await whispercpp.transcribeSamples(samples, { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt });
+    console.error(`[motor] diktering (whisper.cpp): ${(samples.length / SAMPLE_RATE).toFixed(1)} s ljud på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     const kept = segs.map((s) => ({ ...s, text: tidy(s.text), lang: language === 'auto' ? primary : language })).filter((s) => !isHallucination(s.text));
     return { text: kept.map((s) => s.text).join(' ').trim(), languages: [...new Set(kept.map((s) => s.lang))], segments: kept };
   }
 
-  async meetingCpp(input, { policy, diarize = true, speakerCount = 0, onProgress } = {}) {
+  async meetingCpp(input, { policy, diarize = true, speakerCount = 0, prompt, onProgress } = {}) {
     const wavPath = typeof input === 'string' ? input : null;
     const samples = wavPath ? audio.readWav(wavPath).samples : input;
     const durationSec = samples.length / SAMPLE_RATE;
     const { language = 'auto', primary = 'sv' } = policy || {};
     console.error(`[motor] möte (whisper.cpp): ${durationSec.toFixed(1)} s, språk=${language}, antal talare=${speakerCount || 'auto'}`);
+    const t0 = Date.now();
     let diar = [];
     if (diarize) {
       if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
       diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
       if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
     }
-    const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads,
+    const t1 = Date.now();
+    const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt,
       onProgress: onProgress ? (f) => onProgress({ phase: 'transcribe', done: f * 100, total: 100 }) : null };
     const raw = wavPath ? await whispercpp.transcribeWav(wavPath, opts) : await whispercpp.transcribeSamples(samples, opts);
+    const t2 = Date.now();
+    // Tidtagning för hastighetsmätning: syns i loggen och i mötesfönstret.
+    const timing = { diarizeSec: (t1 - t0) / 1000, transcribeSec: (t2 - t1) / 1000, totalSec: (t2 - t0) / 1000, speed: durationSec / Math.max(0.001, (t2 - t0) / 1000) };
+    console.error(`[motor] klart: talare ${timing.diarizeSec.toFixed(1)} s, whisper.cpp ${timing.transcribeSec.toFixed(1)} s, totalt ${timing.totalSec.toFixed(1)} s (${timing.speed.toFixed(1)}× realtid)`);
     let segs = raw.map((s) => ({ start: s.start, end: s.end, text: tidy(s.text), lang: language === 'auto' ? primary : language, speaker: 0 }))
       .filter((s) => s.text && !isHallucination(s.text) && !isJunk(s.text, s.lang, s.end - s.start, policy));
     if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
-    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'whisper.cpp' };
+    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'whisper.cpp', timing };
   }
 
   // Diktering: kort ljud, ingen talarseparering.
