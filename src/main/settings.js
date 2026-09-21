@@ -8,8 +8,8 @@ const ICLOUD_OBSIDIAN = path.join(os.homedir(), 'Library', 'Mobile Documents', '
 const DEFAULTS = {
   hotkey: 'AltRight', // håll in höger ⌥ för att diktera
   hotkeyMode: 'hold', // 'hold' eller 'toggle'
-  whisperSv: 'kb-large-metal', // modell för svenska och blandat tal
-  whisperEn: 'turbo-metal', // modell för helt engelska
+  whisperDictation: 'turbo-metal', // snabb modell för diktering
+  whisperMeeting: 'kb-large-metal', // noggrann modell för möten
   language: 'auto', // 'auto' | 'sv' | 'en'
   allowed: ['sv', 'en'],
   primary: 'sv',
@@ -39,9 +39,10 @@ class Settings {
     try {
       if (fs.existsSync(file)) {
         const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-        // Äldre inställningar hade en enda modell ("whisper"). Den blir svenskmodellen.
-        if (saved.whisper && !saved.whisperSv) saved.whisperSv = saved.whisper;
-        delete saved.whisper;
+        // Äldre inställningar: en enda modell ("whisper") eller per språk (whisperSv/whisperEn).
+        if (!saved.whisperMeeting && (saved.whisperSv || saved.whisper)) saved.whisperMeeting = saved.whisperSv || saved.whisper;
+        if (!saved.whisperDictation && saved.whisperEn) saved.whisperDictation = saved.whisperEn;
+        for (const k of ['whisper', 'whisperSv', 'whisperEn']) delete saved[k];
         this.data = { ...DEFAULTS, ...saved };
       }
     } catch (e) {
@@ -57,9 +58,9 @@ class Settings {
     fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
     return this.data;
   }
-  // Språket avgör modellen: engelska får sin egen, allt annat (svenska, blandat) får svenskmodellen.
-  modelFor(language) {
-    return language === 'en' ? this.data.whisperEn || this.data.whisperSv : this.data.whisperSv;
+  // Användningen avgör modellen: diktering ska vara snabb, möten noggranna.
+  modelFor(use) {
+    return use === 'dictation' ? this.data.whisperDictation || this.data.whisperMeeting : this.data.whisperMeeting || this.data.whisperDictation;
   }
   policy() {
     return { language: this.data.language, allowed: this.data.allowed, primary: this.data.primary };

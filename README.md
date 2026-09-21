@@ -63,17 +63,16 @@ lägg till Speak under både Tillgänglighet och Inmatningsövervakning, och sta
 
 ### Modeller
 
-Alla körs av whisper.cpp på grafikkretsen (Metal). Två modeller räcker, och språket du väljer
-avgör vilken som används: svenska och blandat tal går till svenskmodellen, helt engelska till
-engelskmodellen. Båda väljs i Inställningar.
+Alla körs av whisper.cpp på grafikkretsen (Metal). Två modeller räcker: en snabb för diktering
+och en noggrann för möten. Båda klarar svenska och engelska och väljs i Inställningar.
 
 | Modell | Storlek | Används för |
 |---|---|---|
-| KB-Whisper large | 3 GB | Svenska och blandat. Importeras från konverteringsjobbet. |
-| turbo | 1,6 GB | Engelska. OpenAI large-v3 turbo, laddas ner automatiskt. |
+| turbo | 1,6 GB | Diktering. OpenAI large-v3 turbo, snabb. Laddas ner automatiskt. |
+| KB-Whisper large | 3 GB | Möten. Noggrannast på svenska. Importeras från konverteringsjobbet. |
 
 Konverteringsjobbet kan även ge en komprimerad variant (`-metal-q5`) och medium; importerar du en
-sådan dyker den upp i listan och kan väljas för endera språket.
+sådan dyker den upp i listan och kan väljas för diktering eller möten.
 
 Talarmodellerna (röstdetektor, talarsegmentering, röstavtryck, 50 MB) laddas ner med en knapp.
 

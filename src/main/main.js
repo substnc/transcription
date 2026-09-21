@@ -45,7 +45,7 @@ function notify(title, body) {
 function engineSettings() {
   const s = settings.get();
   const whisperCli = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'whisper-cli') : path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-cli');
-  return { modelsDir, whisper: s.whisperSv, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
+  return { modelsDir, whisper: s.whisperDictation, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
 }
 
 async function ensureLlmModel() {
@@ -105,7 +105,7 @@ async function stopDictation() {
   try {
     const s = settings.get();
     const policy = settings.policy();
-    const r = await engine.call('dictate', { samples, policy, whisper: settings.modelFor(policy.language), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
+    const r = await engine.call('dictate', { samples, policy, whisper: settings.modelFor('dictation'), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
     if (!r.text) return overlay('hidden');
     const how = await pasteText(r.text, { autoPaste: s.autoPaste, restoreClipboard: s.restoreClipboard });
     overlay('done', how === 'pasted' ? 'Inklistrat' : 'Kopierat till urklipp');
@@ -153,7 +153,7 @@ async function transcribeMeeting(wavPath, opts = {}) {
   const speakerCount = opts.speakerCount || 0;
   const policy = { ...settings.policy(), ...(opts.language ? { language: opts.language } : {}) };
   sendToMeeting('meeting:progress', { phase: 'load', text: 'Laddar modeller…' });
-  const whisper = settings.modelFor(policy.language);
+  const whisper = settings.modelFor('meeting');
   const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
   sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
   const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
@@ -193,8 +193,8 @@ function registerIpc() {
     const after = settings.set(patch);
     if (patch.hotkey !== undefined || patch.hotkeyMode !== undefined) hotkey.restart({ hotkey: after.hotkey, hotkeyMode: after.hotkeyMode });
     if (patch.launchAtLogin !== undefined) app.setLoginItemSettings({ openAtLogin: !!patch.launchAtLogin });
-    if (patch.whisperSv !== undefined || patch.whisperEn !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
-    if (before.whisperSv !== after.whisperSv) engine.call('warmup').catch(() => {});
+    if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
+    if (before.whisperDictation !== after.whisperDictation) engine.call('warmup').catch(() => {});
     buildTray();
     return after;
   });
@@ -211,7 +211,7 @@ function registerIpc() {
     const r = await dialog.showOpenDialog(settingsWin, { title: 'Välj modellmapp eller .tar.bz2', properties: ['openFile', 'openDirectory'], filters: [{ name: 'Modell', extensions: ['bz2', 'tar'] }] });
     if (r.canceled || !r.filePaths.length) return null;
     const res = await engine.call('importWhisper', { sourcePath: r.filePaths[0] });
-    if (!settings.get('whisperSv')) settings.set({ whisperSv: res.name });
+    if (!settings.get('whisperMeeting')) settings.set({ whisperMeeting: res.name });
     await engine.call('configure', engineSettings());
     buildTray();
     return res;
@@ -333,7 +333,7 @@ function buildTray() {
     { label: 'Mötesläge…', click: openMeeting },
     { label: 'Inställningar och modeller…', click: openSettings },
     { type: 'separator' },
-    { label: `Svenska: ${s.whisperSv || '–'} · Engelska: ${s.whisperEn || s.whisperSv || '–'}`, enabled: false },
+    { label: `Diktering: ${settings.modelFor('dictation') || '–'} · Möten: ${settings.modelFor('meeting') || '–'}`, enabled: false },
     { label: `Allt körs lokalt${s.useLlm && s.ollamaModel ? ` · Ollama: ${s.ollamaModel}` : ''}`, enabled: false },
     { type: 'separator' },
     { label: 'Avsluta Speak', role: 'quit' },
@@ -344,7 +344,8 @@ function buildTray() {
 async function firstRunCheck() {
   const st = await engine.call('status');
   const s = settings.get();
-  if (!st.whisper[s.whisperSv] || !st.whisper[s.whisperSv].installed || !st.aux.vad.installed) {
+  const d = settings.modelFor('dictation');
+  if (!st.whisper[d] || !st.whisper[d].installed || !st.aux.vad.installed) {
     openSettings();
     notify('Speak behöver modeller', 'Importera KB-Whisper eller ladda ner turbo i Inställningar, och hämta talarmodellerna.');
   } else {

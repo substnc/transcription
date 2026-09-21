@@ -45,10 +45,10 @@
 
 <section class="card">
   <h2>Taligenkänning (whisper)</h2>
-  <p class="status">Språket du väljer avgör modellen. Svenska och blandat tal går till svenskmodellen, helt engelska till engelskmodellen. Modellerna sparas i <code id="modelsDir"></code>.</p>
+  <p class="status">En snabb modell för diktering, en noggrann för möten. Båda klarar svenska och engelska. Modellerna sparas i <code id="modelsDir"></code>.</p>
   <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px">
-    <div class="field"><label for="whisperSv">Svenska och blandat</label><select id="whisperSv"></select></div>
-    <div class="field"><label for="whisperEn">Engelska</label><select id="whisperEn"></select></div>
+    <div class="field"><label for="whisperDictation">Diktering (snabb)</label><select id="whisperDictation"></select></div>
+    <div class="field"><label for="whisperMeeting">Möten (noggrann)</label><select id="whisperMeeting"></select></div>
   </div>
   <div class="row"><span class="label">Motor</span><span class="chip" id="engineStatus">–</span></div>
   <div id="whisperList" style="margin-top:14px"></div>

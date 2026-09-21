@@ -10,12 +10,12 @@ const { spawn } = require('child_process');
 const RELEASES = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
 
 // Alla modeller körs av whisper.cpp på grafikkretsen (Metal). ggml-format i mappar whisper-cpp-<namn>.
-// Två i katalogen: KB-Whisper large för svenska (importeras från konverteringsjobbet) och
-// turbo för engelska (laddas ner automatiskt). Andra importerade modeller visas också.
+// Två i katalogen: turbo för diktering (snabb, laddas ner automatiskt) och KB-Whisper large
+// för möten (noggrannast på svenska, importeras från konverteringsjobbet). Importerade modeller visas också.
 const WHISPER_MODELS = {
-  'kb-large-metal': { size: '3 GB', note: 'KB-Whisper large. Bäst på svenska. Importeras.', manual: true, ggml: true },
-  'turbo-metal': { size: '1.6 GB', note: 'OpenAI whisper large-v3 turbo. För engelska. Laddas ner automatiskt.', ggml: true,
+  'turbo-metal': { size: '1.6 GB', note: 'OpenAI whisper large-v3 turbo. Snabb, för diktering. Laddas ner automatiskt.', ggml: true,
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin' },
+  'kb-large-metal': { size: '3 GB', note: 'KB-Whisper large. Noggrannast på svenska, för möten. Importeras.', manual: true, ggml: true },
 };
 
 const AUX_MODELS = {

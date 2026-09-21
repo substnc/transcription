@@ -76,19 +76,20 @@ async function renderEngine() {
   const el = $('engineStatus');
   try {
     const describe = (info) => (!info.installed ? 'inte installerad' : info.ggml ? 'Metal' : 'CPU (ONNX)');
-    const sv = await api.models.engineInfo(S.whisperSv);
-    const en = await api.models.engineInfo(S.whisperEn || S.whisperSv);
-    if ((sv.ggml || en.ggml) && !sv.whisperCli) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; return; }
-    el.textContent = `Svenska: ${describe(sv)} · Engelska: ${describe(en)}`;
-    el.className = 'chip ' + (sv.installed && en.installed && sv.ggml && en.ggml ? 'ok' : 'warn');
+    const d = await api.models.engineInfo(S.whisperDictation || S.whisperMeeting);
+    const m = await api.models.engineInfo(S.whisperMeeting || S.whisperDictation);
+    if ((d.ggml || m.ggml) && !d.whisperCli) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; return; }
+    el.textContent = `Diktering: ${describe(d)} · Möten: ${describe(m)}`;
+    el.className = 'chip ' + (d.installed && m.installed && d.ggml && m.ggml ? 'ok' : 'warn');
   } catch (e) {
     el.textContent = 'Kunde inte läsa motorstatus: ' + e.message; el.className = 'chip bad';
   }
 }
 
-// De två valen: en modell för svenska (och blandat), en för engelska. Bara installerade går att välja.
+// De två valen: en snabb modell för diktering, en noggrann för möten. Bara installerade går att välja.
 function renderSlots(st) {
-  for (const [id, key] of [['whisperSv', 'whisperSv'], ['whisperEn', 'whisperEn']]) {
+  for (const key of ['whisperDictation', 'whisperMeeting']) {
+    const id = key;
     const sel = $(id);
     sel.innerHTML = '';
     const installed = Object.entries(st.whisper).filter(([, m]) => m.installed).map(([n]) => n);
@@ -148,7 +149,7 @@ async function install(kind, name) {
   renderModels();
   try {
     await api.models.install(kind, name);
-    if (kind === 'whisper' && !S.whisperSv) S = { ...S, ...(await api.settings.set({ whisperSv: name })) };
+    if (kind === 'whisper' && !S.whisperDictation) S = { ...S, ...(await api.settings.set({ whisperDictation: name })) };
   } catch (e) {
     alert(`Nedladdning misslyckades: ${e.message}`);
   }
