@@ -1,0 +1,76 @@
+name: Konvertera KB-Whisper
+
+on:
+  workflow_dispatch:
+    inputs:
+      size:
+        description: "Modellstorlek (large är bäst på svenska)"
+        type: choice
+        default: large
+        options: [large, medium, small, base, tiny]
+
+permissions:
+  contents: read
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SIZE: ${{ inputs.size }}
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Frigör plats på byggservern
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL && df -h / | tail -1
+      - name: Installera beroenden
+        run: pip install --index-url https://download.pytorch.org/whl/cpu --extra-index-url https://pypi.org/simple -r scripts/kb-whisper/requirements.txt
+      - name: Verifiera konverteraren (numerisk kontroll)
+        run: cd scripts/kb-whisper && python test_equivalence.py
+      - name: Hämta modellen (bara safetensors)
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import snapshot_download
+          p = snapshot_download(f"KBLab/kb-whisper-{os.environ['SIZE']}", local_dir="hf",
+                                allow_patterns=["config.json", "generation_config.json", "*.safetensors", "*.safetensors.index.json", "README.md"])
+          print(p)
+          EOF
+          ls -la hf
+      - name: Kontrollera licens
+        run: python scripts/kb-whisper/verify_license.py hf
+      - name: Konvertera till OpenAI-format
+        run: python scripts/kb-whisper/hf_to_openai.py --src hf --out kb.pt && rm -rf hf ~/.cache/huggingface
+      - name: Exportera till ONNX
+        run: |
+          mkdir -p out/sherpa-onnx-whisper-kb-$SIZE && cd out/sherpa-onnx-whisper-kb-$SIZE
+          python ../../scripts/kb-whisper/export_onnx_sherpa.py --model kb-$SIZE --checkpoint ../../kb.pt
+          rm -f ../../kb.pt
+          ls -la
+      - name: Testkör i sherpa-onnx (svenskt tal från lokal TTS)
+        run: |
+          npm install --no-save sherpa-onnx-node@1.13.8
+          B=https://github.com/k2-fsa/sherpa-onnx/releases/download
+          curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
+          node - <<'EOF'
+          const s = require('sherpa-onnx-node');
+          const size = process.env.SIZE;
+          const dir = `out/sherpa-onnx-whisper-kb-${size}`;
+          const tts = new s.OfflineTts({ model: { vits: { model: 'vits-piper-sv_SE-nst-medium/sv_SE-nst-medium.onnx', tokens: 'vits-piper-sv_SE-nst-medium/tokens.txt', dataDir: 'vits-piper-sv_SE-nst-medium/espeak-ng-data' }, numThreads: 2, debug: 0, provider: 'cpu' }, maxNumSentences: 1 });
+          const a = tts.generate({ text: 'Vi bestämde att leverera ljudet till kampanjen på fredag.', sid: 0, speed: 1.0 });
+          const rec = new s.OfflineRecognizer({ featConfig: { sampleRate: 16000, featureDim: 80 }, modelConfig: { whisper: { encoder: `${dir}/kb-${size}-encoder.onnx`, decoder: `${dir}/kb-${size}-decoder.onnx`, language: 'sv', task: 'transcribe', tailPaddings: -1 }, tokens: `${dir}/kb-${size}-tokens.txt`, numThreads: 4, provider: 'cpu', debug: 0 } });
+          const st = rec.createStream(); st.acceptWaveform({ samples: a.samples, sampleRate: a.sampleRate }); rec.decode(st);
+          const text = rec.getResult(st).text; console.log('Transkript:', text);
+          if (!/fredag/i.test(text)) { console.error('Ordet "fredag" saknas, modellen fungerar inte'); process.exit(1); }
+          EOF
+      - name: Paketera
+        run: |
+          cd out && tar cjf ../kb-whisper-$SIZE.tar.bz2 sherpa-onnx-whisper-kb-$SIZE && cd .. && ls -la kb-whisper-$SIZE.tar.bz2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kb-whisper-${{ inputs.size }}
+          path: kb-whisper-${{ inputs.size }}.tar.bz2
+          compression-level: 0

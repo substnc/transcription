@@ -16,6 +16,9 @@ const WHISPER_MODELS = {
   medium: { size: '3 GB', note: 'Bra kvalitet, långsammare.' },
   turbo: { size: '1.6 GB', note: 'Large-v3 turbo. Bäst balans mellan kvalitet och fart.' },
   'large-v3': { size: '6 GB', note: 'Bäst kvalitet, långsammast.' },
+  'kb-large': { size: '6 GB', note: 'KB-Whisper large: svensktränad av Kungliga biblioteket. Bäst på svenska. Importeras manuellt.', manual: true },
+  'kb-medium': { size: '3 GB', note: 'KB-Whisper medium, svensktränad. Importeras manuellt.', manual: true },
+  'kb-small': { size: '1 GB', note: 'KB-Whisper small, svensktränad och snabb. Importeras manuellt.', manual: true },
 };
 
 const AUX_MODELS = {
@@ -124,6 +127,7 @@ function extractTarBz2(archive, targetDir) {
 
 async function installWhisper(modelsDir, name, onProgress) {
   if (!WHISPER_MODELS[name]) throw new Error(`Okänd whisper-modell: ${name}`);
+  if (WHISPER_MODELS[name].manual) throw new Error('Den här modellen laddas inte ner automatiskt. Använd Importera modell.');
   fs.mkdirSync(modelsDir, { recursive: true });
   const archive = path.join(modelsDir, `sherpa-onnx-whisper-${name}.tar.bz2`);
   await download(`${RELEASES}/asr-models/sherpa-onnx-whisper-${name}.tar.bz2`, archive, onProgress);
@@ -157,8 +161,29 @@ async function installAux(modelsDir, key, onProgress) {
   if (!fs.existsSync(auxPath(modelsDir, key))) throw new Error('Modellfilen hittades inte efter nedladdning');
 }
 
+// Importerar en modellmapp eller .tar.bz2 (t.ex. kb-whisper-large.tar.bz2 från konverteringsjobbet).
+async function importWhisper(modelsDir, sourcePath) {
+  fs.mkdirSync(modelsDir, { recursive: true });
+  const st = fs.statSync(sourcePath);
+  if (st.isDirectory()) {
+    const name = path.basename(sourcePath).replace(/^sherpa-onnx-whisper-/, '');
+    const target = whisperDir(modelsDir, name);
+    fs.rmSync(target, { recursive: true, force: true });
+    fs.cpSync(sourcePath, target, { recursive: true });
+    if (!whisperFiles(modelsDir, name)) { fs.rmSync(target, { recursive: true, force: true }); throw new Error('Mappen innehåller ingen whisper-modell (encoder, decoder, tokens).'); }
+    return name;
+  }
+  if (!/\.tar\.bz2$/.test(sourcePath)) throw new Error('Välj en mapp eller en .tar.bz2-fil.');
+  const before = new Set(fs.readdirSync(modelsDir));
+  await extractTarBz2(sourcePath, modelsDir);
+  const added = fs.readdirSync(modelsDir).filter((f) => !before.has(f) && f.startsWith('sherpa-onnx-whisper-'));
+  const name = added.length ? added[0].replace(/^sherpa-onnx-whisper-/, '') : null;
+  if (!name || !whisperFiles(modelsDir, name)) throw new Error('Arkivet innehöll ingen whisper-modell.');
+  return name;
+}
+
 function removeWhisper(modelsDir, name) {
   fs.rmSync(whisperDir(modelsDir, name), { recursive: true, force: true });
 }
 
-module.exports = { WHISPER_MODELS, AUX_MODELS, whisperFiles, auxPath, status, installWhisper, installAux, removeWhisper };
+module.exports = { WHISPER_MODELS, AUX_MODELS, whisperFiles, auxPath, status, installWhisper, installAux, importWhisper, removeWhisper };

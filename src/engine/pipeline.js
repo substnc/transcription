@@ -20,7 +20,9 @@ function checkModelFile(file, label) {
   const fs = require('fs');
   if (!fs.existsSync(file)) throw new Error(`${label}: filen saknas (${file}). Ladda ner modellen igen i Inställningar.`);
   const st = fs.statSync(file);
-  if (st.size < 100000) throw new Error(`${label}: filen är trasig eller ofullständig (${st.size} byte). Ta bort och ladda ner igen.`);
+  // Stora modeller kan ha vikterna i en separat .data-fil bredvid (ONNX external data).
+  const hasExternal = fs.existsSync(file + '.data') || fs.existsSync(file.replace(/\.onnx$/, '.weights'));
+  if (st.size < 100000 && !hasExternal) throw new Error(`${label}: filen är trasig eller ofullständig (${st.size} byte). Ta bort och ladda ner igen.`);
   const fd = fs.openSync(file, 'r');
   const head = Buffer.alloc(8);
   fs.readSync(fd, head, 0, 8, 0);

@@ -75,6 +75,11 @@ Modellerna körs i full precision. Det tar mer plats men ger märkbart bättre s
 
 `npm run models -- turbo` laddar ner en annan modell från terminalen.
 
+**KB-Whisper (bäst på svenska).** Kungliga bibliotekets svensktränade whisper gör ungefär
+hälften så många fel på svenska som OpenAI:s egen. Den konverteras av ett GitHub-jobb:
+Actions → "Konvertera KB-Whisper" → välj storlek → ladda ner artefakten → Inställningar →
+"Importera modell". Detaljer och säkerhetskontroller i `scripts/kb-whisper/README.md`.
+
 ### Ollama (valfritt men rekommenderat)
 
 Installera [Ollama](https://ollama.com) och hämta en modell, till exempel:

@@ -204,6 +204,15 @@ function registerIpc() {
     return engine.call(method, params, (p) => sendToSettings('models:progress', { kind, name, ...p }));
   });
   ipcMain.handle('models:remove', (_e, { name }) => engine.call('removeWhisper', { name }));
+  ipcMain.handle('models:import', async () => {
+    const r = await dialog.showOpenDialog(settingsWin, { title: 'Välj modellmapp eller .tar.bz2', properties: ['openFile', 'openDirectory'], filters: [{ name: 'Modell', extensions: ['bz2', 'tar'] }] });
+    if (r.canceled || !r.filePaths.length) return null;
+    const res = await engine.call('importWhisper', { sourcePath: r.filePaths[0] });
+    settings.set({ whisper: res.name });
+    await engine.call('configure', engineSettings());
+    buildTray();
+    return res;
+  });
   ipcMain.handle('llm:status', () => engine.call('llmStatus'));
   ipcMain.handle('perm:status', () => ({
     accessibility: accessibilityGranted(false),

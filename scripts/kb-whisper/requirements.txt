@@ -1,0 +1,9 @@
+# Låsta versioner för konverteringen. torch >= 2.5 för dynamo=False, < 2.15 för att matcha testad miljö.
+torch==2.14.0
+openai-whisper==20250625
+transformers==4.57.1
+safetensors>=0.4
+onnx>=1.16
+onnxruntime>=1.18
+onnxscript>=0.1
+huggingface_hub>=0.25

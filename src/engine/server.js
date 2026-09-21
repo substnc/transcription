@@ -48,6 +48,10 @@ const methods = {
     await models.installAux(settings.modelsDir, key, (prog) => send({ id, progress: { kind: 'download', name: key, ...prog } }));
     return models.status(settings.modelsDir);
   },
+  async importWhisper({ sourcePath }) {
+    const name = await models.importWhisper(settings.modelsDir, sourcePath);
+    return { name, status: models.status(settings.modelsDir) };
+  },
   async removeWhisper({ name }) {
     if (pipeline && pipeline.loadedWhisper === name) { pipeline.recognizer = null; pipeline.loadedWhisper = null; }
     models.removeWhisper(settings.modelsDir, name);

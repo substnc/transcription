@@ -91,6 +91,7 @@ async function renderModels() {
     const btn = document.createElement('button');
     if (progress[key]) { btn.textContent = 'Laddar ner…'; btn.disabled = true; }
     else if (m.installed) { btn.textContent = 'Ta bort'; btn.className = 'danger'; btn.onclick = async () => { if (confirm(`Ta bort whisper-${name}?`)) { await api.models.remove(name); renderModels(); } }; }
+    else if (m.manual) { btn.textContent = 'Importera'; btn.onclick = importModel; }
     else { btn.textContent = 'Ladda ner'; btn.onclick = () => install('whisper', name); }
     right.appendChild(btn);
     row.append(left, mid, right);
@@ -126,6 +127,16 @@ async function install(kind, name) {
   delete progress[key];
   renderModels();
 }
+
+async function importModel() {
+  try {
+    const r = await api.models.import();
+    if (r) { S = await api.settings.get(); renderModels(); }
+  } catch (e) {
+    alert('Import misslyckades: ' + e.message);
+  }
+}
+$('btnImport').onclick = importModel;
 
 let renderTimer = null;
 api.models.onProgress((p) => {
