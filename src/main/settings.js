@@ -4,6 +4,8 @@ const path = require('path');
 const os = require('os');
 
 const ICLOUD_OBSIDIAN = path.join(os.homedir(), 'Library', 'Mobile Documents', 'iCloud~md~obsidian', 'Documents');
+// Inspelningar: i iCloud Drive under 01_CLAUDE_CODE (Anthons val, synkas alltså via iCloud). Kan ändras i Inställningar.
+const DEFAULT_RECORDINGS = path.join(os.homedir(), 'Library', 'Mobile Documents', 'com~apple~CloudDocs', '01_CLAUDE_CODE', 'speak', 'inspelningar');
 
 const DEFAULTS = {
   hotkey: 'AltRight', // håll in höger ⌥ för att diktera
@@ -20,6 +22,7 @@ const DEFAULTS = {
   voiceCommands: true,
   autoPaste: true,
   restoreClipboard: true,
+  recordingsDir: DEFAULT_RECORDINGS,
   keepRecordings: false, // ljudfilen tas bort när anteckningen är sparad eller mötet kastas
   diarize: true,
   captureSystemAudio: true, // ta med datorns ljud (videomöten) i mötesinspelningar
@@ -67,4 +70,4 @@ class Settings {
   }
 }
 
-module.exports = { Settings, DEFAULTS, ICLOUD_OBSIDIAN };
+module.exports = { Settings, DEFAULTS, ICLOUD_OBSIDIAN, DEFAULT_RECORDINGS };

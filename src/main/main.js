@@ -23,7 +23,7 @@ try {
 } catch (e) { console.error('Kunde inte flytta gamla data:', e.message); }
 const settings = new Settings(path.join(userData, 'settings.json'));
 const modelsDir = process.env.DIKTERA_MODELS_DIR || path.join(userData, 'models');
-const recordingsDir = path.join(userData, 'recordings');
+const recordingsDir = () => settings.get('recordingsDir') || path.join(userData, 'recordings');
 const logsDir = path.join(userData, 'logs');
 const engine = new EngineClient(path.join(logsDir, 'engine.log'));
 const hotkey = new Hotkey();
@@ -128,9 +128,9 @@ function toggleDictation() {
 function startMeetingRecording(opts = {}) {
   if (rec.mode) throw new Error('Inspelning pågår redan');
   const mode = opts.sourceMode || (settings.get('captureSystemAudio') ? 'both' : 'mic');
-  fs.mkdirSync(recordingsDir, { recursive: true });
+  fs.mkdirSync(recordingsDir(), { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  rec.wav = new WavWriter(path.join(recordingsDir, `mote-${stamp}.wav`));
+  rec.wav = new WavWriter(path.join(recordingsDir(), `mote-${stamp}.wav`));
   rec.mode = 'meeting';
   rec.startedAt = Date.now();
   rec.systemAudio = null;
@@ -187,7 +187,7 @@ function registerIpc() {
     else if (rec.mode === 'meeting') { stopMeetingRecording(); sendToMeeting('meeting:error', msg); }
   });
 
-  ipcMain.handle('settings:get', () => ({ ...settings.get(), keyLabels: KEY_LABELS, toggleShortcut: TOGGLE_SHORTCUT, modelsDir, recordingsDir }));
+  ipcMain.handle('settings:get', () => ({ ...settings.get(), keyLabels: KEY_LABELS, toggleShortcut: TOGGLE_SHORTCUT, modelsDir, recordingsDir: recordingsDir() }));
   ipcMain.handle('settings:set', async (_e, patch) => {
     const before = settings.get();
     const after = settings.set(patch);
@@ -262,13 +262,19 @@ function registerIpc() {
     if (r.canceled || !r.filePaths.length) return null;
     const input = r.filePaths[0];
     sendToMeeting('meeting:progress', { phase: 'convert', text: 'Konverterar ljudet…' });
-    fs.mkdirSync(recordingsDir, { recursive: true });
-    const out = path.join(recordingsDir, `upload-${Date.now()}.wav`);
+    fs.mkdirSync(recordingsDir(), { recursive: true });
+    const out = path.join(recordingsDir(), `upload-${Date.now()}.wav`);
     await convertToWav(input, out);
     const result = await transcribeMeeting(out, opts || {});
     return { ...result, sourceFile: input };
   });
   ipcMain.handle('meeting:summarize', (_e, { segments }) => engine.call('summarize', { segments, useLlm: settings.get('useLlm') }));
+  ipcMain.handle('settings:choose-recordings', async () => {
+    const r = await dialog.showOpenDialog(settingsWin, { title: 'Mapp för inspelningar', properties: ['openDirectory', 'createDirectory'] });
+    if (r.canceled) return null;
+    settings.set({ recordingsDir: r.filePaths[0] });
+    return r.filePaths[0];
+  });
   ipcMain.handle('meeting:choose-folder', async () => {
     const r = await dialog.showOpenDialog(meetingWin, { title: 'Välj mapp att spara i', properties: ['openDirectory', 'createDirectory'] });
     return r.canceled ? null : r.filePaths[0];
@@ -286,7 +292,7 @@ function registerIpc() {
     return target;
   });
   ipcMain.handle('meeting:discard-audio', (_e, p) => {
-    if (p && p.startsWith(recordingsDir)) fs.rmSync(p, { force: true });
+    if (p && p.startsWith(recordingsDir())) fs.rmSync(p, { force: true });
     return true;
   });
 }
@@ -343,10 +349,11 @@ function buildTray() {
 
 // Rester i inspelningsmappen (krasch, avslutat mitt i) städas vid start om inspelningar inte ska behållas.
 function cleanRecordings() {
-  if (settings.get('keepRecordings') || !fs.existsSync(recordingsDir)) return;
+  const dir = recordingsDir();
+  if (settings.get('keepRecordings') || !fs.existsSync(dir)) return;
   const old = Date.now() - 24 * 3600 * 1000;
-  for (const f of fs.readdirSync(recordingsDir)) {
-    const p = path.join(recordingsDir, f);
+  for (const f of fs.readdirSync(dir)) {
+    const p = path.join(dir, f);
     try { if (f.endsWith('.wav') && fs.statSync(p).mtimeMs < old) fs.rmSync(p, { force: true }); } catch {}
   }
 }

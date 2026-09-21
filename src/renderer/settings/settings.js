@@ -6,6 +6,7 @@ const progress = {};
 async function load() {
   S = await api.settings.get();
   $('modelsDir').textContent = S.modelsDir;
+  $('recordingsDir').textContent = S.recordingsDir;
   $('toggleShortcut').textContent = S.toggleShortcut.replace('Alt', '⌥').replace('Shift', '⇧').replace(/\+/g, '');
   const hk = $('hotkey');
   hk.innerHTML = '';
@@ -208,6 +209,7 @@ function renderInboxes() {
   });
 }
 
+$('btnRecordingsDir').onclick = async () => { const p = await api.settings.chooseRecordings(); if (p) { S = await api.settings.get(); $('recordingsDir').textContent = p; } };
 $('btnMeeting').onclick = () => api.open.meeting();
 $('btnRecordings').onclick = () => api.open.path(S.recordingsDir);
 $('btnLogs').onclick = () => api.open.logs();

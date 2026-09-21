@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('diktera', {
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (patch) => ipcRenderer.invoke('settings:set', patch),
+    chooseRecordings: () => ipcRenderer.invoke('settings:choose-recordings'),
   },
   models: {
     status: () => ipcRenderer.invoke('models:status'),

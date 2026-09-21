@@ -151,6 +151,6 @@ Motorn körs i en egen process så att appen aldrig hänger under transkribering
 
 ## Integritet
 
-- Under inspelning skrivs ljudet som WAV till `~/Library/Application Support/sub.stnc® - Speak/recordings` så att inget går förlorat om något kraschar. Filen tas bort när anteckningen är sparad eller mötet kastas, och rester äldre än ett dygn städas vid start. Vill du behålla ljudet: bocka i det i Inställningar.
+- Under inspelning skrivs ljudet som WAV till inspelningsmappen (standard: `iCloud Drive/01_CLAUDE_CODE/speak/inspelningar`, valbar i Inställningar; ligger den i iCloud Drive synkas ljudet dit) så att inget går förlorat om något kraschar. Filen tas bort när anteckningen är sparad eller mötet kastas, och rester äldre än ett dygn städas vid start. Vill du behålla ljudet: bocka i det i Inställningar.
 - Inga loggar innehåller transkriberad text.
 - Ingen telemetri, ingen uppdateringskontroll, inga externa anrop.
