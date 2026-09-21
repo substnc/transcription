@@ -124,15 +124,16 @@ function toggleDictation() {
 }
 
 // ---------- Möte ----------
-function startMeetingRecording() {
+function startMeetingRecording(opts = {}) {
   if (rec.mode) throw new Error('Inspelning pågår redan');
+  const mode = opts.sourceMode || (settings.get('captureSystemAudio') ? 'both' : 'mic');
   fs.mkdirSync(recordingsDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   rec.wav = new WavWriter(path.join(recordingsDir, `mote-${stamp}.wav`));
   rec.mode = 'meeting';
   rec.startedAt = Date.now();
   rec.systemAudio = null;
-  captureSend({ cmd: 'start', meter: true, systemAudio: !!settings.get('captureSystemAudio') });
+  captureSend({ cmd: 'start', meter: true, systemAudio: mode !== 'mic', mic: mode !== 'system' });
   return rec.wav.filePath;
 }
 
@@ -228,7 +229,7 @@ function registerIpc() {
   ipcMain.handle('test:stop', async () => { await stopDictation(); });
 
   // Mötesläge
-  ipcMain.handle('meeting:start', () => startMeetingRecording());
+  ipcMain.handle('meeting:start', (_e, opts) => startMeetingRecording(opts || {}));
   ipcMain.handle('meeting:stop', async (_e, opts) => {
     const r = stopMeetingRecording();
     if (!r) throw new Error('Ingen inspelning pågår');

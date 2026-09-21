@@ -48,7 +48,9 @@
   <div class="row" style="gap: 32px; align-items: flex-end; margin-bottom: 8px">
     <div class="field" style="width: 260px; margin: 0"><label for="language">Språk i mötet</label><select id="language"><option value="">Som i Inställningar</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option><option value="auto">Svenska och engelska</option></select></div>
     <div class="field" style="width: 220px; margin: 0"><label for="speakerCount">Antal talare, om du vet</label><input type="text" id="speakerCount" placeholder="t.ex. 25" inputmode="numeric"></div>
+    <div class="field" style="width: 300px; margin: 0"><label for="sourceMode">Ljudkälla</label><select id="sourceMode"><option value="both">Mikrofon och datorns ljud (videomöte)</option><option value="system">Bara datorns ljud (jag lyssnar bara)</option><option value="mic">Bara mikrofon (möte i rummet)</option></select></div>
   </div>
+  <p class="status" style="margin: 0 0 8px">Tips: använd hörlurar i videomöten, annars hör mikrofonen högtalarna och rösterna kan dubblas.</p>
   <div class="row">
     <button class="primary" id="btnRecord">Spela in</button>
     <button id="btnUpload">Ladda upp fil</button>

@@ -23,31 +23,34 @@ async function openSystemAudio() {
   return s;
 }
 
-async function start(withMeter, withSystemAudio) {
+async function start(withMeter, withSystemAudio, withMic = true) {
   if (running) return;
   running = true;
   meter = !!withMeter;
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    if (!running) return stop(); // stoppades innan mikrofonen hann öppnas
+    if (withMic) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      if (!running) return stop(); // stoppades innan mikrofonen hann öppnas
+    }
     let systemAudio = false;
     if (withSystemAudio) {
       try { sysStream = await openSystemAudio(); systemAudio = true; } catch (e) { console.warn('Systemljud gick inte:', e.message); }
       if (!running) return stop();
     }
+    if (!stream && !sysStream) throw new Error('Ingen ljudkälla gick att öppna');
     ctx = new AudioContext({ sampleRate: 16000 });
     await ctx.audioWorklet.addModule('worklet.js');
-    const src = ctx.createMediaStreamSource(stream);
     node = new AudioWorkletNode(ctx, 'pcm-capture', { numberOfOutputs: 1, outputChannelCount: [1] });
+    const src = stream ? ctx.createMediaStreamSource(stream) : null;
     if (sysStream) {
       // Två källor in på samma ingång summeras av Web Audio. Dämpa lite så summan inte klipper.
       const sysSrc = ctx.createMediaStreamSource(sysStream);
       const gain = ctx.createGain(); gain.gain.value = 0.8;
       sysSrc.connect(gain); gain.connect(node);
     }
-    if (withSystemAudio) window.diktera.capture.sendInfo({ systemAudio });
+    if (meter) window.diktera.capture.sendInfo({ systemAudio, mic: !!stream, wantedSystem: !!withSystemAudio });
     node.port.onmessage = (e) => {
       if (!running) return;
       if (meter) {
@@ -59,7 +62,7 @@ async function start(withMeter, withSystemAudio) {
       }
       window.diktera.capture.sendChunk(e.data);
     };
-    src.connect(node);
+    if (src) src.connect(node);
     node.connect(ctx.destination);
     if (meter) meterTimer = setInterval(() => {
       if (meterN) window.diktera.capture.sendLevel(Math.min(1, (meterAcc / meterN) * 6));
@@ -88,6 +91,6 @@ function stop() {
 }
 
 window.diktera.capture.onCommand((msg) => {
-  if (msg.cmd === 'start') start(msg.meter, msg.systemAudio);
+  if (msg.cmd === 'start') start(msg.meter, msg.systemAudio, msg.mic !== false);
   else if (msg.cmd === 'stop') stop();
 });

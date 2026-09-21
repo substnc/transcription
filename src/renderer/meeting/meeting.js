@@ -67,7 +67,7 @@ $('consentOk').onclick = async () => {
   $('consent').classList.add('hidden');
   state.consent = true;
   try {
-    state.audioPath = await api.meeting.start();
+    state.audioPath = await api.meeting.start({ sourceMode: $('sourceMode').value });
     state.startedAt = Date.now();
     levels.fill(0);
     $('sources').textContent = 'Mikrofon';
@@ -82,7 +82,7 @@ $('consentOk').onclick = async () => {
 api.meeting.onLevel(({ level }) => pushLevel(level));
 api.meeting.onError((msg) => fail('Mikrofonfel: ' + msg));
 api.meeting.onInfo((info) => {
-  $('sources').textContent = info.systemAudio ? 'Mikrofon och datorns ljud' : 'Bara mikrofon (datorns ljud gick inte att ta upp, kolla Skärminspelning i Inställningar)';
+  $('sources').textContent = info.systemAudio ? (info.mic ? 'Mikrofon och datorns ljud' : 'Bara datorns ljud') : info.mic ? (info.wantedSystem ? 'Bara mikrofon (datorns ljud gick inte att ta upp, kolla Skärminspelning i Inställningar)' : 'Bara mikrofon') : 'Ingen ljudkälla';
 });
 
 $('btnStop').onclick = async () => {

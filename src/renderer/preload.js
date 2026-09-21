@@ -35,7 +35,7 @@ contextBridge.exposeInMainWorld('diktera', {
     stop: () => ipcRenderer.invoke('test:stop'),
   },
   meeting: {
-    start: () => ipcRenderer.invoke('meeting:start'),
+    start: (opts) => ipcRenderer.invoke('meeting:start', opts),
     stop: (opts) => ipcRenderer.invoke('meeting:stop', opts),
     cancel: () => ipcRenderer.invoke('meeting:cancel'),
     upload: (opts) => ipcRenderer.invoke('meeting:upload', opts),
