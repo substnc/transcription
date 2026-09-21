@@ -6,6 +6,7 @@ const models = require('./models');
 const { assignSpeakers, relabelSpeakers, coalesce } = require('./merge');
 const { isHallucination, tidy } = require('./cleanup');
 const audio = require('./audio');
+const whispercpp = require('./whispercpp');
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
@@ -42,6 +43,7 @@ class Pipeline {
     this.whisperName = opts.whisper || 'small';
     this.numThreads = opts.numThreads || Math.max(2, Math.min(8, require('os').cpus().length - 2));
     this.sherpa = opts.sherpa || null;
+    this.whisperCli = opts.whisperCli || null;
     this.recognizer = null;
     this.vad = null;
     this.diarizer = null;
@@ -66,10 +68,17 @@ class Pipeline {
     }
   }
 
+  // ggml-modell (whisper.cpp på Metal) eller ONNX (sherpa på CPU)?
+  ggmlModel() {
+    const files = models.whisperFiles(this.modelsDir, this.whisperName);
+    return files && files.ggml ? files.ggml : null;
+  }
+
   ensureRecognizer() {
     if (this.recognizer) return this.recognizer;
     const files = models.whisperFiles(this.modelsDir, this.whisperName);
     if (!files) throw new Error(`Whisper-modellen "${this.whisperName}" är inte nedladdad. Öppna Inställningar och ladda ner den.`);
+    if (files.ggml) throw new Error('Den här modellen körs med whisper.cpp, inte sherpa.');
     checkModelFile(files.encoder, 'Whisper encoder');
     checkModelFile(files.decoder, 'Whisper decoder');
     console.error(`[motor] laddar whisper-${this.whisperName} (${this.numThreads} trådar)`);
@@ -189,6 +198,38 @@ class Pipeline {
       if (onProgress) onProgress({ phase: 'transcribe', done: done + (p.start + p.samples.length / SAMPLE_RATE) / (samples.length / SAMPLE_RATE), total });
     }
     return segs;
+  }
+
+  // ---- whisper.cpp-vägen (Metal) ----
+  async dictateCpp(samples, { policy } = {}) {
+    const { language = 'auto', primary = 'sv' } = policy || {};
+    const segs = await whispercpp.transcribeSamples(samples, { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads });
+    const kept = segs.map((s) => ({ ...s, text: tidy(s.text), lang: language === 'auto' ? primary : language })).filter((s) => !isHallucination(s.text));
+    return { text: kept.map((s) => s.text).join(' ').trim(), languages: [...new Set(kept.map((s) => s.lang))], segments: kept };
+  }
+
+  async meetingCpp(input, { policy, diarize = true, speakerCount = 0, onProgress } = {}) {
+    const wavPath = typeof input === 'string' ? input : null;
+    const samples = wavPath ? audio.readWav(wavPath).samples : input;
+    const durationSec = samples.length / SAMPLE_RATE;
+    const { language = 'auto', primary = 'sv' } = policy || {};
+    console.error(`[motor] möte (whisper.cpp): ${durationSec.toFixed(1)} s, språk=${language}, antal talare=${speakerCount || 'auto'}`);
+    let diar = [];
+    if (diarize) {
+      if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
+      diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
+      if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
+    }
+    const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads,
+      onProgress: onProgress ? (f) => onProgress({ phase: 'transcribe', done: f * 100, total: 100 }) : null };
+    const raw = wavPath ? await whispercpp.transcribeWav(wavPath, opts) : await whispercpp.transcribeSamples(samples, opts);
+    let segs = raw.map((s) => ({ start: s.start, end: s.end, text: tidy(s.text), lang: language === 'auto' ? primary : language, speaker: 0 }))
+      .filter((s) => s.text && !isHallucination(s.text) && !isJunk(s.text, s.lang, s.end - s.start, policy));
+    if (diar.length) segs = assignSpeakers(segs, diar);
+    const labeled = relabelSpeakers(segs);
+    const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
+    const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
+    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'whisper.cpp' };
   }
 
   // Diktering: kort ljud, ingen talarseparering.

@@ -18,6 +18,32 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: npm test
+      - name: Bygg whisper.cpp med Metal (grafikkretsen)
+        run: |
+          git clone -q --depth 1 --branch v1.8.2 https://github.com/ggml-org/whisper.cpp.git /tmp/wcpp
+          cmake -S /tmp/wcpp -B /tmp/wcpp/build -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DBUILD_SHARED_LIBS=OFF \
+            -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/wcpp/build --config Release -j 4 --target whisper-cli
+          mkdir -p resources/bin && cp /tmp/wcpp/build/bin/whisper-cli resources/bin/ && ls -la resources/bin
+          ./resources/bin/whisper-cli --help | head -3
+      - name: Testa Metal-motorn på riktigt (tiny-modell + svenskt TTS-tal)
+        run: |
+          npm install --no-save sherpa-onnx-node@1.13.8 >/dev/null
+          B=https://github.com/k2-fsa/sherpa-onnx/releases/download
+          curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
+          curl -sSL -o ggml-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          node - <<'EOF'
+          const s = require('sherpa-onnx-node'); const { writeWav } = require('./src/engine/audio'); const w = require('./src/engine/whispercpp');
+          const tts = new s.OfflineTts({ model: { vits: { model: 'vits-piper-sv_SE-nst-medium/sv_SE-nst-medium.onnx', tokens: 'vits-piper-sv_SE-nst-medium/tokens.txt', dataDir: 'vits-piper-sv_SE-nst-medium/espeak-ng-data' }, numThreads: 2, debug: 0, provider: 'cpu' }, maxNumSentences: 1 });
+          const a = tts.generate({ text: 'Vi ses på fredag klockan tio.', sid: 0, speed: 1.0 });
+          const r = new s.LinearResampler(a.sampleRate, 16000); const x = r.resample(a.samples, true);
+          writeWav('tts.wav', x);
+          const t0 = Date.now();
+          w.transcribeWav('tts.wav', { binary: 'resources/bin/whisper-cli', model: 'ggml-tiny.bin', language: 'sv' }).then((segs) => {
+            console.log('Metal-motorn:', JSON.stringify(segs), 'ms', Date.now() - t0);
+            if (!segs.length) { console.error('inget resultat'); process.exit(1); }
+          }).catch((e) => { console.error(e); process.exit(1); });
+          EOF
       - name: Bygg dmg
         run: npx electron-builder --mac dmg zip --arm64 --publish never
         env:

@@ -8,7 +8,7 @@ const ICLOUD_OBSIDIAN = path.join(os.homedir(), 'Library', 'Mobile Documents', '
 const DEFAULTS = {
   hotkey: 'AltRight', // håll in höger ⌥ för att diktera
   hotkeyMode: 'hold', // 'hold' eller 'toggle'
-  whisper: 'small',
+  whisper: 'kb-large-metal',
   language: 'auto', // 'auto' | 'sv' | 'en'
   allowed: ['sv', 'en'],
   primary: 'sv',
@@ -22,7 +22,6 @@ const DEFAULTS = {
   keepRecordings: true,
   diarize: true,
   captureSystemAudio: true, // ta med datorns ljud (videomöten) i mötesinspelningar
-  numThreads: 0,
   inboxes: [
     { label: '01_CLAUDE_COWORK / 99_inbox', path: path.join(ICLOUD_OBSIDIAN, '01_CLAUDE_COWORK', '99_inbox') },
     { label: '02_CLAUDE_PRIVATE / 99_inbox', path: path.join(ICLOUD_OBSIDIAN, '02_CLAUDE_PRIVATE', '99_inbox') },

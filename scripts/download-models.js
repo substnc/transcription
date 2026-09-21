@@ -8,7 +8,7 @@ const models = require('../src/engine/models');
 const args = process.argv.slice(2);
 const dirIdx = args.indexOf('--dir');
 const modelsDir = dirIdx >= 0 ? args[dirIdx + 1] : path.join(os.homedir(), 'Library', 'Application Support', 'sub.stnc® - Speak', 'models');
-const whisper = args.find((a) => models.WHISPER_MODELS[a]) || 'small';
+const whisper = args.find((a) => models.WHISPER_MODELS[a]) || 'turbo-metal';
 
 function bar(name) {
   let last = -1;
@@ -28,6 +28,7 @@ function bar(name) {
     console.log(`\n${key}: klar`);
   }
   if (st.whisper[whisper].installed) console.log(`whisper-${whisper}: finns redan`);
+  else if (st.whisper[whisper].manual) console.log(`${whisper} importeras manuellt (se scripts/kb-whisper/README.md)`);
   else {
     await models.installWhisper(modelsDir, whisper, bar(`whisper-${whisper}`));
     console.log(`\nwhisper-${whisper}: klar`);

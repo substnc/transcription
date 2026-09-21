@@ -79,7 +79,7 @@ async function renderModels() {
     const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = ' ' + name;
     left.append(radio, nm);
     const mid = document.createElement('div');
-    mid.innerHTML = `<div class="note">${m.note} (${m.size})</div>`;
+    mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
     const key = `whisper:${name}`;
     if (progress[key]) {
       const bar = document.createElement('div'); bar.className = 'bar';
@@ -97,21 +97,15 @@ async function renderModels() {
     row.append(left, mid, right);
     wl.appendChild(row);
   }
-  const al = $('auxList');
-  al.innerHTML = '';
-  for (const [key, m] of Object.entries(st.aux)) {
-    const row = document.createElement('div');
-    row.className = 'model';
-    const left = document.createElement('div'); left.className = 'name'; left.textContent = { vad: 'Röst', segmentation: 'Talare', embedding: 'Röstavtryck' }[key] || key;
-    const mid = document.createElement('div'); mid.innerHTML = `<div class="note">${m.label} (${m.size})</div>`;
-    const pk = `aux:${key}`;
-    if (progress[pk]) { const t = document.createElement('div'); t.className = 'note'; t.textContent = progressLine(pk); mid.appendChild(t); }
-    const right = document.createElement('div');
-    if (m.installed) { const c = document.createElement('span'); c.className = 'chip ok'; c.textContent = 'Installerad'; right.appendChild(c); }
-    else { const b = document.createElement('button'); b.textContent = progress[pk] ? 'Laddar ner…' : 'Ladda ner'; b.disabled = !!progress[pk]; b.onclick = () => install('aux', key); right.appendChild(b); }
-    row.append(left, mid, right);
-    al.appendChild(row);
-  }
+  // Talarmodellerna som en enhet.
+  const auxKeys = Object.keys(st.aux);
+  const missing = auxKeys.filter((k) => !st.aux[k].installed);
+  const busy = auxKeys.some((k) => progress[`aux:${k}`]);
+  $('auxStatus').textContent = busy ? progressLine(`aux:${auxKeys.find((k) => progress[`aux:${k}`])}`) : missing.length ? 'Saknas' : 'Installerade';
+  $('auxStatus').className = 'chip ' + (missing.length ? 'warn' : 'ok');
+  $('btnAux').classList.toggle('hidden', !missing.length && !busy);
+  $('btnAux').disabled = busy;
+  $('btnAux').onclick = async () => { for (const k of missing) await install('aux', k); };
 }
 
 async function install(kind, name) {

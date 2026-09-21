@@ -21,7 +21,7 @@ function send(msg) {
 const methods = {
   async init(p) {
     settings = { ...settings, ...p };
-    pipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: settings.whisper, numThreads: settings.numThreads });
+    pipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: settings.whisper, numThreads: settings.numThreads, whisperCli: settings.whisperCli });
     return models.status(settings.modelsDir);
   },
   async configure(p) {
@@ -33,9 +33,12 @@ const methods = {
     return { ...models.status(settings.modelsDir), loaded: pipeline ? pipeline.loadedWhisper : null };
   },
   async warmup() {
-    pipeline.ensureRecognizer();
+    if (!pipeline.ggmlModel()) pipeline.ensureRecognizer();
     pipeline.ensureVad();
     return true;
+  },
+  async engineInfo() {
+    return { ggml: !!pipeline.ggmlModel(), whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
   },
   async llmStatus() {
     return llm.available(settings.ollamaHost);
@@ -60,7 +63,8 @@ const methods = {
 
   // Diktering: samples (Float32Array 16 kHz) -> städad text.
   async dictate({ samples, policy, useLlm, voiceCommands }) {
-    const raw = pipeline.dictate(samples instanceof Float32Array ? samples : new Float32Array(samples), { policy });
+    const f32 = samples instanceof Float32Array ? samples : new Float32Array(samples);
+    const raw = pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy }) : pipeline.dictate(f32, { policy });
     let text = cleanup(raw.text, { voiceCommands });
     let cleanedBy = 'rules';
     if (useLlm && text && settings.ollamaModel) {
@@ -76,8 +80,10 @@ const methods = {
 
   // Möte: wavPath -> segment med talare och tidsstämplar.
   async meeting({ wavPath, policy, diarize, speakerCount }, id) {
-    const r = pipeline.meeting(wavPath, { policy, diarize, speakerCount, onProgress: (p) => send({ id, progress: p }) });
-    return r;
+    const onProgress = (p) => send({ id, progress: p });
+    return pipeline.ggmlModel()
+      ? pipeline.meetingCpp(wavPath, { policy, diarize, speakerCount, onProgress })
+      : pipeline.meeting(wavPath, { policy, diarize, speakerCount, onProgress });
   },
 
   async summarize({ segments, useLlm }, id) {

@@ -1,0 +1,74 @@
+'use strict';
+// Snabb whisper-motor via whisper.cpp (körs på Macens grafikkrets med Metal).
+// Vi startar den medföljande binären whisper-cli som en underprocess och läser dess JSON.
+
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { spawn } = require('child_process');
+const audio = require('./audio');
+
+// Hittar binären: uttrycklig sökväg (inställning/miljö), paketerad app (Resources/bin), eller repo (resources/bin).
+function findBinary(explicit) {
+  const candidates = [
+    explicit,
+    process.env.SPEAK_WHISPER_CLI,
+    process.resourcesPath ? path.join(process.resourcesPath, 'bin', 'whisper-cli') : null,
+    path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-cli'),
+  ].filter(Boolean);
+  return candidates.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
+}
+
+// Gör om whisper.cpp:s JSON till våra segment.
+function parseResult(json) {
+  const list = (json && json.transcription) || [];
+  return list
+    .map((s) => ({ start: (s.offsets.from || 0) / 1000, end: (s.offsets.to || 0) / 1000, text: String(s.text || '').trim() }))
+    .filter((s) => s.text);
+}
+
+// Kör whisper-cli på en 16 kHz mono WAV. Returnerar [{ start, end, text }].
+function transcribeWav(wavPath, { binary, model, language = 'auto', threads, onProgress, prompt } = {}) {
+  return new Promise((resolve, reject) => {
+    const bin = findBinary(binary);
+    if (!bin) return reject(new Error('whisper-cli saknas (Metal-motorn). Installera om appen.'));
+    if (!model || !fs.existsSync(model)) return reject(new Error('ggml-modellen saknas.'));
+    const out = path.join(os.tmpdir(), `speak-${process.pid}-${Date.now()}`);
+    const args = ['-m', model, '-f', wavPath, '-l', language === 'auto' ? 'auto' : language, '-oj', '-of', out, '-np', '-pp',
+      '-t', String(threads || Math.max(2, Math.min(8, os.cpus().length))), '-bo', '5', '-bs', '5'];
+    if (prompt) args.push('--prompt', prompt);
+    const p = spawn(bin, args);
+    let err = '';
+    p.stderr.on('data', (d) => {
+      const s = d.toString();
+      err += s;
+      if (onProgress) for (const m of s.matchAll(/progress\s*=\s*(\d+)%/g)) onProgress(Number(m[1]) / 100);
+    });
+    p.on('error', reject);
+    p.on('close', (code) => {
+      const file = out + '.json';
+      try {
+        if (code !== 0) throw new Error(`whisper-cli avslutades med kod ${code}: ${err.trim().split('\n').slice(-3).join(' | ')}`);
+        const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+        resolve(parseResult(json));
+      } catch (e) {
+        reject(e);
+      } finally {
+        fs.rmSync(file, { force: true });
+      }
+    });
+  });
+}
+
+// Samma sak för råa samples: skrivs till en temporär WAV först.
+async function transcribeSamples(samples, opts) {
+  const tmp = path.join(os.tmpdir(), `speak-${process.pid}-${Date.now()}.wav`);
+  audio.writeWav(tmp, samples);
+  try {
+    return await transcribeWav(tmp, opts);
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
+module.exports = { findBinary, parseResult, transcribeWav, transcribeSamples };

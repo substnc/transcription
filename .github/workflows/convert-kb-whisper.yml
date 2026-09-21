@@ -44,6 +44,48 @@ jobs:
         run: python scripts/kb-whisper/verify_license.py hf
       - name: Konvertera till OpenAI-format
         run: python scripts/kb-whisper/hf_to_openai.py --src hf --out kb.pt && rm -rf hf ~/.cache/huggingface && ls -la kb.pt && free -h
+      - name: Konvertera till ggml för whisper.cpp (Metal), f16 och q5_0
+        run: |
+          git clone -q --depth 1 --branch v1.8.2 https://github.com/ggml-org/whisper.cpp.git /tmp/wcpp
+          cmake -S /tmp/wcpp -B /tmp/wcpp/build -DBUILD_SHARED_LIBS=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DCMAKE_BUILD_TYPE=Release >/dev/null
+          cmake --build /tmp/wcpp/build --config Release -j 4 --target quantize whisper-cli >/dev/null
+          WHISPER_PKG=$(python -c "import whisper,os; print(os.path.dirname(os.path.dirname(whisper.__file__)))")
+          mkdir -p ggml/whisper-cpp-kb-$SIZE-metal ggml/whisper-cpp-kb-$SIZE-metal-q5
+          python /tmp/wcpp/models/convert-pt-to-ggml.py kb.pt "$WHISPER_PKG" ggml/whisper-cpp-kb-$SIZE-metal
+          /tmp/wcpp/build/bin/quantize ggml/whisper-cpp-kb-$SIZE-metal/ggml-model.bin ggml/whisper-cpp-kb-$SIZE-metal-q5/ggml-model-q5_0.bin q5_0
+          ls -la ggml/*
+      - name: Testkör ggml-modellen (svenskt tal från lokal TTS)
+        run: |
+          npm install --no-save sherpa-onnx-node@1.13.8 >/dev/null
+          B=https://github.com/k2-fsa/sherpa-onnx/releases/download
+          curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
+          node - <<'EOF'
+          const s = require('sherpa-onnx-node'); const { writeWav } = require('./src/engine/audio'); const w = require('./src/engine/whispercpp');
+          const size = process.env.SIZE;
+          const tts = new s.OfflineTts({ model: { vits: { model: 'vits-piper-sv_SE-nst-medium/sv_SE-nst-medium.onnx', tokens: 'vits-piper-sv_SE-nst-medium/tokens.txt', dataDir: 'vits-piper-sv_SE-nst-medium/espeak-ng-data' }, numThreads: 2, debug: 0, provider: 'cpu' }, maxNumSentences: 1 });
+          const a = tts.generate({ text: 'Vi bestämde att leverera ljudet till kampanjen på fredag.', sid: 0, speed: 1.0 });
+          const r = new s.LinearResampler(a.sampleRate, 16000); writeWav('tts.wav', r.resample(a.samples, true));
+          (async () => {
+            for (const m of [`ggml/whisper-cpp-kb-${size}-metal/ggml-model.bin`, `ggml/whisper-cpp-kb-${size}-metal-q5/ggml-model-q5_0.bin`]) {
+              const segs = await w.transcribeWav('tts.wav', { binary: '/tmp/wcpp/build/bin/whisper-cli', model: m, language: 'sv' });
+              const text = segs.map((x) => x.text).join(' '); console.log(m, '->', text);
+              if (!/fredag/i.test(text)) { console.error('Ordet "fredag" saknas'); process.exit(1); }
+            }
+          })().catch((e) => { console.error(e); process.exit(1); });
+          EOF
+      - name: Paketera ggml
+        run: |
+          cd ggml && tar cjf ../kb-whisper-$SIZE-metal.tar.bz2 whisper-cpp-kb-$SIZE-metal && tar cjf ../kb-whisper-$SIZE-metal-q5.tar.bz2 whisper-cpp-kb-$SIZE-metal-q5 && cd .. && rm -rf ggml && ls -la *.tar.bz2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kb-whisper-${{ inputs.size }}-metal
+          path: kb-whisper-${{ inputs.size }}-metal.tar.bz2
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kb-whisper-${{ inputs.size }}-metal-q5
+          path: kb-whisper-${{ inputs.size }}-metal-q5.tar.bz2
+          compression-level: 0
       - name: Exportera till ONNX
         run: |
           mkdir -p out/sherpa-onnx-whisper-kb-$SIZE && cd out/sherpa-onnx-whisper-kb-$SIZE

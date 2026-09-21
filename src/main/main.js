@@ -45,7 +45,8 @@ function notify(title, body) {
 
 function engineSettings() {
   const s = settings.get();
-  return { modelsDir, whisper: s.whisper, numThreads: s.numThreads || undefined, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel };
+  const whisperCli = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'whisper-cli') : path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-cli');
+  return { modelsDir, whisper: s.whisper, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
 }
 
 async function ensureLlmModel() {
@@ -197,6 +198,7 @@ function registerIpc() {
     return after;
   });
   ipcMain.handle('models:status', () => engine.call('status'));
+  ipcMain.handle('engine:info', () => engine.call('engineInfo'));
   ipcMain.handle('open:logs', () => shell.openPath(logsDir));
   ipcMain.handle('models:install', (_e, { kind, name }) => {
     const method = kind === 'whisper' ? 'installWhisper' : 'installAux';
@@ -343,7 +345,7 @@ async function firstRunCheck() {
   const s = settings.get();
   if (!st.whisper[s.whisper] || !st.whisper[s.whisper].installed || !st.aux.vad.installed) {
     openSettings();
-    notify('Speak behöver modeller', 'Ladda ner en whisper-modell och röstdetektorn i Inställningar innan du kan diktera.');
+    notify('Speak behöver modeller', 'Importera KB-Whisper eller ladda ner turbo i Inställningar, och hämta talarmodellerna.');
   } else {
     engine.call('warmup').catch((e) => console.error('warmup', e.message));
   }

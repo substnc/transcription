@@ -30,7 +30,7 @@ modellfiler första gången.
 
 | Del | Teknik | Var det körs |
 |---|---|---|
-| Taligenkänning | Whisper via [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) | På datorn (CPU) |
+| Taligenkänning | Whisper via [whisper.cpp](https://github.com/ggml-org/whisper.cpp) på grafikkretsen (Metal), eller [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) på CPU | På datorn |
 | Röstdetektor | Silero VAD | På datorn |
 | Talarseparering | pyannote segmentation 3.0 + 3D-Speaker | På datorn |
 | Textstädning och sammanfattning | Ollama (valfritt), annars regler | På datorn (127.0.0.1) |
@@ -47,7 +47,7 @@ Kräver macOS 13 eller senare och Node 20 eller senare för att bygga.
 
 ```bash
 npm install
-npm run models          # laddar ner whisper-small + röst- och talarmodeller (ca 1 GB)
+npm run models          # laddar ner talarmodellerna + turbo (ca 1,7 GB)
 npm start
 ```
 
@@ -62,22 +62,19 @@ lägg till Speak under både Tillgänglighet och Inmatningsövervakning, och sta
 
 ### Modeller
 
-Väljs i Inställningar. Svenska behöver minst `small`. Rekommendation för Apple Silicon: `turbo`.
+Alla körs av whisper.cpp på grafikkretsen (Metal). Väljs i Inställningar.
 
 | Modell | Storlek | Kommentar |
 |---|---|---|
-| small | 1 GB | Rimlig svenska, snabb |
-| turbo | 1.6 GB | Large-v3 turbo. Bäst balans |
-| medium | 3 GB | Bra, långsammare |
-| large-v3 | 6 GB | Bäst kvalitet, långsammast |
+| KB-Whisper large | 3 GB | Bäst på svenska. Rekommenderad. Importeras. |
+| KB-Whisper large q5 | 1,1 GB | Komprimerad, snabbast, nästan samma kvalitet. Importeras. |
+| KB-Whisper medium | 1,5 GB | Snabb, något sämre. Importeras. |
+| turbo | 1,6 GB | OpenAI large-v3 turbo. Laddas ner automatiskt. Reserv. |
 
-Modellerna körs i full precision. Det tar mer plats men ger märkbart bättre svenska än de komprimerade varianterna.
+Talarmodellerna (röstdetektor, talarsegmentering, röstavtryck, 50 MB) laddas ner med en knapp.
 
-`npm run models -- turbo` laddar ner en annan modell från terminalen.
-
-**KB-Whisper (bäst på svenska).** Kungliga bibliotekets svensktränade whisper gör ungefär
-hälften så många fel på svenska som OpenAI:s egen. Den konverteras av ett GitHub-jobb:
-Actions → "Konvertera KB-Whisper" → välj storlek → ladda ner artefakten → Inställningar →
+**KB-Whisper** konverteras av ett GitHub-jobb: Actions → "Konvertera KB-Whisper" → välj storlek →
+ladda ner artefakten `kb-whisper-<storlek>-metal` (eller `-metal-q5`) → Inställningar →
 "Importera modell". Detaljer och säkerhetskontroller i `scripts/kb-whisper/README.md`.
 
 ### Ollama (valfritt men rekommenderat)

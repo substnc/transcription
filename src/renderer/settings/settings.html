@@ -47,15 +47,15 @@
 
 <section class="card">
   <h2>Taligenkänning (whisper)</h2>
-  <p class="status">Välj vilken modell som används. Större modell ger bättre svenska men tar längre tid. Modellerna sparas i <code id="modelsDir"></code>.</p>
+  <p class="status">Alla modeller körs på grafikkretsen. KB-Whisper importeras från konverteringsjobbet i repot, turbo laddas ner direkt. Modellerna sparas i <code id="modelsDir"></code>.</p>
   <div id="whisperList"></div>
-  <div class="row" style="margin-top: 14px"><button id="btnImport">Importera modell</button><span class="status">KB-Whisper (svensktränad) skapas via Actions → "Konvertera KB-Whisper" i repot. Ladda ner .tar.bz2-filen och importera den här.</span></div>
+  <div class="row" style="margin-top: 14px"><button id="btnImport">Importera modell</button><span class="status">Välj .tar.bz2-filen (eller en ggml-*.bin) från Actions → "Konvertera KB-Whisper".</span></div>
 </section>
 
 <section class="card">
   <h2>Mötesläge</h2>
-  <div id="auxList"></div>
-  <label class="check" style="margin-top:10px"><input type="checkbox" id="diarize"> Separera talare (kräver modellerna ovan)</label>
+  <div class="row"><span class="label">Talarmodeller (röst, talare, röstavtryck, 50 MB)</span><span class="chip" id="auxStatus">–</span><button id="btnAux">Ladda ner</button></div>
+  <label class="check" style="margin-top:14px"><input type="checkbox" id="diarize"> Separera talare</label>
   <label class="check"><input type="checkbox" id="captureSystemAudio"> Ta med datorns ljud i inspelningen (videomöten). Kräver macOS 14.2 och Skärminspelning.</label>
   <label class="check"><input type="checkbox" id="keepRecordings"> Behåll ljudfilen efter att anteckningen sparats</label>
   <div class="field" style="margin-top:8px"><label>Mappar att spara anteckningar i</label><div id="inboxList" class="stack"></div></div>

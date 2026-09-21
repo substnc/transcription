@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('diktera', {
     install: (kind, name) => ipcRenderer.invoke('models:install', { kind, name }),
     remove: (name) => ipcRenderer.invoke('models:remove', { name }),
     import: () => ipcRenderer.invoke('models:import'),
+    engineInfo: () => ipcRenderer.invoke('engine:info'),
     onProgress: on('models:progress'),
   },
   llm: { status: () => ipcRenderer.invoke('llm:status') },
