@@ -71,21 +71,38 @@ function progressLine(key) {
   return `${(p.done / 1e6).toFixed(0)} MB`;
 }
 
-// Visar vilken motor den valda modellen körs med. Bra vid felsökning: "Metal" betyder whisper.cpp på grafikkretsen.
+// Visar vilken motor de valda modellerna körs med. Bra vid felsökning: "Metal" betyder whisper.cpp på grafikkretsen.
 async function renderEngine() {
   const el = $('engineStatus');
   try {
-    const info = await api.models.engineInfo();
-    if (info.ggml && info.whisperCli) { el.textContent = 'whisper.cpp på Metal'; el.className = 'chip ok'; }
-    else if (info.ggml) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; }
-    else { el.textContent = 'sherpa-onnx på CPU (ONNX-modell)'; el.className = 'chip warn'; }
+    const describe = (info) => (!info.installed ? 'inte installerad' : info.ggml ? 'Metal' : 'CPU (ONNX)');
+    const sv = await api.models.engineInfo(S.whisperSv);
+    const en = await api.models.engineInfo(S.whisperEn || S.whisperSv);
+    if ((sv.ggml || en.ggml) && !sv.whisperCli) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; return; }
+    el.textContent = `Svenska: ${describe(sv)} · Engelska: ${describe(en)}`;
+    el.className = 'chip ' + (sv.installed && en.installed && sv.ggml && en.ggml ? 'ok' : 'warn');
   } catch (e) {
     el.textContent = 'Kunde inte läsa motorstatus: ' + e.message; el.className = 'chip bad';
   }
 }
 
+// De två valen: en modell för svenska (och blandat), en för engelska. Bara installerade går att välja.
+function renderSlots(st) {
+  for (const [id, key] of [['whisperSv', 'whisperSv'], ['whisperEn', 'whisperEn']]) {
+    const sel = $(id);
+    sel.innerHTML = '';
+    const installed = Object.entries(st.whisper).filter(([, m]) => m.installed).map(([n]) => n);
+    if (!installed.length) sel.add(new Option('Ingen modell installerad', ''));
+    for (const n of installed) sel.add(new Option(n, n));
+    if (S[key] && !installed.includes(S[key])) sel.add(new Option(S[key] + ' (saknas)', S[key]));
+    sel.value = S[key] || '';
+    sel.onchange = async () => { S = { ...S, ...(await api.settings.set({ [key]: sel.value })) }; renderEngine(); };
+  }
+}
+
 async function renderModels() {
   const st = await api.models.status();
+  renderSlots(st);
   renderEngine();
   const wl = $('whisperList');
   wl.innerHTML = '';
@@ -93,10 +110,8 @@ async function renderModels() {
     const row = document.createElement('div');
     row.className = 'model';
     const left = document.createElement('div');
-    const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'whisper'; radio.value = name; radio.checked = S.whisper === name; radio.disabled = !m.installed;
-    radio.onchange = async () => { S = await api.settings.set({ whisper: name }); renderEngine(); };
-    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = ' ' + name;
-    left.append(radio, nm);
+    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = name;
+    left.append(nm);
     const mid = document.createElement('div');
     mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
     const key = `whisper:${name}`;
@@ -109,7 +124,7 @@ async function renderModels() {
     const right = document.createElement('div');
     const btn = document.createElement('button');
     if (progress[key]) { btn.textContent = 'Laddar ner…'; btn.disabled = true; }
-    else if (m.installed) { btn.textContent = 'Ta bort'; btn.className = 'danger'; btn.onclick = async () => { if (confirm(`Ta bort whisper-${name}?`)) { await api.models.remove(name); renderModels(); } }; }
+    else if (m.installed) { btn.textContent = 'Ta bort'; btn.className = 'danger'; btn.onclick = async () => { if (confirm(`Ta bort whisper-${name}?`)) { await api.models.remove(name); S = await api.settings.get(); renderModels(); } }; }
     else if (m.manual) { btn.textContent = 'Importera'; btn.onclick = importModel; }
     else { btn.textContent = 'Ladda ner'; btn.onclick = () => install('whisper', name); }
     right.appendChild(btn);
@@ -133,7 +148,7 @@ async function install(kind, name) {
   renderModels();
   try {
     await api.models.install(kind, name);
-    if (kind === 'whisper' && !S.whisper) await api.settings.set({ whisper: name });
+    if (kind === 'whisper' && !S.whisperSv) S = { ...S, ...(await api.settings.set({ whisperSv: name })) };
   } catch (e) {
     alert(`Nedladdning misslyckades: ${e.message}`);
   }

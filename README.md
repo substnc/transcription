@@ -63,18 +63,21 @@ lägg till Speak under både Tillgänglighet och Inmatningsövervakning, och sta
 
 ### Modeller
 
-Alla körs av whisper.cpp på grafikkretsen (Metal). Väljs i Inställningar.
+Alla körs av whisper.cpp på grafikkretsen (Metal). Två modeller räcker, och språket du väljer
+avgör vilken som används: svenska och blandat tal går till svenskmodellen, helt engelska till
+engelskmodellen. Båda väljs i Inställningar.
 
-| Modell | Storlek | Kommentar |
+| Modell | Storlek | Används för |
 |---|---|---|
-| KB-Whisper large | 3 GB | Bäst på svenska. Rekommenderad. Importeras. |
-| KB-Whisper large q5 | 1,1 GB | Komprimerad, snabbast, nästan samma kvalitet. Importeras. |
-| KB-Whisper medium | 1,5 GB | Snabb, något sämre. Importeras. |
-| turbo | 1,6 GB | OpenAI large-v3 turbo. Laddas ner automatiskt. Reserv. |
+| KB-Whisper large | 3 GB | Svenska och blandat. Importeras från konverteringsjobbet. |
+| turbo | 1,6 GB | Engelska. OpenAI large-v3 turbo, laddas ner automatiskt. |
+
+Konverteringsjobbet kan även ge en komprimerad variant (`-metal-q5`) och medium; importerar du en
+sådan dyker den upp i listan och kan väljas för endera språket.
 
 Talarmodellerna (röstdetektor, talarsegmentering, röstavtryck, 50 MB) laddas ner med en knapp.
 
-Raden **Motor** i Inställningar visar vad den valda modellen körs med: "whisper.cpp på Metal" är rätt.
+Raden **Motor** i Inställningar visar vad de valda modellerna körs med: "Metal" är rätt.
 Står det att whisper-cli saknas är appen byggd utan binären; hämta ett nyare bygge. Efter ett möte
 visas tiden det tog och hur många gånger snabbare än realtid det gick, både i mötesfönstret och i loggen
 (Inställningar → Visa loggar, sök på `[motor] klart`).

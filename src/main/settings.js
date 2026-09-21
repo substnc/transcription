@@ -8,7 +8,8 @@ const ICLOUD_OBSIDIAN = path.join(os.homedir(), 'Library', 'Mobile Documents', '
 const DEFAULTS = {
   hotkey: 'AltRight', // håll in höger ⌥ för att diktera
   hotkeyMode: 'hold', // 'hold' eller 'toggle'
-  whisper: 'kb-large-metal',
+  whisperSv: 'kb-large-metal', // modell för svenska och blandat tal
+  whisperEn: 'turbo-metal', // modell för helt engelska
   language: 'auto', // 'auto' | 'sv' | 'en'
   allowed: ['sv', 'en'],
   primary: 'sv',
@@ -36,7 +37,13 @@ class Settings {
     this.file = file;
     this.data = { ...DEFAULTS };
     try {
-      if (fs.existsSync(file)) this.data = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
+      if (fs.existsSync(file)) {
+        const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+        // Äldre inställningar hade en enda modell ("whisper"). Den blir svenskmodellen.
+        if (saved.whisper && !saved.whisperSv) saved.whisperSv = saved.whisper;
+        delete saved.whisper;
+        this.data = { ...DEFAULTS, ...saved };
+      }
     } catch (e) {
       console.error('Kunde inte läsa inställningar:', e.message);
     }
@@ -49,6 +56,10 @@ class Settings {
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
     return this.data;
+  }
+  // Språket avgör modellen: engelska får sin egen, allt annat (svenska, blandat) får svenskmodellen.
+  modelFor(language) {
+    return language === 'en' ? this.data.whisperEn || this.data.whisperSv : this.data.whisperSv;
   }
   policy() {
     return { language: this.data.language, allowed: this.data.allowed, primary: this.data.primary };

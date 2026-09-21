@@ -45,7 +45,7 @@ function notify(title, body) {
 function engineSettings() {
   const s = settings.get();
   const whisperCli = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'whisper-cli') : path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-cli');
-  return { modelsDir, whisper: s.whisper, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
+  return { modelsDir, whisper: s.whisperSv, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
 }
 
 async function ensureLlmModel() {
@@ -104,7 +104,8 @@ async function stopDictation() {
   overlay('processing', 'Bearbetar…');
   try {
     const s = settings.get();
-    const r = await engine.call('dictate', { samples, policy: settings.policy(), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
+    const policy = settings.policy();
+    const r = await engine.call('dictate', { samples, policy, whisper: settings.modelFor(policy.language), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
     if (!r.text) return overlay('hidden');
     const how = await pasteText(r.text, { autoPaste: s.autoPaste, restoreClipboard: s.restoreClipboard });
     overlay('done', how === 'pasted' ? 'Inklistrat' : 'Kopierat till urklipp');
@@ -152,10 +153,11 @@ async function transcribeMeeting(wavPath, opts = {}) {
   const speakerCount = opts.speakerCount || 0;
   const policy = { ...settings.policy(), ...(opts.language ? { language: opts.language } : {}) };
   sendToMeeting('meeting:progress', { phase: 'load', text: 'Laddar modeller…' });
-  const r = await engine.call('meeting', { wavPath, policy, diarize: s.diarize, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
+  const whisper = settings.modelFor(policy.language);
+  const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
   sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
   const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
-  return { ...r, summary, wavPath, model: `whisper-${s.whisper}` };
+  return { ...r, summary, wavPath, model: `whisper-${whisper}` };
 }
 
 // ---------- IPC ----------
@@ -191,13 +193,13 @@ function registerIpc() {
     const after = settings.set(patch);
     if (patch.hotkey !== undefined || patch.hotkeyMode !== undefined) hotkey.restart({ hotkey: after.hotkey, hotkeyMode: after.hotkeyMode });
     if (patch.launchAtLogin !== undefined) app.setLoginItemSettings({ openAtLogin: !!patch.launchAtLogin });
-    if (patch.whisper !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
-    if (before.whisper !== after.whisper) engine.call('warmup').catch(() => {});
+    if (patch.whisperSv !== undefined || patch.whisperEn !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
+    if (before.whisperSv !== after.whisperSv) engine.call('warmup').catch(() => {});
     buildTray();
     return after;
   });
   ipcMain.handle('models:status', () => engine.call('status'));
-  ipcMain.handle('engine:info', () => engine.call('engineInfo'));
+  ipcMain.handle('engine:info', (_e, name) => engine.call('engineInfo', { name }));
   ipcMain.handle('open:logs', () => shell.openPath(logsDir));
   ipcMain.handle('models:install', (_e, { kind, name }) => {
     const method = kind === 'whisper' ? 'installWhisper' : 'installAux';
@@ -209,7 +211,7 @@ function registerIpc() {
     const r = await dialog.showOpenDialog(settingsWin, { title: 'Välj modellmapp eller .tar.bz2', properties: ['openFile', 'openDirectory'], filters: [{ name: 'Modell', extensions: ['bz2', 'tar'] }] });
     if (r.canceled || !r.filePaths.length) return null;
     const res = await engine.call('importWhisper', { sourcePath: r.filePaths[0] });
-    settings.set({ whisper: res.name });
+    if (!settings.get('whisperSv')) settings.set({ whisperSv: res.name });
     await engine.call('configure', engineSettings());
     buildTray();
     return res;
@@ -331,7 +333,7 @@ function buildTray() {
     { label: 'Mötesläge…', click: openMeeting },
     { label: 'Inställningar och modeller…', click: openSettings },
     { type: 'separator' },
-    { label: `Modell: whisper-${s.whisper}`, enabled: false },
+    { label: `Svenska: ${s.whisperSv || '–'} · Engelska: ${s.whisperEn || s.whisperSv || '–'}`, enabled: false },
     { label: `Allt körs lokalt${s.useLlm && s.ollamaModel ? ` · Ollama: ${s.ollamaModel}` : ''}`, enabled: false },
     { type: 'separator' },
     { label: 'Avsluta Speak', role: 'quit' },
@@ -342,7 +344,7 @@ function buildTray() {
 async function firstRunCheck() {
   const st = await engine.call('status');
   const s = settings.get();
-  if (!st.whisper[s.whisper] || !st.whisper[s.whisper].installed || !st.aux.vad.installed) {
+  if (!st.whisper[s.whisperSv] || !st.whisper[s.whisperSv].installed || !st.aux.vad.installed) {
     openSettings();
     notify('Speak behöver modeller', 'Importera KB-Whisper eller ladda ner turbo i Inställningar, och hämta talarmodellerna.');
   } else {

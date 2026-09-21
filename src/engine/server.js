@@ -38,8 +38,10 @@ const methods = {
     pipeline.ensureVad();
     return true;
   },
-  async engineInfo() {
-    return { ggml: !!pipeline.ggmlModel(), whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
+  // Motorinfo per modell: körs den med whisper.cpp (ggml) eller sherpa (ONNX)? Utan namn: den laddade.
+  async engineInfo({ name } = {}) {
+    const files = name ? models.whisperFiles(settings.modelsDir, name) : null;
+    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
   },
   async llmStatus() {
     return llm.available(settings.ollamaHost);
@@ -63,7 +65,8 @@ const methods = {
   },
 
   // Diktering: samples (Float32Array 16 kHz) -> städad text.
-  async dictate({ samples, policy, useLlm, voiceCommands, vocabulary }) {
+  async dictate({ samples, policy, whisper, useLlm, voiceCommands, vocabulary }) {
+    if (whisper) pipeline.setWhisper(whisper);
     const f32 = samples instanceof Float32Array ? samples : new Float32Array(samples);
     const prompt = vocabularyPrompt(vocabulary);
     const raw = pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy, prompt }) : pipeline.dictate(f32, { policy });
@@ -81,7 +84,8 @@ const methods = {
   },
 
   // Möte: wavPath -> segment med talare och tidsstämplar.
-  async meeting({ wavPath, policy, diarize, speakerCount, vocabulary }, id) {
+  async meeting({ wavPath, policy, whisper, diarize, speakerCount, vocabulary }, id) {
+    if (whisper) pipeline.setWhisper(whisper);
     const onProgress = (p) => send({ id, progress: p });
     const prompt = vocabularyPrompt(vocabulary);
     return pipeline.ggmlModel()

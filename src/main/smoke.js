@@ -28,7 +28,7 @@ module.exports = async function smoke({ engine, openMeeting, openSettings, trans
     // Inställningsfönstret ska ha renderat modellistan.
     const rows = await w.settingsWin.webContents.executeJavaScript('document.querySelectorAll("#whisperList .model").length');
     console.log('SMOKE modellrader', rows);
-    if (rows < 5) throw new Error('modellistan renderades inte');
+    if (rows < 2) throw new Error('modellistan renderades inte');
 
     // Dikteringsflödet utan mikrofon: start/stop ska inte krascha.
     await startDictation();
