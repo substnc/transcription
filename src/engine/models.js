@@ -77,6 +77,15 @@ function status(modelsDir) {
   for (const name of Object.keys(WHISPER_MODELS)) {
     whisper[name] = { ...WHISPER_MODELS[name], installed: !!whisperFiles(modelsDir, name) };
   }
+  // Egna importerade modeller som inte finns i katalogen visas också.
+  if (fs.existsSync(modelsDir)) {
+    for (const f of fs.readdirSync(modelsDir)) {
+      const name = f.replace(/^sherpa-onnx-whisper-/, '');
+      if (f.startsWith('sherpa-onnx-whisper-') && !whisper[name] && whisperFiles(modelsDir, name)) {
+        whisper[name] = { size: '', note: 'Importerad modell.', manual: true, installed: true };
+      }
+    }
+  }
   const aux = {};
   for (const key of Object.keys(AUX_MODELS)) {
     aux[key] = { label: AUX_MODELS[key].label, size: AUX_MODELS[key].size, installed: fs.existsSync(auxPath(modelsDir, key)) };
