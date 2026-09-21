@@ -42,14 +42,10 @@ async function start(withMeter, withSystemAudio, withMic = true) {
     if (!stream && !sysStream) throw new Error('Ingen ljudkälla gick att öppna');
     ctx = new AudioContext({ sampleRate: 16000 });
     await ctx.audioWorklet.addModule('worklet.js');
-    node = new AudioWorkletNode(ctx, 'pcm-capture', { numberOfOutputs: 1, outputChannelCount: [1] });
+    // Ingång 0 = mikrofon, ingång 1 = datorns ljud. Worklet:en sköter mix och ekoskydd.
+    node = new AudioWorkletNode(ctx, 'pcm-capture', { numberOfInputs: 2, numberOfOutputs: 1, outputChannelCount: [1] });
     const src = stream ? ctx.createMediaStreamSource(stream) : null;
-    if (sysStream) {
-      // Två källor in på samma ingång summeras av Web Audio. Dämpa lite så summan inte klipper.
-      const sysSrc = ctx.createMediaStreamSource(sysStream);
-      const gain = ctx.createGain(); gain.gain.value = 0.8;
-      sysSrc.connect(gain); gain.connect(node);
-    }
+    if (sysStream) ctx.createMediaStreamSource(sysStream).connect(node, 0, 1);
     if (meter) window.diktera.capture.sendInfo({ systemAudio, mic: !!stream, wantedSystem: !!withSystemAudio });
     node.port.onmessage = (e) => {
       if (!running) return;
@@ -62,7 +58,7 @@ async function start(withMeter, withSystemAudio, withMic = true) {
       }
       window.diktera.capture.sendChunk(e.data);
     };
-    if (src) src.connect(node);
+    if (src) src.connect(node, 0, 0);
     node.connect(ctx.destination);
     if (meter) meterTimer = setInterval(() => {
       if (meterN) window.diktera.capture.sendLevel(Math.min(1, (meterAcc / meterN) * 6));
