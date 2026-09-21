@@ -141,6 +141,7 @@ api.meeting.onProgress(setProgress);
 
 // ---- Resultat ----
 function showResult(r) {
+  state.saved = false;
   state.result = r;
   state.speakerNames = Object.fromEntries(r.speakers.map((s) => [s, s]));
   $('resultTitle').textContent = $('title').value.trim() || 'Möte';
@@ -234,7 +235,6 @@ $('btnCopy').onclick = async () => {
   $('btnCopy').textContent = 'Kopierat';
   setTimeout(() => ($('btnCopy').textContent = 'Kopiera som text'), 1200);
 };
-$('btnSaveTop').onclick = () => $('btnSave').click();
 
 // ---- Spara ----
 async function renderInboxes() {
@@ -289,6 +289,7 @@ $('btnSave').onclick = async () => {
     $('saveStatus').innerHTML = '';
     const a = document.createElement('button'); a.className = 'small'; a.textContent = 'Visa i Finder'; a.onclick = () => api.open.folder(p);
     const b = document.createElement('button'); b.className = 'small'; b.textContent = 'Öppna i Obsidian'; b.onclick = () => api.open.path(p);
+    state.saved = true;
     $('saveStatus').append(`Sparad: ${p.split('/').pop()} `, a, ' ', b);
   } catch (e) {
     $('saveStatus').textContent = 'Kunde inte spara: ' + e.message;
@@ -297,8 +298,11 @@ $('btnSave').onclick = async () => {
   }
 };
 
+// Börja om: tillbaka till starten. Frågar först om anteckningen inte är sparad.
 $('btnNew').onclick = () => {
+  if (state.result && !state.saved && !confirm('Anteckningen är inte sparad. Börja om ändå?')) return;
   state.result = null;
+  state.saved = false;
   state.audioPath = null;
   $('title').value = '';
   show('idle');
