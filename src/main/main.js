@@ -341,6 +341,16 @@ function buildTray() {
   tray.setContextMenu(menu);
 }
 
+// Rester i inspelningsmappen (krasch, avslutat mitt i) städas vid start om inspelningar inte ska behållas.
+function cleanRecordings() {
+  if (settings.get('keepRecordings') || !fs.existsSync(recordingsDir)) return;
+  const old = Date.now() - 24 * 3600 * 1000;
+  for (const f of fs.readdirSync(recordingsDir)) {
+    const p = path.join(recordingsDir, f);
+    try { if (f.endsWith('.wav') && fs.statSync(p).mtimeMs < old) fs.rmSync(p, { force: true }); } catch {}
+  }
+}
+
 async function firstRunCheck() {
   const st = await engine.call('status');
   const s = settings.get();
@@ -380,6 +390,7 @@ app.whenReady().then(async () => {
   buildTray();
   if (process.platform === 'darwin') systemPreferences.askForMediaAccess('microphone').catch(() => {});
   if (process.env.DIKTERA_SMOKE) return require('./smoke')({ engine, openMeeting, openSettings, transcribeMeeting, startDictation, stopDictation, wins: () => ({ meetingWin, settingsWin, captureWin, overlayWin }) });
+  cleanRecordings();
   await firstRunCheck();
 
   engine.on('exit', () => {

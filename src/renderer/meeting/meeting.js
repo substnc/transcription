@@ -299,8 +299,11 @@ $('btnSave').onclick = async () => {
 };
 
 // Börja om: tillbaka till starten. Frågar först om anteckningen inte är sparad.
-$('btnNew').onclick = () => {
+$('btnNew').onclick = async () => {
   if (state.result && !state.saved && !confirm('Anteckningen är inte sparad. Börja om ändå?')) return;
+  // Ljudfilen behövs inte längre (om du inte valt att behålla inspelningar).
+  const s = state.settings || (await api.settings.get());
+  if (state.audioPath && !s.keepRecordings) api.meeting.discardAudio(state.audioPath);
   state.result = null;
   state.saved = false;
   state.audioPath = null;

@@ -20,7 +20,7 @@ const DEFAULTS = {
   voiceCommands: true,
   autoPaste: true,
   restoreClipboard: true,
-  keepRecordings: true,
+  keepRecordings: false, // ljudfilen tas bort när anteckningen är sparad eller mötet kastas
   diarize: true,
   captureSystemAudio: true, // ta med datorns ljud (videomöten) i mötesinspelningar
   vocabulary: '', // ordlista: namn och facktermer, ett per rad, skickas som prompt till whisper
