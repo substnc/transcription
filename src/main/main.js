@@ -1,6 +1,6 @@
 'use strict';
 // sub.stnc® - Speak: menyradsapp för lokal diktering och mötestranskribering.
-const { app, Tray, Menu, nativeImage, ipcMain, dialog, shell, systemPreferences, Notification, session } = require('electron');
+const { app, Tray, Menu, nativeImage, ipcMain, dialog, shell, systemPreferences, Notification, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -131,7 +131,8 @@ function startMeetingRecording() {
   rec.wav = new WavWriter(path.join(recordingsDir, `mote-${stamp}.wav`));
   rec.mode = 'meeting';
   rec.startedAt = Date.now();
-  captureSend({ cmd: 'start', meter: true });
+  rec.systemAudio = null;
+  captureSend({ cmd: 'start', meter: true, systemAudio: !!settings.get('captureSystemAudio') });
   return rec.wav.filePath;
 }
 
@@ -165,6 +166,18 @@ function registerIpc() {
     else if (rec.mode === 'meeting' && rec.wav) rec.wav.write(f);
   });
   ipcMain.on('capture:level', (_e, level) => sendToMeeting('meeting:level', { level, seconds: rec.wav ? rec.wav.seconds : 0 }));
+  // Vilka källor inspelningen faktiskt fick: mikrofon och/eller datorns ljud.
+  ipcMain.on('capture:info', (_e, info) => { rec.systemAudio = info.systemAudio; sendToMeeting('meeting:info', info); });
+  // Skärmkälla för systemljud (macOS 14.2+ via ScreenCaptureKit). Kräver skärminspelningsbehörighet.
+  ipcMain.handle('capture:screen-source', async () => {
+    try {
+      const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } });
+      return sources.length ? sources[0].id : null;
+    } catch (e) {
+      console.error('desktopCapturer:', e.message);
+      return null;
+    }
+  });
   ipcMain.on('capture:error', (_e, msg) => {
     console.error('Mikrofonfel:', msg);
     if (rec.mode === 'dictation') { rec.mode = null; overlay('error', 'Mikrofonfel'); setTimeout(() => overlay('hidden'), 3000); }
@@ -194,6 +207,7 @@ function registerIpc() {
   ipcMain.handle('perm:status', () => ({
     accessibility: accessibilityGranted(false),
     microphone: process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('microphone') : 'granted',
+    screen: process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('screen') : 'granted',
     hotkeyActive: hotkey.active,
     hotkeyError: hotkey.error,
   }));

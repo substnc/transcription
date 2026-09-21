@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('diktera', {
     onProgress: on('meeting:progress'),
     onLevel: on('meeting:level'),
     onError: on('meeting:error'),
+    onInfo: on('meeting:info'),
   },
   overlay: { onState: on('overlay:state') },
   capture: {
@@ -53,5 +54,7 @@ contextBridge.exposeInMainWorld('diktera', {
     sendChunk: (buf) => ipcRenderer.send('capture:chunk', buf),
     sendLevel: (v) => ipcRenderer.send('capture:level', v),
     sendError: (m) => ipcRenderer.send('capture:error', m),
+    sendInfo: (i) => ipcRenderer.send('capture:info', i),
+    screenSource: () => ipcRenderer.invoke('capture:screen-source'),
   },
 });

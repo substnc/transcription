@@ -17,7 +17,7 @@ modellfiler första gången.
 - Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph".
 
 **Mötesläge**
-- Spela in via mikrofonen eller ladda upp en ljud- eller videofil (mp3, m4a, wav, mp4 med flera).
+- Spela in via mikrofonen, plus datorns eget ljud i videomöten (macOS 14.2+), eller ladda upp en ljud- eller videofil (mp3, m4a, wav, mp4 med flera).
 - Innan inspelning visas en påminnelse om samtycke. Du måste bocka i att alla deltagare fått veta och sagt ja.
 - Hela mötet transkriberas, talare märks upp med tidsstämplar, och en sammanfattning med beslut och att-göra skapas.
 - Du kan döpa om talare och redigera allt innan du sparar.
@@ -133,7 +133,7 @@ Motorn körs i en egen process så att appen aldrig hänger under transkribering
 
 ## Kända begränsningar
 
-- Mötesinspelning tar bara upp mikrofonen. Ljud från ett videomöte fångas via högtalarna, inte via systemljudet.
+- Datorns ljud i möten kräver macOS 14.2 eller senare och behörigheten Skärminspelning. På äldre system spelas bara mikrofonen in.
 - Whisper ger inga ordvisa tidsstämplar. Tidsstämplarna gäller per talartur eller talstycke.
 - Språkidentifiering görs per stycke. Ett enstaka engelskt ord i en svensk mening behandlas som svenska, vilket brukar bli rätt.
 - Talarseparering kan slå ihop två personer med liknande röst. Döp om och slå ihop i fönstret innan du sparar.

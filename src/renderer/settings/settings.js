@@ -14,7 +14,7 @@ async function load() {
   $('hotkeyMode').value = S.hotkeyMode;
   $('language').value = S.language;
   $('primary').value = S.primary;
-  for (const id of ['autoPaste', 'restoreClipboard', 'voiceCommands', 'diarize', 'keepRecordings', 'useLlm', 'llmDictation', 'launchAtLogin']) $(id).checked = !!S[id];
+  for (const id of ['autoPaste', 'restoreClipboard', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'useLlm', 'llmDictation', 'launchAtLogin']) $(id).checked = !!S[id];
   renderInboxes();
   await Promise.all([renderModels(), renderLlm(), renderPerms()]);
 }
@@ -29,7 +29,7 @@ bindSimple('hotkey', 'hotkey');
 bindSimple('hotkeyMode', 'hotkeyMode');
 bindSimple('language', 'language');
 bindSimple('primary', 'primary');
-for (const id of ['autoPaste', 'restoreClipboard', 'voiceCommands', 'diarize', 'keepRecordings', 'useLlm', 'llmDictation', 'launchAtLogin']) bindSimple(id, id, 'checked');
+for (const id of ['autoPaste', 'restoreClipboard', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'useLlm', 'llmDictation', 'launchAtLogin']) bindSimple(id, id, 'checked');
 $('ollamaModel').onchange = () => api.settings.set({ ollamaModel: $('ollamaModel').value });
 
 // ---- Behörigheter ----
@@ -38,6 +38,8 @@ async function renderPerms() {
   const mic = $('permMic');
   mic.textContent = p.microphone === 'granted' ? 'OK' : p.microphone === 'denied' ? 'Nekad' : 'Inte tillfrågad';
   mic.className = 'chip ' + (p.microphone === 'granted' ? 'ok' : 'warn');
+  $('permScreen').textContent = p.screen === 'granted' ? 'OK' : p.screen === 'denied' ? 'Nekad' : 'Inte tillfrågad';
+  $('permScreen').className = 'chip ' + (p.screen === 'granted' ? 'ok' : 'warn');
   $('permAcc').textContent = p.accessibility ? 'OK' : 'Saknas';
   $('permAcc').className = 'chip ' + (p.accessibility ? 'ok' : 'warn');
   $('permHook').textContent = p.hotkeyActive ? 'Aktiv' : 'Inaktiv' + (p.hotkeyError ? ` (${p.hotkeyError})` : '');
@@ -45,6 +47,7 @@ async function renderPerms() {
 }
 $('btnMic').onclick = async () => { await api.perm.request('microphone'); renderPerms(); };
 $('btnAcc').onclick = async () => { await api.perm.request('accessibility'); api.open.external('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'); };
+$('btnScreen').onclick = () => api.open.external('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
 $('btnInput').onclick = () => api.open.external('x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent');
 setInterval(renderPerms, 3000);
 

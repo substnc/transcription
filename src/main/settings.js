@@ -21,6 +21,7 @@ const DEFAULTS = {
   restoreClipboard: true,
   keepRecordings: true,
   diarize: true,
+  captureSystemAudio: true, // ta med datorns ljud (videomöten) i mötesinspelningar
   numThreads: 0,
   inboxes: [
     { label: '01_CLAUDE_COWORK / 99_inbox', path: path.join(ICLOUD_OBSIDIAN, '01_CLAUDE_COWORK', '99_inbox') },

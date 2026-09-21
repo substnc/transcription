@@ -26,6 +26,7 @@
   <h2>Behörigheter</h2>
   <div class="perm"><span>Mikrofon</span><span class="row"><span class="chip" id="permMic">–</span><button id="btnMic">Be om åtkomst</button></span></div>
   <div class="perm"><span>Tillgänglighet (för ⌘V och håll-in-tangent)</span><span class="row"><span class="chip" id="permAcc">–</span><button id="btnAcc">Öppna systeminställningar</button></span></div>
+  <div class="perm"><span>Skärminspelning (för datorns ljud i möten)</span><span class="row"><span class="chip" id="permScreen">–</span><button id="btnScreen">Öppna systeminställningar</button></span></div>
   <div class="perm"><span>Inmatningsövervakning (håll-in-tangent)</span><span class="row"><span class="chip" id="permHook">–</span><button id="btnInput">Öppna systeminställningar</button></span></div>
   <p class="status">Om håll-in-tangenten inte fungerar: ge Speak Tillgänglighet och Inmatningsövervakning i Systeminställningar → Integritet och säkerhet, och starta om appen. Genvägen <span id="toggleShortcut"></span> fungerar alltid som av/på-knapp.</p>
 </section>
@@ -54,6 +55,7 @@
   <h2>Mötesläge</h2>
   <div id="auxList"></div>
   <label class="check" style="margin-top:10px"><input type="checkbox" id="diarize"> Separera talare (kräver modellerna ovan)</label>
+  <label class="check"><input type="checkbox" id="captureSystemAudio"> Ta med datorns ljud i inspelningen (videomöten). Kräver macOS 14.2 och Skärminspelning.</label>
   <label class="check"><input type="checkbox" id="keepRecordings"> Behåll ljudfilen efter att anteckningen sparats</label>
   <div class="field" style="margin-top:8px"><label>Mappar att spara anteckningar i</label><div id="inboxList" class="stack"></div></div>
 </section>

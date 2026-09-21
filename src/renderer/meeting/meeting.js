@@ -70,6 +70,7 @@ $('consentOk').onclick = async () => {
     state.audioPath = await api.meeting.start();
     state.startedAt = Date.now();
     levels.fill(0);
+    $('sources').textContent = 'Mikrofon';
     show('recording');
     timerHandle = setInterval(() => ($('timer').textContent = fmt((Date.now() - state.startedAt) / 1000)), 500);
   } catch (e) {
@@ -80,6 +81,9 @@ $('consentOk').onclick = async () => {
 // ---- Inspelning ----
 api.meeting.onLevel(({ level }) => pushLevel(level));
 api.meeting.onError((msg) => fail('Mikrofonfel: ' + msg));
+api.meeting.onInfo((info) => {
+  $('sources').textContent = info.systemAudio ? 'Mikrofon och datorns ljud' : 'Bara mikrofon (datorns ljud gick inte att ta upp, kolla Skärminspelning i Inställningar)';
+});
 
 $('btnStop').onclick = async () => {
   clearInterval(timerHandle);
