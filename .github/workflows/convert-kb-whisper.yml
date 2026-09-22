@@ -20,8 +20,8 @@ jobs:
       SIZE: ${{ inputs.size }}
       HF_HUB_DISABLE_TELEMETRY: "1"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
       - name: Frigör plats på byggservern
@@ -76,12 +76,12 @@ jobs:
       - name: Paketera ggml
         run: |
           cd ggml && tar cjf ../kb-whisper-$SIZE-metal.tar.bz2 whisper-cpp-kb-$SIZE-metal && tar cjf ../kb-whisper-$SIZE-metal-q5.tar.bz2 whisper-cpp-kb-$SIZE-metal-q5 && cd .. && rm -rf ggml && ls -la *.tar.bz2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: kb-whisper-${{ inputs.size }}-metal
           path: kb-whisper-${{ inputs.size }}-metal.tar.bz2
           compression-level: 0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: kb-whisper-${{ inputs.size }}-metal-q5
           path: kb-whisper-${{ inputs.size }}-metal-q5.tar.bz2
@@ -116,7 +116,7 @@ jobs:
       - name: Paketera
         run: |
           cd out && tar cjf ../kb-whisper-$SIZE.tar.bz2 sherpa-onnx-whisper-kb-$SIZE && cd .. && ls -la kb-whisper-$SIZE.tar.bz2
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: kb-whisper-${{ inputs.size }}
           path: kb-whisper-${{ inputs.size }}.tar.bz2
