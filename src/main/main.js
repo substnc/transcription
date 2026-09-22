@@ -195,6 +195,7 @@ function registerIpc() {
     const after = settings.set(patch);
     if (patch.hotkey !== undefined || patch.hotkeyMode !== undefined) hotkey.restart({ hotkey: after.hotkey, hotkeyMode: after.hotkeyMode });
     if (patch.launchAtLogin !== undefined) app.setLoginItemSettings({ openAtLogin: !!patch.launchAtLogin });
+    if (patch.showInDock !== undefined && app.dock) (patch.showInDock ? app.dock.show() : app.dock.hide());
     if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
     if (before.whisperDictation !== after.whisperDictation) engine.call('warmup').catch(() => {});
     buildTray();
@@ -373,7 +374,7 @@ async function firstRunCheck() {
 }
 
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin' && app.dock) app.dock.hide();
+  if (process.platform === 'darwin' && app.dock && !settings.get('showInDock')) app.dock.hide();
 
   // Bara vårt eget osynliga fönster får mikrofonen. Inga andra behörigheter beviljas.
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
@@ -416,6 +417,8 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => { /* menyradsapp: fortsätt köra */ });
+// Klick på Dock-ikonen öppnar Inställningar.
+app.on('activate', () => { if (app.isReady()) openSettings(); });
 app.on('before-quit', () => {
   hotkey.stop();
   engine.stop();

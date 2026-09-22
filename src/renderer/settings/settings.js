@@ -16,7 +16,7 @@ async function load() {
   $('language').value = S.language;
   $('vocabulary').value = S.vocabulary || '';
   $('llmMode').value = !S.useLlm ? 'off' : S.llmDictation ? 'all' : 'meetings';
-  for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin']) $(id).checked = !!S[id];
+  for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) $(id).checked = !!S[id];
   renderInboxes();
   await Promise.all([renderModels(), renderLlm(), renderPerms()]);
 }
@@ -31,7 +31,7 @@ bindSimple('hotkey', 'hotkey');
 bindSimple('hotkeyMode', 'hotkeyMode');
 bindSimple('language', 'language');
 bindSimple('vocabulary', 'vocabulary');
-for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin']) bindSimple(id, id, 'checked');
+for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) bindSimple(id, id, 'checked');
 $('llmMode').onchange = async () => {
   const m = $('llmMode').value;
   S = { ...S, ...(await api.settings.set({ useLlm: m !== 'off', llmDictation: m === 'all' })) };

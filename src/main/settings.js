@@ -33,6 +33,7 @@ const DEFAULTS = {
   ],
   defaultInbox: 0,
   launchAtLogin: false,
+  showInDock: true, // ikon i Dock så att man ser att appen kör
 };
 
 class Settings {
