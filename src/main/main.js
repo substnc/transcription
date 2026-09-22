@@ -15,7 +15,7 @@ const { buildMeetingNote } = require('../engine/markdown');
 
 // Bara en Speak i taget. Klickar man på appen när den redan kör: väck den som finns i stället.
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
-app.on('second-instance', () => openSettings());
+app.on('second-instance', () => showCurrent());
 
 // Appen hette Diktera tidigare. Flytta med modeller och inställningar om de ligger kvar under det gamla namnet.
 const userData = app.getPath('userData');
@@ -417,8 +417,14 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => { /* menyradsapp: fortsätt köra */ });
-// Klick på Dock-ikonen öppnar Inställningar.
-app.on('activate', () => { if (app.isReady()) openSettings(); });
+// Klick på Dock-ikonen visar det som pågår: mötesfönstret om det är öppet eller ett möte spelas in,
+// annars Inställningar om det är öppet, annars mötesläget.
+function showCurrent() {
+  if ((meetingWin && !meetingWin.isDestroyed()) || rec.mode === 'meeting') return openMeeting();
+  if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
+  openMeeting();
+}
+app.on('activate', () => { if (app.isReady()) showCurrent(); });
 app.on('before-quit', () => {
   hotkey.stop();
   engine.stop();
