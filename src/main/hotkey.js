@@ -1,7 +1,7 @@
 'use strict';
 // Håll-in-tangent via uiohook (kräver Tillgänglighet/Inmatningsövervakning i macOS).
 // Reserv: en vanlig global genväg som växlar inspelning av/på.
-const { globalShortcut } = require('electron');
+const { app, globalShortcut } = require('electron');
 const EventEmitter = require('events');
 
 const KEY_LABELS = {
@@ -80,7 +80,7 @@ class Hotkey extends EventEmitter {
     try {
       if (this.uiohook) this.uiohook.stop();
     } catch { /* ignorera */ }
-    globalShortcut.unregisterAll();
+    if (app.isReady()) globalShortcut.unregisterAll();
     this.active = false;
   }
 

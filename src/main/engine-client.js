@@ -29,9 +29,13 @@ class EngineClient extends EventEmitter {
       this.proc.stderr.on('data', (d) => out.write(d));
       this.proc.on('exit', (code) => out.end(`===== motor avslutad, kod ${code} =====\n`));
     }
-    this.ready = new Promise((resolve) => {
+    // Startar motorn inte inom rimlig tid, eller dör den innan den sagt hej, ska anropet misslyckas i stället för att hänga.
+    let readyReject = null;
+    this.ready = new Promise((resolve, reject) => {
+      readyReject = reject;
+      const timer = setTimeout(() => reject(new Error('Motorn svarade inte inom 60 s. ' + this.logTail())), 60000);
       this.proc.on('message', (m) => {
-        if (m && m.ready) return resolve();
+        if (m && m.ready) { clearTimeout(timer); return resolve(); }
         const p = this.pending.get(m.id);
         if (!p) return;
         if (m.progress) return p.onProgress && p.onProgress(m.progress);
@@ -41,6 +45,7 @@ class EngineClient extends EventEmitter {
     });
     this.proc.on('exit', (code) => {
       const tail = this.logTail();
+      if (readyReject) readyReject(new Error(`Motorn kraschade vid start (kod ${code}). ${tail}`));
       for (const p of this.pending.values()) p.reject(new Error(`Motorn kraschade (kod ${code}). ${tail}`));
       this.pending.clear();
       this.proc = null;

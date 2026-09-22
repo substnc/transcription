@@ -13,7 +13,9 @@ const windows = require('./windows');
 const { WavWriter, convertToWav, concatFloat32 } = require('../engine/audio');
 const { buildMeetingNote } = require('../engine/markdown');
 
-if (!app.requestSingleInstanceLock()) app.quit();
+// Bara en Speak i taget. Klickar man på appen när den redan kör: väck den som finns i stället.
+if (!app.requestSingleInstanceLock()) { app.exit(0); }
+app.on('second-instance', () => openSettings());
 
 // Appen hette Diktera tidigare. Flytta med modeller och inställningar om de ligger kvar under det gamla namnet.
 const userData = app.getPath('userData');
@@ -380,9 +382,16 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionCheckHandler((wc, permission) => permission === 'media' && !!captureWin && !!wc && wc.id === captureWin.webContents.id);
 
   registerIpc();
-  await engine.start();
-  await engine.call('init', engineSettings());
-  await ensureLlmModel();
+  // Ikonen först, så att appen alltid syns även om motorn strular.
+  buildTray();
+  try {
+    await engine.start();
+    await engine.call('init', engineSettings());
+    await ensureLlmModel();
+  } catch (e) {
+    console.error('Motorn kunde inte starta:', e.message);
+    dialog.showErrorBox('Speak: motorn kunde inte starta', `${e.message}\n\nLoggar: ${logsDir}`);
+  }
 
   captureWin = windows.createCapture();
   captureWin.webContents.on('render-process-gone', () => { captureWin = windows.createCapture(); });
