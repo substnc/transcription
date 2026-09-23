@@ -1,0 +1,39 @@
+name: Testa Pianissimo på Mac
+
+# Installerar Klang Pianissimo precis som appen gör (uv, Python 3.11, torch, nemo_toolkit[asr], modellen)
+# på en Apple Silicon-Mac, och kör möte, diktering och livetext genom appens motor.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - src/engine/pianissimo.js
+      - src/engine/pipeline.js
+      - resources/pianissimo/**
+      - scripts/test-pianissimo.js
+      - .github/workflows/test-pianissimo.yml
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-latest   # Apple Silicon, som din Mac
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Förbered
+        run: |
+          npm install --no-save sherpa-onnx-node@1.13.8 >/dev/null
+          B=https://github.com/k2-fsa/sherpa-onnx/releases/download
+          curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
+          curl -sSL -o silero_vad.onnx $B/asr-models/silero_vad.onnx
+          df -h / | tail -1; sysctl -n hw.memsize hw.ncpu machdep.cpu.brand_string
+      - name: Installera och kör Pianissimo genom appens kod
+        run: node scripts/test-pianissimo.js pn-models vits-piper-sv_SE-nst-medium
+      - name: Diskutrymme för installationen
+        if: always()
+        run: du -sh pn-models/pianissimo-sv/* 2>/dev/null || true

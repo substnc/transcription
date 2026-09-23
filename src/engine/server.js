@@ -40,7 +40,7 @@ const methods = {
     if (!livePipeline || livePipeline.whisperName !== model) {
       livePipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: model, numThreads: Math.max(2, Math.min(4, require('os').cpus().length - 2)), whisperCli: settings.whisperCli, sherpa: pipeline && pipeline.sherpa });
     }
-    livePipeline.liveStart();
+    await livePipeline.liveStart();
     return true;
   },
   async liveFeed({ samples }) {
@@ -61,7 +61,7 @@ const methods = {
   // Motorinfo per modell: körs den med whisper.cpp (ggml) eller sherpa (ONNX)? Utan namn: den laddade.
   async engineInfo({ name } = {}) {
     const files = name ? models.whisperFiles(settings.modelsDir, name) : null;
-    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), nemo: !!(files && files.nemo), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
+    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), py: !!(files && files.py), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
   },
   async llmStatus() {
     return llm.available(settings.ollamaHost);
@@ -87,10 +87,10 @@ const methods = {
   // Diktering: samples (Float32Array 16 kHz) -> städad text.
   async dictate({ samples, policy, whisper, useLlm, voiceCommands, vocabulary }) {
     if (whisper) pipeline.setWhisper(whisper);
-    pipeline.setHotwords(vocabulary);
     const f32 = samples instanceof Float32Array ? samples : new Float32Array(samples);
     const prompt = vocabularyPrompt(vocabulary);
-    const raw = pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy, prompt }) : pipeline.dictate(f32, { policy });
+    const raw = pipeline.pyWorker() ? await pipeline.dictatePy(f32)
+      : pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy, prompt }) : pipeline.dictate(f32, { policy });
     let text = cleanup(raw.text, { voiceCommands });
     let cleanedBy = 'rules';
     if (useLlm && text && settings.ollamaModel) {
@@ -107,9 +107,9 @@ const methods = {
   // Möte: wavPath -> segment med talare och tidsstämplar.
   async meeting({ wavPath, policy, whisper, diarize, speakerCount, vocabulary }, id) {
     if (whisper) pipeline.setWhisper(whisper);
-    pipeline.setHotwords(vocabulary);
     const onProgress = (p) => send({ id, progress: p });
     const prompt = vocabularyPrompt(vocabulary);
+    if (pipeline.pyWorker()) return pipeline.meetingPy(wavPath, { diarize, speakerCount, onProgress });
     return pipeline.ggmlModel()
       ? pipeline.meetingCpp(wavPath, { policy, diarize, speakerCount, prompt, onProgress })
       : pipeline.meeting(wavPath, { policy, diarize, speakerCount, onProgress });

@@ -15,7 +15,7 @@ modellfiler första gången.
 - Tangent och beteende (håll in eller tryck av/på) väljs i Inställningar. Genvägen ⌥⇧D fungerar alltid som av/på.
 - Texten städas: tvekljud bort, skiljetecken och versaler fixas. Med Ollama installerat gör en lokal språkmodell jobbet, annars enkla regler.
 - Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph".
-- Ordlista: skriv in namn och facktermer i Inställningar (ett per rad). De skickas med till taligenkänningen som ledtråd så att de stavas rätt, i både diktering och möten (whisper: prompt, Pianissimo: hotwords).
+- Ordlista: skriv in namn och facktermer i Inställningar (ett per rad). De skickas med till taligenkänningen som ledtråd så att de stavas rätt, i både diktering och möten (whisper; påverkar inte Pianissimo).
 
 **Mötesläge**
 - Spela in via mikrofonen, plus datorns eget ljud i videomöten (macOS 14.2+), eller ladda upp en ljud- eller videofil (mp3, m4a, wav, mp4 med flera).
@@ -74,9 +74,16 @@ och en noggrann för möten. Båda klarar svenska och engelska och väljs i Inst
 Konverteringsjobbet kan även ge en komprimerad variant (`-metal-q5`) och medium; importerar du en
 sådan dyker den upp i listan och kan väljas för diktering eller möten.
 
-**Klang Pianissimo** (svensk, mycket snabb, körs på processorn via sherpa-onnx) kan användas för livetext
-under möten och för den noggranna körningen efteråt. Den görs om av jobbet Actions → "Konvertera Pianissimo";
-importera artefakten `pianissimo-sv`. Detaljer i `scripts/pianissimo/README.md`.
+**Klang Pianissimo** (öppen svensk modell, CC BY 4.0) körs precis som modellkortet på
+[Hugging Face](https://huggingface.co/KlangAI/pianissimo-sv) beskriver: Python med PyTorch och `nemo_toolkit[asr]`,
+`ASRModel.from_pretrained("KlangAI/pianissimo-sv")` och `model.transcribe(..., timestamps=True)`, med modellens egen
+lokala attention. Ingen omvandling. Installeras med en knapp i Inställningar: appen hämtar uv, en egen Python 3.11,
+PyTorch, NeMo och modellen (cirka 4,5 GB, en gång). Därefter körs den utan nät (`HF_HUB_OFFLINE=1`) i en egen
+Python-process som håller modellen laddad (`resources/pianissimo/worker.py`). Ordlistan påverkar inte Pianissimo.
+Jobbet Actions → "Testa Pianissimo på Mac" installerar och provkör den på en Apple Silicon-Mac.
+
+Klangs egna mätningar (ordfel, lägre är bättre): Pianissimo 4,46 / 6,51 / 4,85 %, KB-Whisper large
+3,91 / 5,08 / 2,30 % (Common Voice / FLEURS / dialekter). KB large är alltså noggrannare, Pianissimo mycket snabbare.
 
 **Livetext:** medan ett möte spelas in visas en grov text som växer fram. När du stoppar görs den noggranna
 körningen med modellen under "Möten", med talare och tidsstämplar. Modellen för livetext väljs i Inställningar
@@ -140,7 +147,8 @@ DIKTERA_SMOKE=1 DIKTERA_MODELS_DIR=/sökväg/till/modeller DIKTERA_TEST_WAV=/sö
 Struktur:
 
 ```
-src/engine/     ren Node: modeller, ljud, whisper-pipeline, städning, sammanfattning, markdown
+src/engine/     ren Node: modeller, ljud, whisper-pipeline, Pianissimo-arbetare, städning, sammanfattning, markdown
+resources/      whisper-cli (byggs i CI) och Pianissimo-arbetaren i Python
 src/main/       Electron: menyrad, tangentlyssning, inklistring, fönster, IPC
 src/renderer/   fönster: osynlig mikrofon, statuspill, mötesläge, inställningar
 scripts/        nedladdning av modeller, ikoner

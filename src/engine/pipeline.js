@@ -1,6 +1,6 @@
 'use strict';
-// Transkriberingsmotorn. Allt körs lokalt: whisper.cpp (Metal) eller sherpa-onnx (whisper, NeMo/Pianissimo),
-// Silero VAD och pyannote-talarseparering.
+// Transkriberingsmotorn. Allt körs lokalt: whisper.cpp (Metal), sherpa-onnx (whisper på CPU) eller
+// Klang Pianissimo med NeMo i Python, plus Silero VAD och pyannote-talarseparering.
 
 const path = require('path');
 const models = require('./models');
@@ -8,6 +8,7 @@ const { assignSpeakers, relabelSpeakers, coalesce } = require('./merge');
 const { isHallucination, tidy } = require('./cleanup');
 const audio = require('./audio');
 const whispercpp = require('./whispercpp');
+const pianissimo = require('./pianissimo');
 
 const SAMPLE_RATE = 16000;
 const VAD_WINDOW = 512;
@@ -19,11 +20,6 @@ const MIN_AUTO_LANG_SEC = 3;
 // Livetext: kortare talstycken så att texten dyker upp snabbt medan mötet pågår.
 const LIVE_MAX_SPEECH_SEC = 12;
 
-// Ordlista -> hotwords för sherpa (NeMo-transducer). Fraser separeras med '/'.
-function hotwordsFrom(text) {
-  const terms = String(text || '').split(/[\n,;/]+/).map((t) => t.trim()).filter(Boolean);
-  return [...new Set(terms)].slice(0, 100).join('/');
-}
 
 // Ett trasigt modellfil får onnxruntime att avsluta hela processen. Kontrollera innan.
 function checkModelFile(file, label) {
@@ -58,8 +54,6 @@ class Pipeline {
     this.diarizer = null;
     this.currentLanguage = null;
     this.loadedWhisper = null;
-    this.isNemo = false;
-    this.hotwords = '';
     this.live = null;
   }
 
@@ -80,12 +74,11 @@ class Pipeline {
     }
   }
 
-  // Ordlista för NeMo-modeller. Byter avkodning (beam search med ordlista, annars greedy), så modellen laddas om vid ändring.
-  setHotwords(text) {
-    const hw = hotwordsFrom(text);
-    if (hw === this.hotwords) return;
-    this.hotwords = hw;
-    if (this.isNemo) { this.recognizer = null; this.loadedWhisper = null; }
+
+  // Pianissimo (NeMo i Python)? Returnerar arbetaren, annars null.
+  pyWorker() {
+    const files = models.whisperFiles(this.modelsDir, this.whisperName);
+    return files && files.py ? pianissimo.worker(files.dir) : null;
   }
 
   // ggml-modell (whisper.cpp på Metal) eller ONNX (sherpa på CPU)?
@@ -99,8 +92,7 @@ class Pipeline {
     const files = models.whisperFiles(this.modelsDir, this.whisperName);
     if (!files) throw new Error(`Whisper-modellen "${this.whisperName}" är inte nedladdad. Öppna Inställningar och ladda ner den.`);
     if (files.ggml) throw new Error('Den här modellen körs med whisper.cpp, inte sherpa.');
-    if (files.nemo) return this.ensureNemo(files);
-    this.isNemo = false;
+    if (files.py) throw new Error('Den här modellen körs med NeMo i Python, inte sherpa.');
     checkModelFile(files.encoder, 'Whisper encoder');
     checkModelFile(files.decoder, 'Whisper decoder');
     console.error(`[motor] laddar whisper-${this.whisperName} (${this.numThreads} trådar)`);
@@ -116,35 +108,6 @@ class Pipeline {
     };
     this.recognizer = new this.s.OfflineRecognizer(this.config);
     this.currentLanguage = '';
-    this.loadedWhisper = this.whisperName;
-    return this.recognizer;
-  }
-
-  // NeMo-transducer (Parakeet/Pianissimo). Bara ett språk, ingen språkinställning.
-  ensureNemo(files) {
-    checkModelFile(files.encoder, 'Encoder');
-    checkModelFile(files.decoder, 'Decoder');
-    checkModelFile(files.joiner, 'Joiner');
-    const useHotwords = !!(this.hotwords && files.bpeVocab);
-    console.error(`[motor] laddar ${this.whisperName} (NeMo, ${this.numThreads} trådar${useHotwords ? ', med ordlista' : ''})`);
-    this.config = {
-      featConfig: { sampleRate: SAMPLE_RATE, featureDim: 128 },
-      modelConfig: {
-        transducer: { encoder: files.encoder, decoder: files.decoder, joiner: files.joiner },
-        tokens: files.tokens,
-        numThreads: this.numThreads,
-        provider: 'cpu',
-        debug: 0,
-        modelType: 'nemo_transducer',
-        ...(useHotwords ? { modelingUnit: 'bpe', bpeVocab: files.bpeVocab } : {}),
-      },
-      decodingMethod: useHotwords ? 'modified_beam_search' : 'greedy_search',
-      ...(useHotwords ? { maxActivePaths: 4, hotwordsScore: 1.5 } : {}),
-    };
-    this.recognizer = new this.s.OfflineRecognizer(this.config);
-    this.isNemo = true;
-    this.nemoHotwords = useHotwords;
-    this.currentLanguage = 'sv';
     this.loadedWhisper = this.whisperName;
     return this.recognizer;
   }
@@ -187,7 +150,6 @@ class Pipeline {
 
   setLanguage(lang) {
     const rec = this.ensureRecognizer();
-    if (this.isNemo) return;
     const l = lang === 'auto' ? '' : lang || '';
     if (l === this.currentLanguage) return;
     const cfg = JSON.parse(JSON.stringify(this.config));
@@ -200,19 +162,16 @@ class Pipeline {
   decode(samples, lang) {
     const rec = this.ensureRecognizer();
     this.setLanguage(lang);
-    const st = this.isNemo && this.nemoHotwords ? rec.createStream(this.hotwords) : rec.createStream();
+    const st = rec.createStream();
     st.acceptWaveform({ samples, sampleRate: SAMPLE_RATE });
     rec.decode(st);
     const r = rec.getResult(st);
-    if (this.isNemo) return { text: (r.text || '').trim(), lang: 'sv' };
     return { text: (r.text || '').trim(), lang: r.lang || lang || '' };
   }
 
   // Språkpolicy: auto-detektera, men tillåt bara de valda språken. Annat tvingas till huvudspråket.
   decodeWithPolicy(samples, policy) {
     const { language = 'auto', allowed = ['sv', 'en'], primary = 'sv' } = policy || {};
-    this.ensureRecognizer();
-    if (this.isNemo) return this.decode(samples, 'sv');
     if (language !== 'auto') return this.decode(samples, language);
     if (samples.length < MIN_AUTO_LANG_SEC * SAMPLE_RATE) return this.decode(samples, allowed.includes(primary) ? primary : allowed[0]);
     let r = this.decode(samples, 'auto');
@@ -344,21 +303,63 @@ class Pipeline {
 
     const t2 = Date.now();
     const timing = { diarizeSec: (t1 - t0) / 1000, transcribeSec: (t2 - t1) / 1000, totalSec: (t2 - t0) / 1000, speed: durationSec / Math.max(0.001, (t2 - t0) / 1000) };
-    console.error(`[motor] klart (${this.isNemo ? 'NeMo' : 'sherpa'}): talare ${timing.diarizeSec.toFixed(1)} s, taligenkänning ${timing.transcribeSec.toFixed(1)} s, totalt ${timing.totalSec.toFixed(1)} s (${timing.speed.toFixed(1)}× realtid)`);
+    console.error(`[motor] klart (sherpa): talare ${timing.diarizeSec.toFixed(1)} s, taligenkänning ${timing.transcribeSec.toFixed(1)} s, totalt ${timing.totalSec.toFixed(1)} s (${timing.speed.toFixed(1)}× realtid)`);
     if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
-    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: this.isNemo ? 'nemo' : 'sherpa', timing };
+    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'sherpa', timing };
+  }
+
+  // ---- Pianissimo (NeMo i Python), som modellkortet beskriver ----
+  // Hela filen skickas i ett anrop med tidsstämplar; modellens lokala attention klarar långa inspelningar.
+  async meetingPy(wavPath, { diarize = true, speakerCount = 0, onProgress } = {}) {
+    const w = this.pyWorker();
+    const samples = audio.readWav(wavPath).samples;
+    const durationSec = samples.length / SAMPLE_RATE;
+    console.error(`[motor] möte (Pianissimo): ${durationSec.toFixed(1)} s, antal talare=${speakerCount || 'auto'}`);
+    const t0 = Date.now();
+    let diar = [];
+    if (diarize) {
+      if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
+      diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
+      if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
+    }
+    const t1 = Date.now();
+    if (onProgress) onProgress({ phase: 'transcribe', text: 'Transkriberar med Pianissimo…' });
+    const r = await w.transcribe(wavPath, { timestamps: true });
+    const t2 = Date.now();
+    let segs = (r.segments || []).filter((x) => x.start != null && x.end != null)
+      .map((x) => ({ start: x.start, end: x.end, text: tidy(x.text), lang: 'sv', speaker: 0 }))
+      .filter((x) => x.text && !isHallucination(x.text));
+    if (!segs.length && r.text) segs = [{ start: 0, end: durationSec, text: tidy(r.text), lang: 'sv', speaker: 0 }];
+    const timing = { diarizeSec: (t1 - t0) / 1000, transcribeSec: (t2 - t1) / 1000, totalSec: (t2 - t0) / 1000, speed: durationSec / Math.max(0.001, (t2 - t0) / 1000) };
+    console.error(`[motor] klart (Pianissimo): talare ${timing.diarizeSec.toFixed(1)} s, Pianissimo ${timing.transcribeSec.toFixed(1)} s, totalt ${timing.totalSec.toFixed(1)} s (${timing.speed.toFixed(1)}× realtid)`);
+    if (diar.length) segs = assignSpeakers(segs, diar);
+    const labeled = relabelSpeakers(segs);
+    const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
+    return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'pianissimo', timing };
+  }
+
+  async dictatePy(samples) {
+    const t0 = Date.now();
+    const r = await this.pyWorker().transcribeSamples(samples);
+    console.error(`[motor] diktering (Pianissimo): ${(samples.length / SAMPLE_RATE).toFixed(1)} s ljud på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    const text = tidy(r.text || '');
+    const segs = text && !isHallucination(text) ? [{ start: 0, end: samples.length / SAMPLE_RATE, text, lang: 'sv' }] : [];
+    return { text: segs.map((x) => x.text).join(' '), languages: ['sv'], segments: segs };
   }
 
   // ---- Livetext under inspelning ----
   // Ljud matas in i bitar medan mötet pågår. En egen röstdetektor hittar avslutade talstycken,
   // som transkriberas direkt. Resultatet är grovt; den noggranna körningen görs när mötet stoppas.
-  liveStart() {
+  async liveStart() {
     const model = models.auxPath(this.modelsDir, 'vad');
     if (!require('fs').existsSync(model)) throw new Error('Röstdetektorn saknas. Ladda ner talarmodellerna i Inställningar.');
-    if (!this.ggmlModel()) this.ensureRecognizer(); // ladda modellen nu, inte vid första talstycket
+    // Ladda modellen nu, inte vid första talstycket.
+    const w = this.pyWorker();
+    if (w) await w.start();
+    else if (!this.ggmlModel()) this.ensureRecognizer();
     const vad = new this.s.Vad({
       sileroVad: { model, threshold: 0.5, minSilenceDuration: 0.4, minSpeechDuration: 0.25, windowSize: VAD_WINDOW, maxSpeechDuration: LIVE_MAX_SPEECH_SEC },
       sampleRate: SAMPLE_RATE, numThreads: 1, provider: 'cpu', debug: 0,
@@ -400,7 +401,10 @@ class Pipeline {
       const dur = p.samples.length / SAMPLE_RATE;
       if (dur < 0.5) continue;
       let text;
-      if (this.ggmlModel()) {
+      const w = this.pyWorker();
+      if (w) {
+        text = (await w.transcribeSamples(p.samples)).text || '';
+      } else if (this.ggmlModel()) {
         const segs = await whispercpp.transcribeSamples(p.samples, { binary: this.whisperCli, model: this.ggmlModel(), language: 'sv', threads: this.numThreads });
         text = segs.map((s) => s.text).join(' ');
       } else {
@@ -422,4 +426,4 @@ function isJunk(text, lang, dur, policy) {
   return false;
 }
 
-module.exports = { Pipeline, SAMPLE_RATE, audio, hotwordsFrom, modelsDir: (base) => path.join(base, 'models') };
+module.exports = { Pipeline, SAMPLE_RATE, audio, modelsDir: (base) => path.join(base, 'models') };

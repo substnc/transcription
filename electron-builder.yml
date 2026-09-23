@@ -13,6 +13,8 @@ files:
 extraResources:
   - from: resources/bin
     to: bin
+  - from: resources/pianissimo
+    to: pianissimo
 asarUnpack:
   - node_modules/sherpa-onnx-node/**
   - node_modules/sherpa-onnx-darwin-*/**

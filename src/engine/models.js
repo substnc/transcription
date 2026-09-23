@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const { spawn } = require('child_process');
+const pianissimo = require('./pianissimo');
 
 const RELEASES = 'https://github.com/k2-fsa/sherpa-onnx/releases/download';
 
@@ -16,11 +17,12 @@ const WHISPER_MODELS = {
   'turbo-metal': { size: '1.6 GB', note: 'OpenAI whisper large-v3 turbo. Snabb, för diktering. Laddas ner automatiskt.', ggml: true,
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin' },
   'kb-large-metal': { size: '3 GB', note: 'KB-Whisper large. Noggrannast på svenska, för möten. Importeras.', manual: true, ggml: true },
-  'pianissimo-sv': { size: '0.7 GB', note: 'Klang Pianissimo. Bara svenska, mycket snabb. För livetext och möten. Importeras.', manual: true },
+  // Körs med NeMo i Python, som modellkortet beskriver. Installeras med en knapp (Python, PyTorch, NeMo, modellen).
+  'pianissimo-sv': { size: '4.5 GB', note: 'Klang Pianissimo. Bara svenska, mycket snabb. Körs med NeMo (Python). För livetext och möten.', python: true },
 };
 
-// Mappnamn per modelltyp: whisper i ONNX (sherpa), whisper i ggml (whisper.cpp), NeMo-transducer (sherpa, t.ex. Pianissimo).
-const PREFIX = /^(sherpa-onnx-whisper-|whisper-cpp-|sherpa-onnx-nemo-)/;
+// Mappnamn per modelltyp: whisper i ONNX (sherpa) eller whisper i ggml (whisper.cpp).
+const PREFIX = /^(sherpa-onnx-whisper-|whisper-cpp-)/;
 
 const AUX_MODELS = {
   vad: {
@@ -51,15 +53,13 @@ function whisperDir(modelsDir, name) {
 function ggmlDir(modelsDir, name) {
   return path.join(modelsDir, `whisper-cpp-${name}`);
 }
-// NeMo-transducer (Parakeet, Pianissimo) i sherpa-format: sherpa-onnx-nemo-<namn>/{encoder,decoder,joiner}.onnx + tokens.txt
-function nemoDir(modelsDir, name) {
-  return path.join(modelsDir, `sherpa-onnx-nemo-${name}`);
+// Python-modeller (Pianissimo): egen mapp med Python-miljö, NeMo och modellcache.
+function pyDir(modelsDir, name) {
+  return path.join(modelsDir, name);
 }
 function dirFor(modelsDir, folder) {
   const name = folder.replace(PREFIX, '');
-  if (folder.startsWith('whisper-cpp-')) return ggmlDir(modelsDir, name);
-  if (folder.startsWith('sherpa-onnx-nemo-')) return nemoDir(modelsDir, name);
-  return whisperDir(modelsDir, name);
+  return folder.startsWith('whisper-cpp-') ? ggmlDir(modelsDir, name) : whisperDir(modelsDir, name);
 }
 
 function findFile(dir, patterns) {
@@ -75,17 +75,13 @@ function findFile(dir, patterns) {
 // Hittar encoder/decoder/tokens för en whisper-modell. Föredrar full precision (bättre svenska),
 // int8 används bara om fp32-filerna saknas.
 function whisperFiles(modelsDir, name) {
+  if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) {
+    const dir = pyDir(modelsDir, name);
+    return pianissimo.isInstalled(dir) ? { py: true, dir } : null;
+  }
   const gdir = ggmlDir(modelsDir, name);
   const ggml = findFile(gdir, [/^ggml-model\.bin$/, /^ggml-model-f16\.bin$/, /^ggml-model-q5_0\.bin$/, /^ggml-.*\.bin$/]);
   if (ggml) return { ggml };
-  const ndir = nemoDir(modelsDir, name);
-  const nemo = {
-    encoder: findFile(ndir, [/^encoder\.onnx$/, /^encoder\.int8\.onnx$/]),
-    decoder: findFile(ndir, [/^decoder\.onnx$/, /^decoder\.int8\.onnx$/]),
-    joiner: findFile(ndir, [/^joiner\.onnx$/, /^joiner\.int8\.onnx$/]),
-    tokens: findFile(ndir, [/^tokens\.txt$/]),
-  };
-  if (nemo.encoder && nemo.decoder && nemo.joiner && nemo.tokens) return { nemo: true, ...nemo, bpeVocab: findFile(ndir, [/^bpe\.vocab$/]) };
   const dir = whisperDir(modelsDir, name);
   const encoder = findFile(dir, [/-encoder\.onnx$/, /-encoder\.int8\.onnx$/]);
   const decoder = findFile(dir, [/-decoder\.onnx$/, /-decoder\.int8\.onnx$/]);
@@ -102,7 +98,7 @@ function status(modelsDir) {
   const whisper = {};
   for (const name of Object.keys(WHISPER_MODELS)) {
     const files = whisperFiles(modelsDir, name);
-    whisper[name] = { ...WHISPER_MODELS[name], installed: !!files, ggml: !!(files && files.ggml) || !!WHISPER_MODELS[name].ggml, nemo: !!(files && files.nemo) };
+    whisper[name] = { ...WHISPER_MODELS[name], installed: !!files, ggml: !!(files && files.ggml) || !!WHISPER_MODELS[name].ggml, py: !!WHISPER_MODELS[name].python };
   }
   // Egna importerade modeller som inte finns i katalogen visas också.
   if (fs.existsSync(modelsDir)) {
@@ -111,7 +107,7 @@ function status(modelsDir) {
       const files = PREFIX.test(f) && !whisper[name] ? whisperFiles(modelsDir, name) : null;
       if (files) {
         const ggml = !!files.ggml; // ggml-mappen vinner om flera finns, precis som i motorn
-        whisper[name] = { size: '', note: ggml ? 'Importerad modell (Metal).' : 'Importerad modell.', manual: true, ggml, nemo: !!files.nemo, installed: true };
+        whisper[name] = { size: '', note: ggml ? 'Importerad modell (Metal).' : 'Importerad modell.', manual: true, ggml, installed: true };
       }
     }
   }
@@ -167,6 +163,10 @@ async function installWhisper(modelsDir, name, onProgress) {
   if (!WHISPER_MODELS[name]) throw new Error(`Okänd whisper-modell: ${name}`);
   if (WHISPER_MODELS[name].manual) throw new Error('Den här modellen laddas inte ner automatiskt. Använd Importera modell.');
   fs.mkdirSync(modelsDir, { recursive: true });
+  if (WHISPER_MODELS[name].python) {
+    await pianissimo.install(pyDir(modelsDir, name), { download, onProgress });
+    return;
+  }
   if (WHISPER_MODELS[name].ggml) {
     const dir = ggmlDir(modelsDir, name);
     fs.mkdirSync(dir, { recursive: true });
@@ -239,7 +239,10 @@ async function importWhisper(modelsDir, sourcePath) {
 function removeWhisper(modelsDir, name) {
   fs.rmSync(whisperDir(modelsDir, name), { recursive: true, force: true });
   fs.rmSync(ggmlDir(modelsDir, name), { recursive: true, force: true });
-  fs.rmSync(nemoDir(modelsDir, name), { recursive: true, force: true });
+  if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) {
+    pianissimo.stopAll();
+    fs.rmSync(pyDir(modelsDir, name), { recursive: true, force: true });
+  }
 }
 
 module.exports = { WHISPER_MODELS, AUX_MODELS, whisperFiles, auxPath, status, installWhisper, installAux, importWhisper, removeWhisper };

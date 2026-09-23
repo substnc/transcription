@@ -245,7 +245,7 @@ function registerIpc() {
   ipcMain.handle('models:install', (_e, { kind, name }) => {
     const method = kind === 'whisper' ? 'installWhisper' : 'installAux';
     const params = kind === 'whisper' ? { name } : { key: name };
-    return engine.call(method, params, (p) => sendToSettings('models:progress', { kind, name, ...p }));
+    return engine.call(method, params, (p) => sendToSettings('models:progress', { ...p, kind, name }));
   });
   ipcMain.handle('models:remove', (_e, { name }) => engine.call('removeWhisper', { name }));
   ipcMain.handle('models:import', async () => {
