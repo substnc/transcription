@@ -28,8 +28,12 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Frigör plats på byggservern
-        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL && df -h / | tail -1 && free -h && nproc
+      - name: Frigör plats och lägg till växlingsminne
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL
+          sudo swapoff -a || true
+          (sudo fallocate -l 16G /swapfile2 && sudo chmod 600 /swapfile2 && sudo mkswap /swapfile2 >/dev/null && sudo swapon /swapfile2) || echo "kunde inte lägga till växlingsminne"
+          df -h / | tail -1 && free -h && nproc
       - name: Installera beroenden
         run: |
           pip install --index-url https://download.pytorch.org/whl/cpu torch torchaudio
@@ -40,9 +44,11 @@ jobs:
       - name: Exportera till ONNX (sherpa-format)
         run: |
           mkdir -p out && cd out
-          python ../scripts/pianissimo/export_onnx.py ${{ inputs.attention == 'full' && '--full-attention' || '' }}
+          python ../scripts/pianissimo/export_onnx.py export ${{ inputs.attention == 'full' && '--full-attention' || '' }}
           rm -rf ~/.cache/huggingface ~/.cache/torch
-          df -h / | tail -1
+          free -h && df -h / | tail -1
+      - name: Komprimera till int8
+        run: cd out && python ../scripts/pianissimo/export_onnx.py quantize && free -h
       - name: Paketera
         run: |
           I=pkg/sherpa-onnx-nemo-pianissimo-sv; F=pkg/sherpa-onnx-nemo-pianissimo-sv-fp32

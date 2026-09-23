@@ -11,11 +11,11 @@ Ut:  encoder.onnx (+ encoder.weights), decoder.onnx, joiner.onnx     full precis
 
 import argparse
 import glob
+import json
 import os
+import sys
 
-import nemo.collections.asr as nemo_asr
 import onnx
-import torch
 from onnxruntime.quantization import QuantType, quantize_dynamic
 
 MODEL = "KlangAI/pianissimo-sv"
@@ -48,11 +48,11 @@ def export_all(asr_model):
     asr_model.joint.export("joiner.onnx")
 
 
-@torch.no_grad()
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--full-attention", action="store_true", help="byt till full attention innan export")
-    args = ap.parse_args()
+def export(args):
+    import nemo.collections.asr as nemo_asr
+    import torch
+
+    torch.set_grad_enabled(False)
 
     asr_model = nemo_asr.models.ASRModel.from_pretrained(model_name=MODEL, map_location="cpu")
     asr_model.eval()
@@ -97,21 +97,36 @@ def main():
         "feat_dim": int(asr_model.cfg.preprocessor.get("features", 128)),
     }
 
+    # Komprimering görs i en egen process (quantize()), så att NeMo-modellen inte ligger kvar i minnet.
+    with open("meta.json", "w") as f:
+        json.dump(meta_data, f)
+    print("meta_data", meta_data)
+    os.system("ls -lh")
+
+
+def quantize():
+    with open("meta.json") as f:
+        meta_data = json.load(f)
     for m in ["encoder", "decoder", "joiner"]:
         quantize_dynamic(
             model_input=f"./{m}.onnx",
             model_output=f"./{m}.int8.onnx",
             weight_type=QuantType.QUInt8 if m == "encoder" else QuantType.QInt8,
+            use_external_data_format=(m == "encoder"),
         )
-
+        print("komprimerad:", m, flush=True)
     add_meta_data("encoder.int8.onnx", meta_data)
     add_meta_data("encoder.onnx", meta_data, external="encoder.weights")
     # Lösa viktfiler från exporten behövs inte efter att encodern sparats om med encoder.weights.
-    for f in glob.glob("onnx__*") + glob.glob("*.onnx.data"):
-        os.remove(f)
-    print("meta_data", meta_data)
+    for f in glob.glob("onnx__*") + glob.glob("*.onnx.data") + glob.glob("*.int8.onnx.data") + ["meta.json"]:
+        if os.path.exists(f):
+            os.remove(f)
     os.system("ls -lh")
 
 
 if __name__ == "__main__":
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("step", choices=["export", "quantize"])
+    ap.add_argument("--full-attention", action="store_true", help="byt till full attention innan export")
+    a = ap.parse_args()
+    export(a) if a.step == "export" else quantize()
