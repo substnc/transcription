@@ -92,7 +92,8 @@ def export(args):
         "model_type": "EncDecRNNTBPEModel",
         "version": "2",
         "model_author": "Klang (NeMo)",
-        "url": f"https://huggingface.co/{MODEL}",
+        # sherpa-onnx känner igen TDT-modeller (Token-and-Duration Transducer) på att "tdt" finns i url.
+        "url": f"https://huggingface.co/{MODEL} (parakeet-tdt-0.6b-v3 fine-tune)",
         "comment": "Only the transducer branch is exported",
         "feat_dim": int(asr_model.cfg.preprocessor.get("features", 128)),
     }
