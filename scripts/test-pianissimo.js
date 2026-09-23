@@ -81,20 +81,26 @@ function check(cond, msg) { if (!cond) throw new Error(msg); }
   check(c.segments[0].speaker === 'Jag' && /fredag/.test(c.segments[0].text), 'mikrofonens mening ska vara "Jag"');
   check(c.segments.some((s) => s.speaker !== 'Jag' && /Stockholm/.test(s.text)), 'datorns mening ska ha en annan talare');
 
-  // 4. Nemotron på två olika röster i samma kanal (engelsk TTS med flera röster).
-  const en = makeTts(multiDir, 'en_US-libritts_r-medium.onnx');
-  const a = say(en, 'Good morning everyone, thanks for joining the call today. Let us start with the budget.', 0);
-  const b = say(en, 'Sure, I have the numbers ready and I can walk you through them right now.', 100);
-  const a2 = say(en, 'Great, please go ahead and share your screen when you are ready.', 0);
+  // 4. Två tydligt olika röster i samma kanal (svensk mansröst, engelsk kvinnoröst), A B A.
+  //    Två röster ur samma TTS-modell är för lika: varken Nemotron eller den inbyggda skiljer dem.
+  const en = makeTts(multiDir, 'en_US-amy-low.onnx');
+  const a = say(sv, 'God morgon allihop och tack för att ni kunde vara med i dag. Vi börjar med budgeten för kampanjen.');
+  const b = say(en, 'Sure, I have the numbers ready and I can walk you through them right now, it will only take a few minutes.');
+  const a2 = say(sv, 'Toppen, dela gärna skärmen när du är redo så går vi igenom siffrorna tillsammans.');
   writeWav('two.wav', concat(a, silence(0.5), b, silence(0.5), a2));
+  const describe = (tl) => JSON.stringify(tl.diar.map((x) => [x.start.toFixed(1), x.end.toFixed(1), x.speaker]));
+  const std = await p.speakerTimeline({ wavPath: 'two.wav', diarize: true, diarizer: 'standard' });
+  console.log(`inbyggd, två röster: ${new Set(std.diar.map((x) => x.speaker)).size} talare`, describe(std));
   t = Date.now();
   const tl = await p.speakerTimeline({ wavPath: 'two.wav', diarize: true, diarizer: 'nemotron' });
   const found = new Set(tl.diar.map((x) => x.speaker)).size;
-  console.log(`Nemotron, två röster (${tl.via}, ${((Date.now() - t) / 1000).toFixed(1)} s): ${found} talare`, JSON.stringify(tl.diar.map((x) => [x.start.toFixed(1), x.end.toFixed(1), x.speaker])));
+  console.log(`Nemotron, två röster (${tl.via}, ${((Date.now() - t) / 1000).toFixed(1)} s): ${found} talare`, describe(tl));
   check(tl.via === 'Nemotron 3', 'Nemotron användes inte');
   check(found === 2, `Nemotron hittade ${found} talare, väntade 2`);
-  const std = await p.speakerTimeline({ wavPath: 'two.wav', diarize: true, diarizer: 'standard' });
-  console.log(`inbyggd, två röster: ${new Set(std.diar.map((x) => x.speaker)).size} talare`);
+  // Första och sista stycket ska vara samma röst, mittstycket en annan.
+  const at = (sec) => (tl.diar.find((x) => x.start <= sec && x.end >= sec) || {}).speaker;
+  const secA = a.length / 16000 / 2, secB = (a.length + 8000 + b.length / 2) / 16000, secA2 = (a.length + b.length + 16000 + a2.length / 2) / 16000;
+  check(at(secA) === at(secA2) && at(secA) !== at(secB), 'Nemotron satte fel talare på styckena');
 
   pianissimo.stopAll();
 })().catch((e) => { console.error(e); pianissimo.stopAll(); process.exit(1); });
