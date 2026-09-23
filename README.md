@@ -15,7 +15,7 @@ modellfiler första gången.
 - Tangent och beteende (håll in eller tryck av/på) väljs i Inställningar. Genvägen ⌥⇧D fungerar alltid som av/på.
 - Texten städas: tvekljud bort, skiljetecken och versaler fixas. Med Ollama installerat gör en lokal språkmodell jobbet, annars enkla regler.
 - Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph".
-- Ordlista: skriv in namn och facktermer i Inställningar (ett per rad). De skickas med till whisper som ledtråd så att de stavas rätt, i både diktering och möten.
+- Ordlista: skriv in namn och facktermer i Inställningar (ett per rad). De skickas med till taligenkänningen som ledtråd så att de stavas rätt, i både diktering och möten (whisper: prompt, Pianissimo: hotwords).
 
 **Mötesläge**
 - Spela in via mikrofonen, plus datorns eget ljud i videomöten (macOS 14.2+), eller ladda upp en ljud- eller videofil (mp3, m4a, wav, mp4 med flera).
@@ -73,6 +73,14 @@ och en noggrann för möten. Båda klarar svenska och engelska och väljs i Inst
 
 Konverteringsjobbet kan även ge en komprimerad variant (`-metal-q5`) och medium; importerar du en
 sådan dyker den upp i listan och kan väljas för diktering eller möten.
+
+**Klang Pianissimo** (svensk, mycket snabb, körs på processorn via sherpa-onnx) kan användas för livetext
+under möten och för den noggranna körningen efteråt. Den görs om av jobbet Actions → "Konvertera Pianissimo";
+importera artefakten `pianissimo-sv`. Detaljer i `scripts/pianissimo/README.md`.
+
+**Livetext:** medan ett möte spelas in visas en grov text som växer fram. När du stoppar görs den noggranna
+körningen med modellen under "Möten", med talare och tidsstämplar. Modellen för livetext väljs i Inställningar
+(eller "Av").
 
 Talarmodellerna (röstdetektor, talarsegmentering, röstavtryck, 50 MB) laddas ner med en knapp.
 

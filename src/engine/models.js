@@ -16,7 +16,11 @@ const WHISPER_MODELS = {
   'turbo-metal': { size: '1.6 GB', note: 'OpenAI whisper large-v3 turbo. Snabb, för diktering. Laddas ner automatiskt.', ggml: true,
     url: 'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin' },
   'kb-large-metal': { size: '3 GB', note: 'KB-Whisper large. Noggrannast på svenska, för möten. Importeras.', manual: true, ggml: true },
+  'pianissimo-sv': { size: '0.7 GB', note: 'Klang Pianissimo. Bara svenska, mycket snabb. För livetext och möten. Importeras.', manual: true },
 };
+
+// Mappnamn per modelltyp: whisper i ONNX (sherpa), whisper i ggml (whisper.cpp), NeMo-transducer (sherpa, t.ex. Pianissimo).
+const PREFIX = /^(sherpa-onnx-whisper-|whisper-cpp-|sherpa-onnx-nemo-)/;
 
 const AUX_MODELS = {
   vad: {
@@ -47,6 +51,16 @@ function whisperDir(modelsDir, name) {
 function ggmlDir(modelsDir, name) {
   return path.join(modelsDir, `whisper-cpp-${name}`);
 }
+// NeMo-transducer (Parakeet, Pianissimo) i sherpa-format: sherpa-onnx-nemo-<namn>/{encoder,decoder,joiner}.onnx + tokens.txt
+function nemoDir(modelsDir, name) {
+  return path.join(modelsDir, `sherpa-onnx-nemo-${name}`);
+}
+function dirFor(modelsDir, folder) {
+  const name = folder.replace(PREFIX, '');
+  if (folder.startsWith('whisper-cpp-')) return ggmlDir(modelsDir, name);
+  if (folder.startsWith('sherpa-onnx-nemo-')) return nemoDir(modelsDir, name);
+  return whisperDir(modelsDir, name);
+}
 
 function findFile(dir, patterns) {
   if (!fs.existsSync(dir)) return null;
@@ -64,6 +78,14 @@ function whisperFiles(modelsDir, name) {
   const gdir = ggmlDir(modelsDir, name);
   const ggml = findFile(gdir, [/^ggml-model\.bin$/, /^ggml-model-f16\.bin$/, /^ggml-model-q5_0\.bin$/, /^ggml-.*\.bin$/]);
   if (ggml) return { ggml };
+  const ndir = nemoDir(modelsDir, name);
+  const nemo = {
+    encoder: findFile(ndir, [/^encoder\.onnx$/, /^encoder\.int8\.onnx$/]),
+    decoder: findFile(ndir, [/^decoder\.onnx$/, /^decoder\.int8\.onnx$/]),
+    joiner: findFile(ndir, [/^joiner\.onnx$/, /^joiner\.int8\.onnx$/]),
+    tokens: findFile(ndir, [/^tokens\.txt$/]),
+  };
+  if (nemo.encoder && nemo.decoder && nemo.joiner && nemo.tokens) return { nemo: true, ...nemo, bpeVocab: findFile(ndir, [/^bpe\.vocab$/]) };
   const dir = whisperDir(modelsDir, name);
   const encoder = findFile(dir, [/-encoder\.onnx$/, /-encoder\.int8\.onnx$/]);
   const decoder = findFile(dir, [/-decoder\.onnx$/, /-decoder\.int8\.onnx$/]);
@@ -80,17 +102,16 @@ function status(modelsDir) {
   const whisper = {};
   for (const name of Object.keys(WHISPER_MODELS)) {
     const files = whisperFiles(modelsDir, name);
-    whisper[name] = { ...WHISPER_MODELS[name], installed: !!files, ggml: !!(files && files.ggml) || !!WHISPER_MODELS[name].ggml };
+    whisper[name] = { ...WHISPER_MODELS[name], installed: !!files, ggml: !!(files && files.ggml) || !!WHISPER_MODELS[name].ggml, nemo: !!(files && files.nemo) };
   }
   // Egna importerade modeller som inte finns i katalogen visas också.
   if (fs.existsSync(modelsDir)) {
     for (const f of fs.readdirSync(modelsDir)) {
-      const isGgml = f.startsWith('whisper-cpp-');
-      const name = f.replace(/^(sherpa-onnx-whisper-|whisper-cpp-)/, '');
-      const files = (f.startsWith('sherpa-onnx-whisper-') || isGgml) && !whisper[name] ? whisperFiles(modelsDir, name) : null;
+      const name = f.replace(PREFIX, '');
+      const files = PREFIX.test(f) && !whisper[name] ? whisperFiles(modelsDir, name) : null;
       if (files) {
-        const ggml = !!files.ggml; // ggml-mappen vinner om båda finns, precis som i motorn
-        whisper[name] = { size: '', note: ggml ? 'Importerad modell (Metal).' : 'Importerad modell.', manual: true, ggml, installed: true };
+        const ggml = !!files.ggml; // ggml-mappen vinner om flera finns, precis som i motorn
+        whisper[name] = { size: '', note: ggml ? 'Importerad modell (Metal).' : 'Importerad modell.', manual: true, ggml, nemo: !!files.nemo, installed: true };
       }
     }
   }
@@ -191,11 +212,11 @@ async function importWhisper(modelsDir, sourcePath) {
   const st = fs.statSync(sourcePath);
   if (st.isDirectory()) {
     const base = path.basename(sourcePath);
-    const name = base.replace(/^(sherpa-onnx-whisper-|whisper-cpp-)/, '');
-    const target = base.startsWith('whisper-cpp-') ? ggmlDir(modelsDir, name) : whisperDir(modelsDir, name);
+    const name = base.replace(PREFIX, '');
+    const target = dirFor(modelsDir, base);
     fs.rmSync(target, { recursive: true, force: true });
     fs.cpSync(sourcePath, target, { recursive: true });
-    if (!whisperFiles(modelsDir, name)) { fs.rmSync(target, { recursive: true, force: true }); throw new Error('Mappen innehåller ingen whisper-modell (encoder, decoder, tokens).'); }
+    if (!whisperFiles(modelsDir, name)) { fs.rmSync(target, { recursive: true, force: true }); throw new Error('Mappen innehåller ingen taligenkänningsmodell.'); }
     return name;
   }
   // En ensam ggml-fil (t.ex. ggml-model.bin) läggs i en egen mapp döpt efter filnamnet.
@@ -209,15 +230,16 @@ async function importWhisper(modelsDir, sourcePath) {
   if (!/\.tar\.bz2$/.test(sourcePath)) throw new Error('Välj en mapp, en .tar.bz2-fil eller en ggml-*.bin-fil.');
   const before = new Set(fs.readdirSync(modelsDir));
   await extractTarBz2(sourcePath, modelsDir);
-  const added = fs.readdirSync(modelsDir).filter((f) => !before.has(f) && (f.startsWith('sherpa-onnx-whisper-') || f.startsWith('whisper-cpp-')));
-  const name = added.length ? added[0].replace(/^(sherpa-onnx-whisper-|whisper-cpp-)/, '') : null;
-  if (!name || !whisperFiles(modelsDir, name)) throw new Error('Arkivet innehöll ingen whisper-modell.');
+  const added = fs.readdirSync(modelsDir).filter((f) => !before.has(f) && PREFIX.test(f));
+  const name = added.length ? added[0].replace(PREFIX, '') : null;
+  if (!name || !whisperFiles(modelsDir, name)) throw new Error('Arkivet innehöll ingen taligenkänningsmodell.');
   return name;
 }
 
 function removeWhisper(modelsDir, name) {
   fs.rmSync(whisperDir(modelsDir, name), { recursive: true, force: true });
   fs.rmSync(ggmlDir(modelsDir, name), { recursive: true, force: true });
+  fs.rmSync(nemoDir(modelsDir, name), { recursive: true, force: true });
 }
 
 module.exports = { WHISPER_MODELS, AUX_MODELS, whisperFiles, auxPath, status, installWhisper, installAux, importWhisper, removeWhisper };

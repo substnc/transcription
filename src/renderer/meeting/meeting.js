@@ -70,6 +70,8 @@ $('consentOk').onclick = async () => {
     state.audioPath = await api.meeting.start({ sourceMode: $('sourceMode').value });
     state.startedAt = Date.now();
     levels.fill(0);
+    $('liveText').innerHTML = '';
+    $('liveStatus').textContent = '';
     $('sources').textContent = 'Mikrofon';
     show('recording');
     timerHandle = setInterval(() => ($('timer').textContent = fmt((Date.now() - state.startedAt) / 1000)), 500);
@@ -77,6 +79,20 @@ $('consentOk').onclick = async () => {
     fail('Kunde inte starta inspelning: ' + e.message);
   }
 };
+
+// ---- Livetext ----
+api.meeting.onLiveStatus((s) => ($('liveStatus').textContent = s.text || ''));
+api.meeting.onLive((segs) => {
+  const box = $('liveText');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  for (const s of segs) {
+    const p = document.createElement('p');
+    const t = document.createElement('span'); t.className = 't'; t.textContent = fmt(s.start);
+    p.append(t, s.text);
+    box.appendChild(p);
+  }
+  if (atBottom) box.scrollTop = box.scrollHeight;
+});
 
 // ---- Inspelning ----
 api.meeting.onLevel(({ level }) => pushLevel(level));

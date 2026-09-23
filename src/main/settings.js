@@ -12,6 +12,7 @@ const DEFAULTS = {
   hotkeyMode: 'hold', // 'hold' eller 'toggle'
   whisperDictation: 'turbo-metal', // snabb modell för diktering
   whisperMeeting: 'kb-large-metal', // noggrann modell för möten
+  liveModel: 'pianissimo-sv', // livetext under inspelning ('' = av)
   language: 'auto', // 'auto' | 'sv' | 'en'
   allowed: ['sv', 'en'],
   primary: 'sv',

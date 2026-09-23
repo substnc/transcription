@@ -47,7 +47,7 @@ function notify(title, body) {
 function engineSettings() {
   const s = settings.get();
   const whisperCli = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'whisper-cli') : path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-cli');
-  return { modelsDir, whisper: s.whisperDictation, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
+  return { modelsDir, whisper: s.whisperDictation, liveModel: s.liveModel, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
 }
 
 async function ensureLlmModel() {
@@ -137,12 +137,50 @@ function startMeetingRecording(opts = {}) {
   rec.startedAt = Date.now();
   rec.systemAudio = null;
   captureSend({ cmd: 'start', meter: true, systemAudio: mode !== 'mic', mic: mode !== 'system' });
+  startLive();
   return rec.wav.filePath;
+}
+
+// Livetext: skicka nytt ljud till motorn ungefär varje sekund. Motorn svarar med färdiga talstycken.
+function startLive() {
+  rec.live = null;
+  const model = settings.get('liveModel');
+  if (!model) return sendToMeeting('meeting:live-status', { on: false, text: 'Livetext av (välj modell i Inställningar).' });
+  const live = { chunks: [], busy: false, timer: null };
+  rec.live = live;
+  engine.call('liveStart', { model }).then(() => {
+    if (rec.live !== live) return;
+    sendToMeeting('meeting:live-status', { on: true, text: `Livetext med ${model}. Grov version, den noggranna görs när du stoppar.` });
+    live.timer = setInterval(() => pumpLive(live), 1000);
+  }).catch((e) => {
+    if (rec.live === live) rec.live = null;
+    sendToMeeting('meeting:live-status', { on: false, text: `Livetext av: ${e.message}` });
+  });
+}
+
+function pumpLive(live) {
+  if (live.busy || !live.chunks.length) return;
+  const samples = concatFloat32(live.chunks);
+  live.chunks = [];
+  live.busy = true;
+  engine.call('liveFeed', { samples })
+    .then((segs) => { if (segs && segs.length) sendToMeeting('meeting:live', segs); })
+    .catch((e) => console.error('livetext:', e.message))
+    .finally(() => { live.busy = false; });
+}
+
+function stopLive() {
+  const live = rec.live;
+  rec.live = null;
+  if (!live) return;
+  clearInterval(live.timer);
+  engine.call('liveStop').catch(() => {});
 }
 
 function stopMeetingRecording() {
   if (rec.mode !== 'meeting') return null;
   captureSend({ cmd: 'stop' });
+  stopLive();
   rec.mode = null;
   const p = rec.wav.finalize();
   const seconds = rec.wav.seconds;
@@ -168,7 +206,7 @@ function registerIpc() {
   ipcMain.on('capture:chunk', (_e, buf) => {
     const f = new Float32Array(buf);
     if (rec.mode === 'dictation') rec.chunks.push(f);
-    else if (rec.mode === 'meeting' && rec.wav) rec.wav.write(f);
+    else if (rec.mode === 'meeting' && rec.wav) { rec.wav.write(f); if (rec.live) rec.live.chunks.push(f); }
   });
   ipcMain.on('capture:level', (_e, level) => sendToMeeting('meeting:level', { level, seconds: rec.wav ? rec.wav.seconds : 0 }));
   // Vilka källor inspelningen faktiskt fick: mikrofon och/eller datorns ljud.
@@ -196,7 +234,7 @@ function registerIpc() {
     if (patch.hotkey !== undefined || patch.hotkeyMode !== undefined) hotkey.restart({ hotkey: after.hotkey, hotkeyMode: after.hotkeyMode });
     if (patch.launchAtLogin !== undefined) app.setLoginItemSettings({ openAtLogin: !!patch.launchAtLogin });
     if (patch.showInDock !== undefined && app.dock) (patch.showInDock ? app.dock.show() : app.dock.hide());
-    if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
+    if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.liveModel !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
     if (before.whisperDictation !== after.whisperDictation) engine.call('warmup').catch(() => {});
     buildTray();
     return after;

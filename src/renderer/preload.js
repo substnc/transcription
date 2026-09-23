@@ -50,6 +50,8 @@ contextBridge.exposeInMainWorld('diktera', {
     onLevel: on('meeting:level'),
     onError: on('meeting:error'),
     onInfo: on('meeting:info'),
+    onLive: on('meeting:live'),
+    onLiveStatus: on('meeting:live-status'),
   },
   overlay: { onState: on('overlay:state') },
   capture: {

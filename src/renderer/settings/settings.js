@@ -76,7 +76,7 @@ function progressLine(key) {
 async function renderEngine() {
   const el = $('engineStatus');
   try {
-    const describe = (info) => (!info.installed ? 'inte installerad' : info.ggml ? 'Metal' : 'CPU (ONNX)');
+    const describe = (info) => (!info.installed ? 'inte installerad' : info.ggml ? 'Metal' : info.nemo ? 'CPU (NeMo)' : 'CPU (ONNX)');
     const d = await api.models.engineInfo(S.whisperDictation || S.whisperMeeting);
     const m = await api.models.engineInfo(S.whisperMeeting || S.whisperDictation);
     if ((d.ggml || m.ggml) && !d.whisperCli) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; return; }
@@ -89,12 +89,13 @@ async function renderEngine() {
 
 // De två valen: en snabb modell för diktering, en noggrann för möten. Bara installerade går att välja.
 function renderSlots(st) {
-  for (const key of ['whisperDictation', 'whisperMeeting']) {
+  for (const key of ['whisperDictation', 'whisperMeeting', 'liveModel']) {
     const id = key;
     const sel = $(id);
     sel.innerHTML = '';
     const installed = Object.entries(st.whisper).filter(([, m]) => m.installed).map(([n]) => n);
-    if (!installed.length) sel.add(new Option('Ingen modell installerad', ''));
+    if (key === 'liveModel') sel.add(new Option('Av', ''));
+    else if (!installed.length) sel.add(new Option('Ingen modell installerad', ''));
     for (const n of installed) sel.add(new Option(n, n));
     if (S[key] && !installed.includes(S[key])) sel.add(new Option(S[key] + ' (saknas)', S[key]));
     sel.value = S[key] || '';
@@ -115,7 +116,7 @@ async function renderModels() {
     const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = name;
     left.append(nm);
     const mid = document.createElement('div');
-    mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
+    mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : m.nemo ? 'CPU · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
     const key = `whisper:${name}`;
     if (progress[key]) {
       const bar = document.createElement('div'); bar.className = 'bar';

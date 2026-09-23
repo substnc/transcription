@@ -11,6 +11,7 @@ const { cleanup } = require('./cleanup');
 const { vocabularyPrompt } = require('./whispercpp');
 
 let pipeline = null;
+let livePipeline = null; // egen instans för livetext, så att den inte krockar med den noggranna körningen
 let settings = {};
 
 const port = process.parentPort || null;
@@ -23,12 +24,31 @@ const methods = {
   async init(p) {
     settings = { ...settings, ...p };
     pipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: settings.whisper, numThreads: settings.numThreads, whisperCli: settings.whisperCli });
+    livePipeline = null;
     return models.status(settings.modelsDir);
   },
   async configure(p) {
     settings = { ...settings, ...p };
     if (pipeline && p.whisper) pipeline.setWhisper(p.whisper);
     return true;
+  },
+
+  // ---- Livetext ----
+  async liveStart({ model }) {
+    if (!model) throw new Error('Ingen modell vald för livetext.');
+    if (!models.whisperFiles(settings.modelsDir, model)) throw new Error(`Modellen ${model} är inte installerad.`);
+    if (!livePipeline || livePipeline.whisperName !== model) {
+      livePipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: model, numThreads: Math.max(2, Math.min(4, require('os').cpus().length - 2)), whisperCli: settings.whisperCli, sherpa: pipeline && pipeline.sherpa });
+    }
+    livePipeline.liveStart();
+    return true;
+  },
+  async liveFeed({ samples }) {
+    if (!livePipeline) return [];
+    return livePipeline.liveFeed(samples instanceof Float32Array ? samples : new Float32Array(samples));
+  },
+  async liveStop() {
+    return livePipeline ? livePipeline.liveStop() : [];
   },
   async status() {
     return { ...models.status(settings.modelsDir), loaded: pipeline ? pipeline.loadedWhisper : null };
@@ -41,7 +61,7 @@ const methods = {
   // Motorinfo per modell: körs den med whisper.cpp (ggml) eller sherpa (ONNX)? Utan namn: den laddade.
   async engineInfo({ name } = {}) {
     const files = name ? models.whisperFiles(settings.modelsDir, name) : null;
-    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
+    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), nemo: !!(files && files.nemo), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
   },
   async llmStatus() {
     return llm.available(settings.ollamaHost);
@@ -67,6 +87,7 @@ const methods = {
   // Diktering: samples (Float32Array 16 kHz) -> städad text.
   async dictate({ samples, policy, whisper, useLlm, voiceCommands, vocabulary }) {
     if (whisper) pipeline.setWhisper(whisper);
+    pipeline.setHotwords(vocabulary);
     const f32 = samples instanceof Float32Array ? samples : new Float32Array(samples);
     const prompt = vocabularyPrompt(vocabulary);
     const raw = pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy, prompt }) : pipeline.dictate(f32, { policy });
@@ -86,6 +107,7 @@ const methods = {
   // Möte: wavPath -> segment med talare och tidsstämplar.
   async meeting({ wavPath, policy, whisper, diarize, speakerCount, vocabulary }, id) {
     if (whisper) pipeline.setWhisper(whisper);
+    pipeline.setHotwords(vocabulary);
     const onProgress = (p) => send({ id, progress: p });
     const prompt = vocabularyPrompt(vocabulary);
     return pipeline.ggmlModel()

@@ -4,6 +4,10 @@
 <title>Speak – Mötesläge</title>
 <link rel="stylesheet" href="../shared.css">
 <style>
+  .live { margin-top: 28px; max-height: 38vh; overflow-y: auto; border-top: 1px solid var(--rule); padding-top: 12px; -webkit-user-select: text; }
+  .live p { margin: 0 0 8px; color: var(--sub); font-size: 15px; line-height: 1.45; }
+  .live p:last-child { color: var(--text); }
+  .live .t { color: var(--muted); font-size: 12px; margin-right: 10px; font-variant-numeric: tabular-nums; }
   .modal-bg { position: fixed; inset: 0; background: rgba(10,10,10,.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
   .modal { background: var(--bg); padding: 36px 40px; width: 520px; max-width: 90vw; }
   .modal ul { padding-left: 18px; margin: 8px 0 18px; }
@@ -67,6 +71,8 @@
     <button id="btnCancel" class="danger">Avbryt</button>
   </div>
   <p class="status" style="margin-top: 40px"><span id="sources">Mikrofon</span> · Sparas löpande till fil så att inget går förlorat.</p>
+  <p class="status" id="liveStatus" style="margin: 4px 0 0"></p>
+  <div class="live" id="liveText"></div>
 </section>
 
 <section id="processing" class="hidden">
