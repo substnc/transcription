@@ -34,6 +34,11 @@ jobs:
           curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
           curl -sSL $B/tts-models/vits-piper-en_US-amy-low.tar.bz2 | tar xj
           curl -sSL -o silero_vad.onnx $B/asr-models/silero_vad.onnx
+          # Den inbyggda talarigenkänningen, för jämförelse med Nemotron.
+          mkdir -p pn-models && cd pn-models
+          curl -sSL $B/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2 | tar xj
+          curl -sSL -o 3dspeaker_speech_eres2net_base_200k_sv_zh-cn_16k-common.onnx $B/speaker-recongition-models/3dspeaker_speech_eres2net_base_200k_sv_zh-cn_16k-common.onnx
+          cd ..
           df -h / | tail -1; sysctl -n hw.memsize hw.ncpu machdep.cpu.brand_string
       - name: Installera och kör Pianissimo och Nemotron genom appens kod
         run: node scripts/test-pianissimo.js pn-models vits-piper-sv_SE-nst-medium vits-piper-en_US-amy-low
