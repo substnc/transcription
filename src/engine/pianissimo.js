@@ -21,7 +21,10 @@ const COMPONENTS = {
   diar: { repo: 'nvidia/Nemotron-3-Diarization', label: 'Nemotron 3 Diarization' },
 };
 const PYTHON_VERSION = '3.11';
-const PACKAGES = ['torch', 'nemo_toolkit[asr]'];
+// NeMo låst till en version från huvudgrenen: Nemotron 3 Diarization använder "rope"-attention, som den senaste
+// versionen på PyPI (2.7.3) saknar. Hämtas som ett arkiv från GitHub, så att datorn inte behöver git.
+const NEMO_REF = 'cf724ac337d1ebc7d0dda1e23fb80916f52927a5';
+const PACKAGES = ['torch', `nemo_toolkit[asr] @ https://github.com/NVIDIA/NeMo/archive/${NEMO_REF}.tar.gz`];
 
 function layout(dir) {
   return {
