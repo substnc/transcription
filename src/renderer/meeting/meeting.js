@@ -162,7 +162,7 @@ function showResult(r) {
   state.speakerNames = Object.fromEntries(r.speakers.map((s) => [s, s]));
   $('resultTitle').textContent = $('title').value.trim() || 'Möte';
   const d = new Date(state.startedAt || Date.now());
-  $('meta').textContent = `${d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })} · ${fmt(r.durationSec)} · ${r.speakers.length} talare · ${(r.languages || []).join(', ') || '–'} · ${r.model}${r.timing ? ` · ${r.engine === 'whisper.cpp' ? 'Metal' : 'CPU'} ${r.timing.totalSec.toFixed(0)} s (${r.timing.speed.toFixed(1)}× realtid)` : ''}`;
+  $('meta').textContent = `${d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })} · ${fmt(r.durationSec)} · ${r.speakers.length} talare · ${(r.languages || []).join(', ') || '–'} · ${r.model}${r.timing ? ` · ${r.engine === 'whisper.cpp' ? 'Metal' : 'CPU'} ${r.timing.totalSec.toFixed(0)} s (${r.timing.speed.toFixed(1)}× realtid)` : ''}${r.diarizer && r.diarizer !== 'av' ? ` · talare: ${r.diarizer}` : ''}`;
   renderSpeakers();
   renderSegments();
   fillSummary(r.summary);

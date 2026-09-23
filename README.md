@@ -33,7 +33,7 @@ modellfiler första gången.
 |---|---|---|
 | Taligenkänning | Whisper via [whisper.cpp](https://github.com/ggml-org/whisper.cpp) på grafikkretsen (Metal), eller [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) på CPU | På datorn |
 | Röstdetektor | Silero VAD | På datorn |
-| Talarseparering | pyannote segmentation 3.0 + 3D-Speaker | På datorn |
+| Talarseparering | Kanaler (mikrofon = du) + NVIDIA Nemotron 3 Diarization, eller pyannote segmentation 3.0 + 3D-Speaker | På datorn |
 | Textstädning och sammanfattning | Ollama (valfritt), annars regler | På datorn (127.0.0.1) |
 | Ljudkonvertering | ffmpeg (medföljer) | På datorn |
 | Håll-in-tangent | uiohook | På datorn |
@@ -84,6 +84,14 @@ Jobbet Actions → "Testa Pianissimo på Mac" installerar och provkör den på e
 
 Klangs egna mätningar (ordfel, lägre är bättre): Pianissimo 4,46 / 6,51 / 4,85 %, KB-Whisper large
 3,91 / 5,08 / 2,30 % (Common Voice / FLEURS / dialekter). KB large är alltså noggrannare, Pianissimo mycket snabbare.
+
+**Talare:** vid videomöten spelas mikrofonen och datorns ljud in var för sig (`mote-x.mic.wav`, `mote-x.sys.wav`,
+bredvid den vanliga filen). Allt som hörs mest i mikrofonen blir "Jag", och bara datorns ljud delas upp i talare.
+Uppdelningen görs med **NVIDIA Nemotron 3 Diarization** (open weights, OpenMDW-licens, max 8 talare) när den är
+installerad, precis som modellkortet beskriver: `SortformerEncLabelModel.from_pretrained("nvidia/Nemotron-3-Diarization")`
+och `diarize(...)`. Den installeras med en knapp under Mötesläge och delar Python-miljö med Pianissimo. Annars,
+eller vid fler än 8 talare, används den inbyggda (pyannote-segmentering och röstavtryck via sherpa-onnx). Med
+Pianissimo kopplas talare till varje ord, så att ett talarbyte mitt i en mening hamnar rätt.
 
 **Livetext:** medan ett möte spelas in visas en grov text som växer fram. När du stoppar görs den noggranna
 körningen med modellen under "Möten", med talare och tidsstämplar. Modellen för livetext väljs i Inställningar

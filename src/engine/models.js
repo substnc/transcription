@@ -115,7 +115,7 @@ function status(modelsDir) {
   for (const key of Object.keys(AUX_MODELS)) {
     aux[key] = { label: AUX_MODELS[key].label, size: AUX_MODELS[key].size, installed: fs.existsSync(auxPath(modelsDir, key)) };
   }
-  return { whisper, aux, diarizationReady: aux.segmentation.installed && aux.embedding.installed && aux.vad.installed };
+  return { whisper, aux, nemotron: { installed: nemotronInstalled(modelsDir) }, diarizationReady: aux.segmentation.installed && aux.embedding.installed && aux.vad.installed };
 }
 
 function download(url, dest, onProgress, redirects = 0) {
@@ -239,10 +239,23 @@ async function importWhisper(modelsDir, sourcePath) {
 function removeWhisper(modelsDir, name) {
   fs.rmSync(whisperDir(modelsDir, name), { recursive: true, force: true });
   fs.rmSync(ggmlDir(modelsDir, name), { recursive: true, force: true });
-  if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) {
-    pianissimo.stopAll();
-    fs.rmSync(pyDir(modelsDir, name), { recursive: true, force: true });
-  }
+  if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) pianissimo.uninstall(pyDir(modelsDir, name), 'asr');
 }
 
-module.exports = { WHISPER_MODELS, AUX_MODELS, whisperFiles, auxPath, status, installWhisper, installAux, importWhisper, removeWhisper };
+// NVIDIA Nemotron 3 Diarization: talarseparering med NeMo, i samma Python-miljö som Pianissimo.
+const NEMO_ENV = 'pianissimo-sv';
+function nemotronDir(modelsDir) {
+  return pyDir(modelsDir, NEMO_ENV);
+}
+function nemotronInstalled(modelsDir) {
+  return pianissimo.isInstalled(nemotronDir(modelsDir), 'diar');
+}
+function installNemotron(modelsDir, onProgress) {
+  fs.mkdirSync(modelsDir, { recursive: true });
+  return pianissimo.install(nemotronDir(modelsDir), { download, onProgress, component: 'diar' });
+}
+function removeNemotron(modelsDir) {
+  pianissimo.uninstall(nemotronDir(modelsDir), 'diar');
+}
+
+module.exports = { WHISPER_MODELS, AUX_MODELS, whisperFiles, auxPath, status, installWhisper, installAux, importWhisper, removeWhisper, nemotronDir, nemotronInstalled, installNemotron, removeNemotron };

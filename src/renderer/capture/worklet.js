@@ -1,5 +1,7 @@
 // Tar emot mikrofon (ingång 0) och datorns ljud (ingång 1), blandar dem och skickar
-// Float32-bitar (16 kHz, mono) till huvudprocessen.
+// Float32-bitar (16 kHz, mono) till huvudprocessen. När båda finns skickas även kanalerna var för sig
+// (mikrofonen efter ekoskyddet), så att talare kan bestämmas utifrån vilken kanal som låter:
+// mikrofonen är du, datorns ljud är de andra.
 //
 // Ekoskydd utan hörlurar: när datorns ljud innehåller tal dämpas mikrofonen kraftigt,
 // annars hör mikrofonen högtalarna och rösterna dubblas. Dämpningen släpper en stund
@@ -8,6 +10,8 @@ class PcmCapture extends AudioWorkletProcessor {
   constructor() {
     super();
     this.buf = new Float32Array(2048);
+    this.bufMic = new Float32Array(2048);
+    this.bufSys = new Float32Array(2048);
     this.n = 0;
     this.hold = 0; // block kvar av efterhållning
     this.holdBlocks = Math.round((0.3 * sampleRate) / 128); // ~300 ms efter att datorn tystnat
@@ -27,14 +31,22 @@ class PcmCapture extends AudioWorkletProcessor {
     if (sys && rms > this.threshold) this.hold = this.holdBlocks;
     else if (this.hold > 0) this.hold--;
     const target = this.hold > 0 ? this.ducked : 1;
+    const both = !!(mic && sys);
     for (let i = 0; i < len; i++) {
       this.gain = this.gain * this.smooth + target * (1 - this.smooth);
-      let v = 0;
-      if (mic) v += mic[i] * this.gain;
-      if (sys) v += sys[i];
+      const m = mic ? mic[i] * this.gain : 0;
+      const y = sys ? sys[i] : 0;
+      const v = m + y;
+      if (both) { this.bufMic[this.n] = m; this.bufSys[this.n] = y; }
       this.buf[this.n++] = v > 1 ? 1 : v < -1 ? -1 : v;
       if (this.n === this.buf.length) {
-        this.port.postMessage(this.buf.buffer, [this.buf.buffer]);
+        if (both) {
+          this.port.postMessage({ mix: this.buf.buffer, mic: this.bufMic.buffer, sys: this.bufSys.buffer }, [this.buf.buffer, this.bufMic.buffer, this.bufSys.buffer]);
+          this.bufMic = new Float32Array(2048);
+          this.bufSys = new Float32Array(2048);
+        } else {
+          this.port.postMessage({ mix: this.buf.buffer }, [this.buf.buffer]);
+        }
         this.buf = new Float32Array(2048);
         this.n = 0;
       }

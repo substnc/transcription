@@ -65,6 +65,9 @@
   <h2>Mötesläge</h2>
   <div class="row"><span class="label">Talarmodeller (röst, talare, röstavtryck, 50 MB)</span><span class="chip" id="auxStatus">–</span><button id="btnAux">Ladda ner</button></div>
   <label class="check" style="margin-top:14px"><input type="checkbox" id="diarize"> Separera talare</label>
+  <div class="field" style="max-width:520px;margin-top:6px"><label for="diarizer">Talarigenkänning</label><select id="diarizer"><option value="nemotron">NVIDIA Nemotron 3 när den är installerad (max 8 talare)</option><option value="standard">Inbyggd (ingen gräns för antal talare)</option></select></div>
+  <div class="row"><span class="label">Nemotron 3 Diarization (NeMo, cirka 0,5 GB, delar Python-miljö med Pianissimo)</span><span class="chip" id="nemotronStatus">–</span><button id="btnNemotron">Installera</button></div>
+  <p class="status">Vid videomöten spelas mikrofonen och datorns ljud in var för sig. Allt från mikrofonen blir "Jag", och bara datorns ljud behöver delas upp i talare.</p>
   <label class="check"><input type="checkbox" id="captureSystemAudio"> Ta med datorns ljud i inspelningen (videomöten). Kräver macOS 14.2 och Skärminspelning.</label>
   <label class="check"><input type="checkbox" id="keepRecordings"> Behåll ljudfilerna (annars tas de bort när anteckningen är sparad eller mötet kastas)</label>
   <div class="row" style="margin-top:6px"><span class="label">Inspelningar sparas i</span><code id="recordingsDir"></code><button class="small" id="btnRecordingsDir">Välj</button></div>

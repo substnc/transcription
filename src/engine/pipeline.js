@@ -3,8 +3,9 @@
 // Klang Pianissimo med NeMo i Python, plus Silero VAD och pyannote-talarseparering.
 
 const path = require('path');
+const os = require('os');
 const models = require('./models');
-const { assignSpeakers, relabelSpeakers, coalesce } = require('./merge');
+const { assignSpeakers, relabelSpeakers, coalesce, channelActivity, combineChannelDiarization, segmentsFromWords } = require('./merge');
 const { isHallucination, tidy } = require('./cleanup');
 const audio = require('./audio');
 const whispercpp = require('./whispercpp');
@@ -224,19 +225,14 @@ class Pipeline {
     return { text: kept.map((s) => s.text).join(' ').trim(), languages: [...new Set(kept.map((s) => s.lang))], segments: kept };
   }
 
-  async meetingCpp(input, { policy, diarize = true, speakerCount = 0, prompt, onProgress } = {}) {
+  async meetingCpp(input, { policy, diarize = true, diarizer, channels, speakerCount = 0, prompt, onProgress } = {}) {
     const wavPath = typeof input === 'string' ? input : null;
     const samples = wavPath ? audio.readWav(wavPath).samples : input;
     const durationSec = samples.length / SAMPLE_RATE;
     const { language = 'auto', primary = 'sv' } = policy || {};
     console.error(`[motor] möte (whisper.cpp): ${durationSec.toFixed(1)} s, språk=${language}, antal talare=${speakerCount || 'auto'}`);
     const t0 = Date.now();
-    let diar = [];
-    if (diarize) {
-      if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
-      diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
-      if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
-    }
+    const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
     const t1 = Date.now();
     const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt,
       onProgress: onProgress ? (f) => onProgress({ phase: 'transcribe', done: f * 100, total: 100 }) : null };
@@ -251,7 +247,7 @@ class Pipeline {
     const labeled = relabelSpeakers(segs);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
-    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'whisper.cpp', timing };
+    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'whisper.cpp', timing, diarizer: via };
   }
 
   // Diktering: kort ljud, ingen talarseparering.
@@ -272,19 +268,15 @@ class Pipeline {
   // Mötesläge: dela ljudet i naturliga talstycken (VAD), transkribera dem hela,
   // och märk talare efteråt utifrån talarsepareringen. Hela stycken ger whisper
   // sammanhang; korta talarturer gav hallucinationer.
-  meeting(input, { policy, diarize = true, speakerCount = 0, onProgress } = {}) {
+  async meeting(input, { policy, diarize = true, diarizer, channels, speakerCount = 0, onProgress } = {}) {
     // Egen WAV-läsare: sherpas readWave ger externa buffertar som Electrons utility-process inte tillåter.
-    const samples = typeof input === 'string' ? audio.readWav(input).samples : input;
+    const wavPath = typeof input === 'string' ? input : null;
+    const samples = wavPath ? audio.readWav(wavPath).samples : input;
     const durationSec = samples.length / SAMPLE_RATE;
     console.error(`[motor] möte: ${durationSec.toFixed(1)} s ljud, talarseparering=${diarize}, antal talare=${speakerCount || 'auto'}`);
     const t0 = Date.now();
 
-    let diar = [];
-    if (diarize) {
-      if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
-      diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
-      if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
-    }
+    const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
 
     const t1 = Date.now();
     this.ensureRecognizer();
@@ -308,23 +300,68 @@ class Pipeline {
     const labeled = relabelSpeakers(segs);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
-    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'sherpa', timing };
+    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'sherpa', timing, diarizer: via };
+  }
+
+  // ---- Talare ----
+  // Vem pratar när? Med två kanaler (mikrofon + datorns ljud) är allt från mikrofonen "Jag", och bara
+  // datorns ljud separeras. Separeringen görs med NVIDIA Nemotron 3 Diarization när den är installerad
+  // (max 8 talare), annars med den inbyggda (pyannote-segmentering + röstavtryck via sherpa).
+  async speakerTimeline({ wavPath, samples, diarize = true, diarizer = 'nemotron', channels, speakerCount = 0, onProgress } = {}) {
+    if (!diarize) return { diar: [], via: 'av' };
+    if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
+    let runs = null;
+    let target = { wavPath, samples };
+    let count = speakerCount;
+    if (channels) {
+      const mic = audio.readWav(channels.mic).samples;
+      const sys = audio.readWav(channels.sys).samples;
+      runs = channelActivity(mic, sys, SAMPLE_RATE);
+      target = { wavPath: channels.sys, samples: sys };
+      count = speakerCount > 1 ? speakerCount - 1 : 0; // du själv räknas inte i datorns ljud
+    }
+    let result;
+    if (runs && !runs.some((r) => r.source === 'sys')) {
+      result = { diar: runs.map((r) => ({ start: r.start, end: r.end, speaker: 'me' })), via: 'kanaler' };
+    } else {
+      const d = await this.diarizeAudio(target, count, diarizer);
+      result = runs ? { diar: combineChannelDiarization(runs, d.diar), via: `${d.via} + kanaler` } : d;
+    }
+    if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
+    console.error(`[motor] talare: ${result.via}, ${result.diar.length} stycken`);
+    return result;
+  }
+
+  async diarizeAudio({ wavPath, samples }, count, diarizer) {
+    const useNemotron = diarizer !== 'standard' && models.nemotronInstalled(this.modelsDir) && !(count > 8);
+    if (useNemotron) {
+      let tmp = null;
+      try {
+        let p = wavPath;
+        if (!p) { tmp = path.join(os.tmpdir(), `speak-diar-${process.pid}-${Date.now()}.wav`); audio.writeWav(tmp, samples); p = tmp; }
+        const t0 = Date.now();
+        const diar = await pianissimo.worker(models.nemotronDir(this.modelsDir)).diarize(p);
+        console.error(`[motor] Nemotron 3: ${new Set(diar.map((d) => d.speaker)).size} talare på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+        return { diar, via: 'Nemotron 3' };
+      } catch (e) {
+        console.error('[motor] Nemotron misslyckades, använder den inbyggda:', e.message);
+      } finally {
+        if (tmp) require('fs').rmSync(tmp, { force: true });
+      }
+    }
+    const s = samples || audio.readWav(wavPath).samples;
+    return { diar: this.ensureDiarizer(count > 0 ? count : -1).process(s), via: 'standard' };
   }
 
   // ---- Pianissimo (NeMo i Python), som modellkortet beskriver ----
   // Hela filen skickas i ett anrop med tidsstämplar; modellens lokala attention klarar långa inspelningar.
-  async meetingPy(wavPath, { diarize = true, speakerCount = 0, onProgress } = {}) {
+  async meetingPy(wavPath, { diarize = true, diarizer, channels, speakerCount = 0, onProgress } = {}) {
     const w = this.pyWorker();
     const samples = audio.readWav(wavPath).samples;
     const durationSec = samples.length / SAMPLE_RATE;
     console.error(`[motor] möte (Pianissimo): ${durationSec.toFixed(1)} s, antal talare=${speakerCount || 'auto'}`);
     const t0 = Date.now();
-    let diar = [];
-    if (diarize) {
-      if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
-      diar = this.ensureDiarizer(speakerCount > 0 ? speakerCount : -1).process(samples);
-      if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
-    }
+    const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
     const t1 = Date.now();
     if (onProgress) onProgress({ phase: 'transcribe', text: 'Transkriberar med Pianissimo…' });
     const r = await w.transcribe(wavPath, { timestamps: true });
@@ -333,12 +370,16 @@ class Pipeline {
       .map((x) => ({ start: x.start, end: x.end, text: tidy(x.text), lang: 'sv', speaker: 0 }))
       .filter((x) => x.text && !isHallucination(x.text));
     if (!segs.length && r.text) segs = [{ start: 0, end: durationSec, text: tidy(r.text), lang: 'sv', speaker: 0 }];
+    // Med talare: koppla varje ord till en talare, så att byten mitt i en mening hamnar rätt.
+    const words = (r.words || []).filter((x) => x.start != null && x.end != null && x.word);
+    const byWords = diar.length && words.length;
     const timing = { diarizeSec: (t1 - t0) / 1000, transcribeSec: (t2 - t1) / 1000, totalSec: (t2 - t0) / 1000, speed: durationSec / Math.max(0.001, (t2 - t0) / 1000) };
     console.error(`[motor] klart (Pianissimo): talare ${timing.diarizeSec.toFixed(1)} s, Pianissimo ${timing.transcribeSec.toFixed(1)} s, totalt ${timing.totalSec.toFixed(1)} s (${timing.speed.toFixed(1)}× realtid)`);
-    if (diar.length) segs = assignSpeakers(segs, diar);
+    if (byWords) segs = segmentsFromWords(words, diar, { lang: 'sv' }).map((x) => ({ ...x, text: tidy(x.text) })).filter((x) => x.text && !isHallucination(x.text));
+    else if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
-    return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'pianissimo', timing };
+    return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'pianissimo', timing, diarizer: via };
   }
 
   async dictatePy(samples) {
@@ -358,7 +399,7 @@ class Pipeline {
     if (!require('fs').existsSync(model)) throw new Error('Röstdetektorn saknas. Ladda ner talarmodellerna i Inställningar.');
     // Ladda modellen nu, inte vid första talstycket.
     const w = this.pyWorker();
-    if (w) await w.start();
+    if (w) await w.load('asr');
     else if (!this.ggmlModel()) this.ensureRecognizer();
     const vad = new this.s.Vad({
       sileroVad: { model, threshold: 0.5, minSilenceDuration: 0.4, minSpeechDuration: 0.25, windowSize: VAD_WINDOW, maxSpeechDuration: LIVE_MAX_SPEECH_SEC },

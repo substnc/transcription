@@ -49,14 +49,15 @@ async function start(withMeter, withSystemAudio, withMic = true) {
     if (meter) window.diktera.capture.sendInfo({ systemAudio, mic: !!stream, wantedSystem: !!withSystemAudio });
     node.port.onmessage = (e) => {
       if (!running) return;
+      const { mix, mic, sys } = e.data;
       if (meter) {
-        const f = new Float32Array(e.data);
+        const f = new Float32Array(mix);
         let s = 0;
         for (let i = 0; i < f.length; i++) s += f[i] * f[i];
         meterAcc += Math.sqrt(s / f.length);
         meterN++;
       }
-      window.diktera.capture.sendChunk(e.data);
+      window.diktera.capture.sendChunk(mix, mic || null, sys || null);
     };
     if (src) src.connect(node, 0, 0);
     node.connect(ctx.destination);

@@ -26,6 +26,7 @@ const DEFAULTS = {
   recordingsDir: DEFAULT_RECORDINGS,
   keepRecordings: false, // ljudfilen tas bort när anteckningen är sparad eller mötet kastas
   diarize: true,
+  diarizer: 'nemotron', // 'nemotron' (NVIDIA Nemotron 3, när den är installerad, max 8 talare) eller 'standard'
   captureSystemAudio: true, // ta med datorns ljud (videomöten) i mötesinspelningar
   vocabulary: '', // ordlista: namn och facktermer, ett per rad, skickas som prompt till whisper
   inboxes: [

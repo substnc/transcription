@@ -43,14 +43,89 @@ function assignSpeakers(asrSegments, diarSegments) {
   });
 }
 
+// Talaren som hörs i mikrofonen (du själv) när mikrofon och datorns ljud spelas in var för sig.
+const ME = 'me';
+const ME_LABEL = 'Jag';
+
 // Döper om talare i ordning efter första förekomst: 0,1,2... -> "Talare 1", "Talare 2"...
+// Mikrofonkanalen ("me") heter alltid "Jag" och räknas inte in i numreringen.
 function relabelSpeakers(segments, prefix = 'Talare') {
   const map = new Map();
+  let n = 0;
   const out = segments.map((s) => {
-    if (!map.has(s.speaker)) map.set(s.speaker, `${prefix} ${map.size + 1}`);
+    if (!map.has(s.speaker)) map.set(s.speaker, s.speaker === ME ? ME_LABEL : `${prefix} ${++n}`);
     return { ...s, speaker: map.get(s.speaker) };
   });
   return { segments: out, speakers: [...map.values()] };
+}
+
+function rms(x, a, b) {
+  let s = 0;
+  const end = Math.min(b, x.length);
+  if (end <= a) return 0;
+  for (let i = a; i < end; i++) s += x[i] * x[i];
+  return Math.sqrt(s / (end - a));
+}
+
+// Vilken kanal som låter mest, tiondel för tiondel: mikrofonen (du) eller datorns ljud (de andra).
+// Mikrofonen är redan dämpad när datorn spelar tal (ekoskyddet), så högtalarljud räknas inte som du.
+// Returnerar sammanhängande stycken [{ start, end, source: 'mic' | 'sys' }].
+function channelActivity(mic, sys, sampleRate = 16000, { frame = 0.1, threshold = 0.004, maxGap = 0.3 } = {}) {
+  const step = Math.round(frame * sampleRate);
+  const n = Math.max(mic.length, sys.length);
+  const runs = [];
+  for (let i = 0; i < n; i += step) {
+    const m = rms(mic, i, i + step);
+    const y = rms(sys, i, i + step);
+    if (Math.max(m, y) < threshold) continue;
+    const source = m > y ? 'mic' : 'sys';
+    const start = i / sampleRate;
+    const end = Math.min(n, i + step) / sampleRate;
+    const last = runs[runs.length - 1];
+    if (last && last.source === source && start - last.end <= maxGap) last.end = end;
+    else runs.push({ start, end, source });
+  }
+  return runs.filter((r) => r.end - r.start >= 0.2);
+}
+
+// Slår ihop kanalstyckena med talarsepareringen av datorns ljud:
+// mikrofonstycken blir "me", stycken från datorn får talarna som separeringen hittade där.
+function combineChannelDiarization(runs, sysDiar) {
+  const out = [];
+  for (const r of runs) {
+    if (r.source === 'mic') { out.push({ start: r.start, end: r.end, speaker: ME }); continue; }
+    const parts = [];
+    for (const d of sysDiar) {
+      const start = Math.max(r.start, d.start);
+      const end = Math.min(r.end, d.end);
+      if (end - start > 0.05) parts.push({ start, end, speaker: d.speaker });
+    }
+    if (parts.length) out.push(...parts);
+    else {
+      // Separeringen missade stycket: ge det närmaste talare från datorns ljud.
+      const mid = (r.start + r.end) / 2;
+      const near = sysDiar.reduce((p, d) => { const dist = Math.min(Math.abs(d.start - mid), Math.abs(d.end - mid)); return dist < p.dist ? { d, dist } : p; }, { d: null, dist: Infinity }).d;
+      out.push({ start: r.start, end: r.end, speaker: near ? near.speaker : 0 });
+    }
+  }
+  return out.sort((a, b) => a.start - b.start);
+}
+
+// Bygger talarturer från ord med tidsstämplar: varje ord får den talare som överlappar mest,
+// och nya turer börjar när talaren byts eller när det blir en lång paus.
+function segmentsFromWords(words, diar, { maxGap = 1.5, lang } = {}) {
+  const withSpk = assignSpeakers(words.filter((w) => w.word && w.start != null && w.end != null).map((w) => ({ start: w.start, end: w.end, text: w.word })), diar);
+  const out = [];
+  for (const w of withSpk) {
+    const last = out[out.length - 1];
+    if (last && last.speaker === w.speaker && w.start - last.end <= maxGap) {
+      last.end = w.end;
+      last.text += ' ' + w.text;
+    } else {
+      out.push({ start: w.start, end: w.end, text: w.text, speaker: w.speaker, ...(lang ? { lang } : {}) });
+    }
+  }
+  return out;
 }
 
 // Slår ihop korta segment från samma talare till läsbara stycken.
@@ -68,4 +143,4 @@ function coalesce(segments, { maxGap = 1.0, maxLen = 40 } = {}) {
   return out;
 }
 
-module.exports = { turnsFromDiarization, assignSpeakers, relabelSpeakers, coalesce, overlap };
+module.exports = { turnsFromDiarization, assignSpeakers, relabelSpeakers, coalesce, overlap, channelActivity, combineChannelDiarization, segmentsFromWords, ME, ME_LABEL };

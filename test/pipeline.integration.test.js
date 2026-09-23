@@ -14,7 +14,7 @@ test('hela kedjan: talarseparering + whisper + sammanfattning + markdown', { ski
   const { heuristicSummary } = require('../src/engine/summarize');
   const p = new Pipeline({ modelsDir: dir, whisper: 'tiny', numThreads: 2 });
   const progress = [];
-  const r = p.meeting(wav, { policy: { language: 'auto', allowed: ['sv', 'en'], primary: 'sv' }, onProgress: (x) => progress.push(x) });
+  const r = await p.meeting(wav, { policy: { language: 'auto', allowed: ['sv', 'en'], primary: 'sv' }, onProgress: (x) => progress.push(x) });
   assert.ok(r.segments.length >= 3, 'segment');
   assert.ok(r.speakers.length === 2, `två talare, fick ${r.speakers.length}`);
   assert.ok(r.segments.every((s) => ['sv', 'en'].includes(s.lang)), 'bara sv/en');

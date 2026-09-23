@@ -14,6 +14,7 @@ async function load() {
   hk.value = S.hotkey;
   $('hotkeyMode').value = S.hotkeyMode;
   $('language').value = S.language;
+  $('diarizer').value = S.diarizer || 'nemotron';
   $('vocabulary').value = S.vocabulary || '';
   $('llmMode').value = !S.useLlm ? 'off' : S.llmDictation ? 'all' : 'meetings';
   for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) $(id).checked = !!S[id];
@@ -30,6 +31,7 @@ function bindSimple(id, key, type = 'value') {
 bindSimple('hotkey', 'hotkey');
 bindSimple('hotkeyMode', 'hotkeyMode');
 bindSimple('language', 'language');
+bindSimple('diarizer', 'diarizer');
 bindSimple('vocabulary', 'vocabulary');
 for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) bindSimple(id, id, 'checked');
 $('llmMode').onchange = async () => {
@@ -136,6 +138,20 @@ async function renderModels() {
     row.append(left, mid, right);
     wl.appendChild(row);
   }
+  // Nemotron 3 Diarization (NeMo i Python).
+  const nKey = 'nemotron:nemotron';
+  const nBtn = $('btnNemotron');
+  $('nemotronStatus').textContent = progress[nKey] ? progressLine(nKey) : st.nemotron && st.nemotron.installed ? 'Installerad' : 'Inte installerad';
+  $('nemotronStatus').className = 'chip ' + (st.nemotron && st.nemotron.installed ? 'ok' : 'warn');
+  nBtn.disabled = !!progress[nKey];
+  if (st.nemotron && st.nemotron.installed) {
+    nBtn.textContent = 'Ta bort'; nBtn.className = 'danger';
+    nBtn.onclick = async () => { if (confirm('Ta bort Nemotron 3 Diarization?')) { await api.models.remove('nemotron'); renderModels(); } };
+  } else {
+    nBtn.textContent = progress[nKey] ? 'Installerar…' : 'Installera'; nBtn.className = '';
+    nBtn.onclick = () => { if (confirm('Nemotron 3 Diarization installeras med Python, PyTorch och NeMo, som modellkortet beskriver. Finns Pianissimo redan används samma miljö. Kräver nät en gång. Fortsätt?')) install('nemotron', 'nemotron'); };
+  }
+
   // Talarmodellerna som en enhet.
   const auxKeys = Object.keys(st.aux);
   const missing = auxKeys.filter((k) => !st.aux[k].installed);

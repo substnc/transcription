@@ -78,6 +78,14 @@ const methods = {
     const name = await models.importWhisper(settings.modelsDir, sourcePath);
     return { name, status: models.status(settings.modelsDir) };
   },
+  async installNemotron(_p, id) {
+    await models.installNemotron(settings.modelsDir, (prog) => send({ id, progress: { kind: 'download', name: 'nemotron', ...prog } }));
+    return models.status(settings.modelsDir);
+  },
+  async removeNemotron() {
+    models.removeNemotron(settings.modelsDir);
+    return models.status(settings.modelsDir);
+  },
   async removeWhisper({ name }) {
     if (pipeline && pipeline.loadedWhisper === name) { pipeline.recognizer = null; pipeline.loadedWhisper = null; }
     models.removeWhisper(settings.modelsDir, name);
@@ -105,14 +113,15 @@ const methods = {
   },
 
   // Möte: wavPath -> segment med talare och tidsstämplar.
-  async meeting({ wavPath, policy, whisper, diarize, speakerCount, vocabulary }, id) {
+  async meeting({ wavPath, policy, whisper, diarize, diarizer, channels, speakerCount, vocabulary }, id) {
     if (whisper) pipeline.setWhisper(whisper);
     const onProgress = (p) => send({ id, progress: p });
     const prompt = vocabularyPrompt(vocabulary);
-    if (pipeline.pyWorker()) return pipeline.meetingPy(wavPath, { diarize, speakerCount, onProgress });
+    const speakers = { diarize, diarizer, channels, speakerCount };
+    if (pipeline.pyWorker()) return pipeline.meetingPy(wavPath, { ...speakers, onProgress });
     return pipeline.ggmlModel()
-      ? pipeline.meetingCpp(wavPath, { policy, diarize, speakerCount, prompt, onProgress })
-      : pipeline.meeting(wavPath, { policy, diarize, speakerCount, onProgress });
+      ? pipeline.meetingCpp(wavPath, { policy, prompt, ...speakers, onProgress })
+      : pipeline.meeting(wavPath, { policy, ...speakers, onProgress });
   },
 
   async summarize({ segments, useLlm }, id) {

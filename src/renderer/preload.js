@@ -56,7 +56,7 @@ contextBridge.exposeInMainWorld('diktera', {
   overlay: { onState: on('overlay:state') },
   capture: {
     onCommand: on('capture:command'),
-    sendChunk: (buf) => ipcRenderer.send('capture:chunk', buf),
+    sendChunk: (buf, mic, sys) => ipcRenderer.send('capture:chunk', buf, mic, sys),
     sendLevel: (v) => ipcRenderer.send('capture:level', v),
     sendError: (m) => ipcRenderer.send('capture:error', m),
     sendInfo: (i) => ipcRenderer.send('capture:info', i),

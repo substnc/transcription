@@ -37,7 +37,7 @@ let meetingWin = null;
 let settingsWin = null;
 
 // Tillstånd för ljudinspelning. mode: null | 'dictation' | 'meeting'
-const rec = { mode: null, chunks: [], wav: null, startedAt: 0, processing: false };
+const rec = { mode: null, chunks: [], wav: null, wavMic: null, wavSys: null, startedAt: 0, processing: false };
 
 // ---------- Hjälpfunktioner ----------
 function notify(title, body) {
@@ -177,6 +177,30 @@ function stopLive() {
   engine.call('liveStop').catch(() => {});
 }
 
+// Mikrofon och datorns ljud sparas även var för sig (mote-x.mic.wav, mote-x.sys.wav) när båda spelas in.
+// Talare bestäms sedan utifrån kanalen: mikrofonen är du, datorns ljud är de andra.
+function channelPaths(wavPath) {
+  const base = wavPath.replace(/\.wav$/, '');
+  return { mic: `${base}.mic.wav`, sys: `${base}.sys.wav` };
+}
+function writeChannels(mic, sys) {
+  if (!rec.wavMic) {
+    const c = channelPaths(rec.wav.filePath);
+    rec.wavMic = new WavWriter(c.mic);
+    rec.wavSys = new WavWriter(c.sys);
+    // Kanalerna kom igång efter mixen: fyll ut med tystnad så att tiderna stämmer.
+    const lead = new Float32Array(Math.round(rec.wav.seconds * 16000));
+    if (lead.length) { rec.wavMic.write(lead); rec.wavSys.write(lead); }
+  }
+  rec.wavMic.write(mic);
+  rec.wavSys.write(sys);
+}
+function rmRecording(p) {
+  if (!p) return;
+  const c = channelPaths(p);
+  for (const f of [p, c.mic, c.sys]) fs.rmSync(f, { force: true });
+}
+
 function stopMeetingRecording() {
   if (rec.mode !== 'meeting') return null;
   captureSend({ cmd: 'stop' });
@@ -185,6 +209,9 @@ function stopMeetingRecording() {
   const p = rec.wav.finalize();
   const seconds = rec.wav.seconds;
   rec.wav = null;
+  if (rec.wavMic) { rec.wavMic.finalize(); rec.wavSys.finalize(); }
+  rec.wavMic = null;
+  rec.wavSys = null;
   return { wavPath: p, seconds };
 }
 
@@ -194,7 +221,9 @@ async function transcribeMeeting(wavPath, opts = {}) {
   const policy = { ...settings.policy(), ...(opts.language ? { language: opts.language } : {}) };
   sendToMeeting('meeting:progress', { phase: 'load', text: 'Laddar modeller…' });
   const whisper = settings.modelFor('meeting');
-  const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
+  const c = channelPaths(wavPath);
+  const channels = fs.existsSync(c.mic) && fs.existsSync(c.sys) ? c : null;
+  const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
   sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
   const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
   return { ...r, summary, wavPath, model: `whisper-${whisper}` };
@@ -203,10 +232,14 @@ async function transcribeMeeting(wavPath, opts = {}) {
 // ---------- IPC ----------
 function registerIpc() {
   // Ljud från det osynliga fönstret.
-  ipcMain.on('capture:chunk', (_e, buf) => {
+  ipcMain.on('capture:chunk', (_e, buf, mic, sys) => {
     const f = new Float32Array(buf);
     if (rec.mode === 'dictation') rec.chunks.push(f);
-    else if (rec.mode === 'meeting' && rec.wav) { rec.wav.write(f); if (rec.live) rec.live.chunks.push(f); }
+    else if (rec.mode === 'meeting' && rec.wav) {
+      if (mic && sys) writeChannels(new Float32Array(mic), new Float32Array(sys));
+      rec.wav.write(f);
+      if (rec.live) rec.live.chunks.push(f);
+    }
   });
   ipcMain.on('capture:level', (_e, level) => sendToMeeting('meeting:level', { level, seconds: rec.wav ? rec.wav.seconds : 0 }));
   // Vilka källor inspelningen faktiskt fick: mikrofon och/eller datorns ljud.
@@ -243,11 +276,12 @@ function registerIpc() {
   ipcMain.handle('engine:info', (_e, name) => engine.call('engineInfo', { name }));
   ipcMain.handle('open:logs', () => shell.openPath(logsDir));
   ipcMain.handle('models:install', (_e, { kind, name }) => {
+    if (kind === 'nemotron') return engine.call('installNemotron', {}, (p) => sendToSettings('models:progress', { ...p, kind, name }));
     const method = kind === 'whisper' ? 'installWhisper' : 'installAux';
     const params = kind === 'whisper' ? { name } : { key: name };
     return engine.call(method, params, (p) => sendToSettings('models:progress', { ...p, kind, name }));
   });
-  ipcMain.handle('models:remove', (_e, { name }) => engine.call('removeWhisper', { name }));
+  ipcMain.handle('models:remove', (_e, { name }) => engine.call(name === 'nemotron' ? 'removeNemotron' : 'removeWhisper', { name }));
   ipcMain.handle('models:import', async () => {
     const r = await dialog.showOpenDialog(settingsWin, { title: 'Välj modellmapp eller .tar.bz2', properties: ['openFile', 'openDirectory'], filters: [{ name: 'Modell', extensions: ['bz2', 'tar'] }] });
     if (r.canceled || !r.filePaths.length) return null;
@@ -291,7 +325,7 @@ function registerIpc() {
   });
   ipcMain.handle('meeting:cancel', () => {
     const r = stopMeetingRecording();
-    if (r && !settings.get('keepRecordings')) fs.rmSync(r.wavPath, { force: true });
+    if (r && !settings.get('keepRecordings')) rmRecording(r.wavPath);
     return true;
   });
   ipcMain.handle('meeting:upload', async (_e, opts) => {
@@ -329,11 +363,11 @@ function registerIpc() {
     let i = 2;
     while (fs.existsSync(target)) target = path.join(folder, built.filename.replace(/\.md$/, ` (${i++}).md`));
     fs.writeFileSync(target, built.content, 'utf8');
-    if (!s.keepRecordings && note.audioPath) fs.rmSync(note.audioPath, { force: true });
+    if (!s.keepRecordings && note.audioPath) rmRecording(note.audioPath);
     return target;
   });
   ipcMain.handle('meeting:discard-audio', (_e, p) => {
-    if (p && p.startsWith(recordingsDir())) fs.rmSync(p, { force: true });
+    if (p && p.startsWith(recordingsDir())) rmRecording(p);
     return true;
   });
 }

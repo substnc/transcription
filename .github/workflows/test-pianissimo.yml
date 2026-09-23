@@ -1,7 +1,8 @@
 name: Testa Pianissimo på Mac
 
-# Installerar Klang Pianissimo precis som appen gör (uv, Python 3.11, torch, nemo_toolkit[asr], modellen)
-# på en Apple Silicon-Mac, och kör möte, diktering och livetext genom appens motor.
+# Installerar Klang Pianissimo och NVIDIA Nemotron 3 Diarization precis som appen gör (uv, egen Python,
+# torch, nemo_toolkit[asr], modellerna) på en Apple Silicon-Mac, och kör möte, diktering, livetext,
+# talare från två kanaler och talarseparering genom appens motor.
 on:
   workflow_dispatch:
   push:
@@ -9,6 +10,7 @@ on:
     paths:
       - src/engine/pianissimo.js
       - src/engine/pipeline.js
+      - src/engine/merge.js
       - resources/pianissimo/**
       - scripts/test-pianissimo.js
       - .github/workflows/test-pianissimo.yml
@@ -30,10 +32,11 @@ jobs:
           npm install --no-save sherpa-onnx-node@1.13.8 >/dev/null
           B=https://github.com/k2-fsa/sherpa-onnx/releases/download
           curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
+          curl -sSL $B/tts-models/vits-piper-en_US-libritts_r-medium.tar.bz2 | tar xj
           curl -sSL -o silero_vad.onnx $B/asr-models/silero_vad.onnx
           df -h / | tail -1; sysctl -n hw.memsize hw.ncpu machdep.cpu.brand_string
-      - name: Installera och kör Pianissimo genom appens kod
-        run: node scripts/test-pianissimo.js pn-models vits-piper-sv_SE-nst-medium
+      - name: Installera och kör Pianissimo och Nemotron genom appens kod
+        run: node scripts/test-pianissimo.js pn-models vits-piper-sv_SE-nst-medium vits-piper-en_US-libritts_r-medium
       - name: Diskutrymme för installationen
         if: always()
         run: du -sh pn-models/pianissimo-sv/* 2>/dev/null || true
