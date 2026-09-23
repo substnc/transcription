@@ -66,10 +66,12 @@ jobs:
           B=https://github.com/k2-fsa/sherpa-onnx/releases/download
           curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
           curl -sSL -o silero_vad.onnx $B/asr-models/silero_vad.onnx
+          ok=0
           for v in pianissimo-sv pianissimo-sv-fp32; do
             rm -rf m && mkdir m && cp silero_vad.onnx m/ && ln -s "$PWD/pkg/sherpa-onnx-nemo-$v" m/
-            node scripts/pianissimo/test_model.js m vits-piper-sv_SE-nst-medium
+            node scripts/pianissimo/test_model.js m vits-piper-sv_SE-nst-medium || { echo "::error::$v klarade inte testet"; ok=1; }
           done
+          exit $ok
       - name: Packa
         run: |
           cd pkg

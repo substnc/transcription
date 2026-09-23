@@ -29,6 +29,19 @@ writeWav('tts.wav', samples);
 console.log(`ljud: ${(total / 16000).toFixed(1)} s`);
 
 (async () => {
+  // Rå avkodning av första meningen, utan appens filter, för felsökning.
+  {
+    const models = require('../../src/engine/models');
+    const f = models.whisperFiles(modelsDir, name);
+    const t0 = Date.now();
+    const rec = new sherpa.OfflineRecognizer({ featConfig: { sampleRate: 16000, featureDim: 128 }, modelConfig: { transducer: { encoder: f.encoder, decoder: f.decoder, joiner: f.joiner }, tokens: f.tokens, numThreads: 2, provider: 'cpu', debug: 0, modelType: 'nemo_transducer' }, decodingMethod: 'greedy_search' });
+    const t1 = Date.now();
+    const st = rec.createStream();
+    st.acceptWaveform({ sampleRate: 16000, samples: parts[0] });
+    rec.decode(st);
+    const r = rec.getResult(st);
+    console.log(`[${name}] rå (laddning ${((t1 - t0) / 1000).toFixed(1)} s, avkodning ${((Date.now() - t1) / 1000).toFixed(1)} s av ${(parts[0].length / 16000).toFixed(1)} s):`, JSON.stringify(r.text), 'tokens:', (r.tokens || []).length);
+  }
   const p = new Pipeline({ modelsDir, whisper: name, sherpa });
   const m = p.meeting('tts.wav', { diarize: false, policy: { language: 'sv' } });
   const text = m.segments.map((s) => s.text).join(' ');
