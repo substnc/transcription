@@ -84,8 +84,9 @@ function overlay(state, text) {
 function sendToMeeting(channel, payload) {
   if (meetingWin && !meetingWin.isDestroyed()) meetingWin.webContents.send(channel, payload);
 }
+// Inställningar kan också visas i huvudfönstret, så nedladdningsförlopp skickas dit med.
 function sendToSettings(channel, payload) {
-  if (settingsWin && !settingsWin.isDestroyed()) settingsWin.webContents.send(channel, payload);
+  for (const w of [settingsWin, homeWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
 }
 
 function captureSend(msg) {

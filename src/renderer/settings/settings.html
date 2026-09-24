@@ -16,11 +16,15 @@
   .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
   .line .label { font-size: 15px; color: var(--ink); }
   #inboxList .row { flex-wrap: nowrap; }
+  /* Öppnad från huvudfönstret: tillbaka-knapp bredvid fönsterknapparna, */
+  .back { position: fixed; top: 10px; left: 84px; z-index: 5; -webkit-app-region: no-drag; }
+
   #inboxList input[type=radio] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid var(--ink); border-radius: 50%; flex: none; display: grid; place-items: center; }
   #inboxList input[type=radio]:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
 </style></head>
 <body>
 <div class="drag"></div>
+<button class="small back hidden" id="btnBack">← Tillbaka</button>
 <div class="label">Speak</div>
 <h1>Inställningar.<span class="dim">Allt stannar på datorn.</span></h1>
 <p class="sub">Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>

@@ -233,4 +233,11 @@ $('btnMeeting').onclick = () => api.open.meeting();
 $('btnRecordings').onclick = () => api.open.path(S.recordingsDir);
 $('btnLogs').onclick = () => api.open.logs();
 
+// Öppnad från huvudfönstret: visa tillbaka-knappen.
+if (new URLSearchParams(location.search).get('from') === 'home') {
+  document.body.classList.add('embedded');
+  $('btnBack').classList.remove('hidden');
+  $('btnBack').onclick = () => (location.href = '../home/home.html');
+}
+
 load();

@@ -37,6 +37,7 @@ button.primary:hover { background: #2a2a2a; }
 button.danger { color: var(--soft); }
 button.small { height: 32px; padding: 0 14px; font-size: 13px; }
 button.link { height: auto; padding: 0; background: transparent !important; font-size: 13px; text-decoration: underline; }
+button.link:focus-visible { outline: none; text-decoration-thickness: 2px; }
 button:disabled { opacity: .35; cursor: default; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 

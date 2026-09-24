@@ -59,10 +59,12 @@ $('btnTest').onclick = () => testDictation($('testStatus'));
 $('wTest').onclick = () => testDictation($('wTestStatus'));
 $('btnMeeting').onclick = () => api.open.meeting();
 $('btnUpload').onclick = () => api.open.meeting({ upload: true });
-$('btnSettings').onclick = () => api.open.settings();
+// Inställningar öppnas i samma fönster, med en tillbaka-knapp uppe till vänster.
+const toSettings = () => (location.href = '../settings/settings.html?from=home');
+$('btnSettings').onclick = toSettings;
 $('btnAbout').onclick = () => api.open.about();
-$('wPermBtn').onclick = () => api.open.settings();
-$('wModelsBtn').onclick = () => api.open.settings();
+$('wPermBtn').onclick = toSettings;
+$('wModelsBtn').onclick = toSettings;
 $('btnStart').onclick = async () => { await api.settings.set({ welcomed: true }); render(); };
 
 render();
