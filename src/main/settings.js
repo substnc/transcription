@@ -4,8 +4,10 @@ const path = require('path');
 const os = require('os');
 
 const ICLOUD_OBSIDIAN = path.join(os.homedir(), 'Library', 'Mobile Documents', 'iCloud~md~obsidian', 'Documents');
-// Inspelningar: i iCloud Drive under 01_CLAUDE_CODE (Anthons val, synkas alltså via iCloud). Kan ändras i Inställningar.
-const DEFAULT_RECORDINGS = path.join(os.homedir(), 'Library', 'Mobile Documents', 'com~apple~CloudDocs', '01_CLAUDE_CODE', 'speak', 'inspelningar');
+// Inspelningar sparas som standard lokalt (Application Support/…/recordings), aldrig i iCloud, så att ljud
+// inte hamnar i ett moln för den som installerar appen. Anthons val (iCloud Drive/01_CLAUDE_CODE) ligger kvar i
+// hans sparade inställningar. Kan ändras i Inställningar.
+const DEFAULT_RECORDINGS = '';
 
 const DEFAULTS = {
   hotkey: 'AltRight', // håll in höger ⌥ för att diktera

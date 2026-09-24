@@ -23,7 +23,7 @@ Electron-menyradsapp (ikon i Dock, valbart). Klick på Dock-ikonen visar det som
 - Livetext under inspelning (grov), noggrann körning när man stoppar.
 - Tre modellval i Inställningar: Diktering (turbo-metal), Möten (kb-large-metal), Livetext (pianissimo-sv).
 - Ordlista (namn/fackord) skickas som --prompt till whisper.cpp. Påverkar inte Pianissimo.
-- Inspelningar i iCloud Drive/01_CLAUDE_CODE/speak/inspelningar (valbart), raderas efter sparad anteckning
+- Inspelningar: standard lokalt i Application Support (ingen synk). Anthon har själv valt iCloud Drive/01_CLAUDE_CODE/speak/inspelningar. Raderas efter sparad anteckning
   om inte "Behåll ljudfilerna" är ikryssat. Rester äldre än ett dygn städas vid start.
 
 ## Utseende (sub.stnc® light, designfil: claude.ai artifact "Speak i sub.stnc® stil", sidan sub.stnc® light)
