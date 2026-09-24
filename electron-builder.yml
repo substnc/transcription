@@ -34,8 +34,8 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     LSUIElement: true
-    # Filen heter Speak.app, men namnet som visas (Dock, menyer) är "Speak."
-    CFBundleName: Speak.
+    # Filen heter Speak.app och namnet som visas är "Speak.". CFBundleName får inte ändras:
+    # Electron letar upp "<CFBundleName> Helper.app" vid start och kraschar annars ("Unable to find helper app").
     CFBundleDisplayName: Speak.
     NSMicrophoneUsageDescription: Speak behöver mikrofonen för att transkribera ditt tal lokalt på datorn.
     NSAudioCaptureUsageDescription: Speak tar upp datorns ljud under mötesinspelning så att alla deltagare i ett videomöte hörs. Ljudet stannar på datorn.
