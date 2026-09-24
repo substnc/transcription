@@ -8,6 +8,9 @@ Anthon, MacBook Pro M1 Max 32 GB, macOS 27. Svara kort på svenska i vardagsord.
 Krav: allt ljud och all text stannar på datorn. Inga molnsteg (undantag: modellnedladdning en gång).
 Arbetssätt: jag testar på min Mac, du felsöker. Ge ALLTID xattr-raden tillsammans med länken till ett nytt bygge:
     xattr -cr "/Applications/Speak.app"
+Vid varje nytt bygge: ge Anthon raden som tar bort den gamla versionen och installerar den nya
+(förutsätter att artefakten Speak-arm64 är nedladdad och uppackad i Hämtade filer):
+    pkill -x Speak; rm -rf "/Applications/Speak.app" "/Applications/sub.stnc® - Speak.app" && ditto -x -k ~/Downloads/Speak-arm64/Speak-*-arm64.zip /Applications && xattr -cr "/Applications/Speak.app" && open "/Applications/Speak.app"
 (Appen hette "sub.stnc® - Speak" före 24 sep 2026. Modeller och inställningar ligger kvar i
 ~/Library/Application Support/sub.stnc® - Speak, appen pekar dit med app.setPath.)
 
