@@ -1,6 +1,6 @@
 {
   "name": "speak",
-  "productName": "sub.stnc® - Speak",
+  "productName": "Speak",
   "version": "0.1.0",
   "description": "Lokal AI-diktering och mötestranskribering för Mac. Inget ljud eller text lämnar datorn.",
   "main": "src/main/main.js",

@@ -1,13 +1,15 @@
-# Handover: sub.stnc® - Speak
+# Handover: Speak.
 
-Fortsätt på appen sub.stnc® - Speak i repot substnc/transcription, branch claude/ai-dictation-app-mac-31cco2
+Fortsätt på appen Speak. i repot substnc/transcription, branch claude/ai-dictation-app-mac-31cco2
 (senaste commit 67e3609). Läs README.md, docs/HANDOVER.md och de senaste commit-meddelandena först.
 
 ## Om mig
 Anthon, MacBook Pro M1 Max 32 GB, macOS 27. Svara kort på svenska i vardagsord.
 Krav: allt ljud och all text stannar på datorn. Inga molnsteg (undantag: modellnedladdning en gång).
 Arbetssätt: jag testar på min Mac, du felsöker. Ge ALLTID xattr-raden tillsammans med länken till ett nytt bygge:
-    xattr -cr "/Applications/sub.stnc® - Speak.app"
+    xattr -cr "/Applications/Speak.app"
+(Appen hette "sub.stnc® - Speak" före 24 sep 2026. Modeller och inställningar ligger kvar i
+~/Library/Application Support/sub.stnc® - Speak, appen pekar dit med app.setPath.)
 
 ## Läge just nu
 Electron-menyradsapp (ikon i Dock, valbart). Klick på Dock-ikonen visar det som pågår.

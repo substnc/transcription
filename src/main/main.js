@@ -1,5 +1,5 @@
 'use strict';
-// sub.stnc® - Speak: menyradsapp för lokal diktering och mötestranskribering.
+// Speak. (sub.stnc®): menyradsapp för lokal diktering och mötestranskribering.
 const { app, Tray, Menu, nativeImage, ipcMain, dialog, shell, systemPreferences, Notification, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -14,11 +14,15 @@ const art = require('./icon-art');
 const { WavWriter, convertToWav, concatFloat32 } = require('../engine/audio');
 const { buildMeetingNote } = require('../engine/markdown');
 
+// Appen hette "sub.stnc® - Speak" innan den blev "Speak". Modeller (flera GB) och inställningar ligger kvar
+// i den gamla mappen, så den används fortfarande. Ingen flytt: Pianissimos Python-miljö ligger där.
+app.setName('Speak.');
+app.setPath('userData', path.join(app.getPath('appData'), 'sub.stnc® - Speak'));
 // Bara en Speak i taget. Klickar man på appen när den redan kör: väck den som finns i stället.
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
 app.on('second-instance', () => showCurrent());
 
-// Appen hette Diktera tidigare. Flytta med modeller och inställningar om de ligger kvar under det gamla namnet.
+// Ännu tidigare hette appen Diktera. Flytta med modeller och inställningar om de ligger kvar under det namnet.
 const userData = app.getPath('userData');
 try {
   const oldData = path.join(path.dirname(userData), 'Diktera');
@@ -479,7 +483,7 @@ function buildTray() {
   if (!tray) {
     try {
       tray = new Tray(trayIcon());
-      tray.setToolTip('sub.stnc® - Speak');
+      tray.setToolTip('Speak.');
     } catch (e) {
       console.error('Kunde inte skapa menyradsikon:', e.message);
       return;

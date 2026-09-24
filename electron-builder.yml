@@ -1,5 +1,5 @@
 appId: se.substnc.speak
-productName: sub.stnc® - Speak
+productName: Speak
 artifactName: Speak-${version}-${arch}.${ext}
 copyright: sub.stnc
 directories:
@@ -34,6 +34,9 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     LSUIElement: true
+    # Filen heter Speak.app, men namnet som visas (Dock, menyer) är "Speak."
+    CFBundleName: Speak.
+    CFBundleDisplayName: Speak.
     NSMicrophoneUsageDescription: Speak behöver mikrofonen för att transkribera ditt tal lokalt på datorn.
     NSAudioCaptureUsageDescription: Speak tar upp datorns ljud under mötesinspelning så att alla deltagare i ett videomöte hörs. Ljudet stannar på datorn.
     NSScreenCaptureUsageDescription: Speak behöver skärminspelning bara för att ta upp datorns ljud. Ingen bild sparas.

@@ -1,4 +1,4 @@
-# sub.stnc® - Speak
+# Speak. (sub.stnc®)
 
 Lokal AI-diktering och mötestranskribering för Mac, som en app i menyraden.
 Håll in en tangent, prata, släpp. Texten städas och klistras in där markören står.
@@ -131,7 +131,7 @@ Varje push bygger appen på GitHubs Mac-maskiner. Hämta den så här:
 Den är byggd för Apple Silicon (M1 och senare). Kör sedan en gång i Terminal:
 
 ```bash
-xattr -cr "/Applications/sub.stnc® - Speak.app"
+xattr -cr "/Applications/Speak.app"
 ```
 
 Det behövs för att appen är osignerad. Annars säger macOS att den är skadad.
