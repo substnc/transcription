@@ -1,57 +1,79 @@
-/* sub.stnc® designsystem: varm beige, Inter, ingen dekoration. Typografi och luft gör jobbet. */
-@import url("fonts/fonts.css");
-
+/* sub.stnc® light: vitt, svart, en grå. Helvetica Neue, rundade ytor, inga skuggor. Typografi och luft gör jobbet. */
 :root {
-  --bg: #BBB2AB; --bg2: #C9C2BB; --text: #0A0A0A; --sub: #4A4440; --muted: #7A7370; --rule: #A8A09A;
-  --panel: #C9C2BB; --soft: #C9C2BB; --line: #A8A09A; --accent: #0A0A0A; --ok: #3E5A3E; --warn: #6E551E; --bad: #642828;
-  --sp1: #0A0A0A; --sp2: #4A4440; --sp3: #7A7370; --sp4: #6E551E; --sp5: #3E5A3E; --sp6: #642828;
-  --sans: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --bg: #ffffff; --ink: #000000; --muted: #818181; --soft: #5f5f5f; --tile: #ebecef; --off: #c9ccd3;
+  --text: var(--ink); --sub: var(--soft); --rule: var(--tile);
+  --sans: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); }
-body { padding: 60px 48px 40px; -webkit-user-select: none; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); }
+body { padding: 64px 40px 40px; -webkit-user-select: none; }
 .drag { -webkit-app-region: drag; position: fixed; top: 0; left: 0; right: 0; height: 44px; }
-h1 { font-weight: 500; font-size: 44px; line-height: 1.05; letter-spacing: -0.01em; margin: 0 0 8px; }
-h2 { font-weight: 500; font-size: 24px; line-height: 1.15; margin: 0 0 10px; }
-.label { font-size: 15px; font-weight: 500; color: var(--muted); }
-p, li { color: var(--sub); }
-.sub { color: var(--sub); margin: 0 0 28px; font-size: 17px; max-width: 640px; line-height: 1.45; }
-.card { padding: 0; margin: 0 0 32px; background: transparent; border: 0; }
+
+/* Rubriker: två rader, första svart, andra grå. */
+.label { font-size: 13px; line-height: 16px; color: var(--soft); }
+h1, .hero { font-weight: 500; font-size: 56px; line-height: 60px; letter-spacing: -0.02em; margin: 0 0 8px; }
+h1 .dim, .hero .dim { display: block; color: var(--muted); }
+h2 { font-weight: 500; font-size: 20px; line-height: 24px; margin: 0 0 12px; }
+p, li { color: var(--soft); }
+.sub { color: var(--soft); margin: 0 0 28px; font-size: 15px; max-width: 560px; }
+small { color: var(--soft); }
+code { font-size: 13px; color: var(--soft); -webkit-user-select: text; }
+a { color: var(--ink); }
+
+/* Ytor */
+.card, .panel { background: var(--tile); border-radius: 16px; padding: 24px; margin: 0 0 24px; }
 .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .row.between { justify-content: space-between; }
 .stack { display: flex; flex-direction: column; gap: 10px; }
-button { font: 500 15px var(--sans); height: 44px; padding: 0 20px; border: 1px solid var(--text); border-radius: 0; background: transparent; color: var(--text); cursor: pointer; }
-button:hover { background: var(--bg2); }
-button.primary { background: var(--text); color: var(--bg); }
-button.primary:hover { background: #2a2826; }
-button.danger { border-color: var(--rule); color: var(--sub); }
-button.small { height: 32px; padding: 0 12px; font-size: 13px; }
-button:disabled { opacity: .35; cursor: default; }
-input[type=text], select, textarea { font: 15px var(--sans); color: var(--text); background: transparent; border: 0; border-bottom: 1px solid var(--text); border-radius: 0; padding: 8px 0; width: 100%; }
-input[type=text]:focus, select:focus, textarea:focus { outline: none; border-bottom-color: var(--sub); }
-input::placeholder { color: var(--muted); }
-textarea { resize: vertical; min-height: 70px; -webkit-user-select: text; line-height: 1.5; }
-select { appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: linear-gradient(45deg, transparent 50%, var(--text) 50%), linear-gradient(135deg, var(--text) 50%, transparent 50%); background-position: calc(100% - 14px) 55%, calc(100% - 9px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
-select option { background: var(--bg); }
-label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 2px; }
-.field { margin-bottom: 18px; }
-.check { display: flex; align-items: center; gap: 12px; color: var(--text); font-size: 15px; margin: 10px 0; cursor: pointer; }
-.check input { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border: 1px solid var(--text); border-radius: 0; background: transparent; flex: none; display: grid; place-items: center; }
-.check input:checked::after { content: ""; width: 10px; height: 10px; background: var(--text); }
-.radio { display: flex; align-items: center; gap: 14px; padding: 10px 0; color: var(--text); }
-.radio input { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border: 1px solid var(--text); border-radius: 50%; flex: none; display: grid; place-items: center; }
-.radio input:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--text); }
-.radio label { margin: 0; color: var(--text); font-size: 15px; flex-grow: 1; }
-.radio small { display: block; color: var(--muted); }
-.chip { display: inline-block; color: var(--muted); font-size: 14px; font-weight: 500; }
-.chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); } .chip.bad { color: var(--bad); }
-.status { font-size: 14px; color: var(--muted); }
 .hidden { display: none !important; }
-.bar { height: 2px; background: var(--rule); overflow: hidden; }
-.bar > i { display: block; height: 100%; background: var(--text); width: 0; transition: width .2s; }
-code { font-size: 13px; color: var(--sub); -webkit-user-select: text; }
-small { color: var(--muted); }
-.dot { width: 10px; height: 10px; background: var(--text); flex: none; }
-.hr { height: 0; margin: 0; }
-.brand { position: fixed; right: 40px; bottom: 32px; width: 64px; height: 64px; opacity: .95; pointer-events: none; }
-::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: var(--rule); }
+
+/* Knappar: piller. Svart = huvudval, grå = övrigt. På en grå yta blir de vita. */
+button { font: 500 15px var(--sans); height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--tile); color: var(--ink); cursor: pointer; }
+.card button, .panel button { background: #ffffff; }
+button:hover { background: #dfe0e4; }
+.card button:hover, .panel button:hover { background: #f4f5f7; }
+button.primary, .card button.primary, .panel button.primary { background: var(--ink); color: #ffffff; }
+button.primary:hover { background: #2a2a2a; }
+button.danger { color: var(--soft); }
+button.small { height: 32px; padding: 0 14px; font-size: 13px; }
+button.link { height: auto; padding: 0; background: transparent !important; font-size: 13px; text-decoration: underline; }
+button:disabled { opacity: .35; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Fält */
+input[type=text], select, textarea { font: 15px var(--sans); color: var(--ink); background-color: var(--tile); border: 0; border-radius: 16px; padding: 0 16px; height: 44px; width: 100%; }
+.card input[type=text], .card select, .card textarea, .panel input[type=text], .panel select, .panel textarea { background-color: #ffffff; }
+textarea { height: auto; padding: 12px 16px; resize: vertical; min-height: 70px; -webkit-user-select: text; line-height: 1.5; }
+input:focus, select:focus, textarea:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--ink); }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+select { appearance: none; -webkit-appearance: none; padding-right: 36px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' stroke='%23000' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-position: right 14px center; background-repeat: no-repeat; }
+label { display: block; font-size: 13px; color: var(--soft); margin-bottom: 8px; }
+.field { margin-bottom: 16px; }
+
+/* Av/på-reglage i stället för kryssrutor. Texten står till vänster, reglaget till höger. */
+.check { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--ink); font-size: 15px; margin: 0; padding: 8px 0; cursor: pointer; }
+.check input { order: 2; appearance: none; -webkit-appearance: none; width: 40px; height: 24px; margin: 0; border-radius: 999px; background: var(--off); flex: none; position: relative; cursor: pointer; transition: background .15s; }
+.check input::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 999px; background: #ffffff; transition: left .15s; }
+.check input:checked { background: var(--ink); }
+.check input:checked::after { left: 19px; }
+
+.radio { display: flex; align-items: center; gap: 12px; padding: 8px 0; color: var(--ink); }
+.radio input { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid var(--ink); border-radius: 50%; flex: none; display: grid; place-items: center; }
+.radio input:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+.radio label { margin: 0; color: var(--ink); font-size: 15px; flex-grow: 1; }
+.radio small { display: block; color: var(--soft); font-size: 12px; }
+
+/* Status: en prick och ett ord. Fylld = klart, ring = saknas. */
+.chip { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 13px; }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 999px; background: var(--ink); flex: none; }
+.chip.warn, .chip.bad { color: var(--soft); }
+.chip.warn::before, .chip.bad::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--soft); }
+.chip.plain::before { display: none; }
+.status { font-size: 13px; color: var(--soft); }
+
+.bar { height: 4px; border-radius: 999px; background: #ffffff; overflow: hidden; }
+body > .bar, section > .bar { background: var(--tile); }
+.bar > i { display: block; height: 100%; background: var(--ink); width: 0; transition: width .2s; border-radius: 999px; }
+.dot { width: 10px; height: 10px; border-radius: 999px; background: var(--ink); flex: none; }
+.foot { font-size: 13px; color: var(--soft); }
+::-webkit-scrollbar { width: 8px; } ::-webkit-scrollbar-thumb { background: var(--tile); border-radius: 999px; }

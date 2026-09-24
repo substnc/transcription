@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'none'">
+<title>About Speak</title>
+<link rel="stylesheet" href="../shared.css">
+<link rel="stylesheet" href="../icon.css">
+<style>
+  body { height: 100vh; display: flex; flex-direction: column; gap: 28px; padding: 72px 32px 32px; }
+  .name { font-size: 44px; line-height: 46px; font-weight: 500; letter-spacing: -0.02em; }
+  .bottom { margin-top: auto; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+  .sig { display: flex; flex-direction: column; gap: 10px; font-size: 13px; }
+  .sig img { width: 200px; height: auto; display: block; }
+  #licenses { position: fixed; inset: 0; background: #ffffff; padding: 56px 32px 32px; overflow-y: auto; -webkit-user-select: text; }
+  #licenses h2 { font-size: 20px; }
+  #licenses dl { margin: 0; display: grid; grid-template-columns: 1fr auto; gap: 8px 16px; font-size: 13px; }
+  #licenses dt { color: var(--ink); }
+  #licenses dd { margin: 0; color: var(--soft); text-align: right; }
+</style></head>
+<body>
+<div class="drag"></div>
+<div id="icon"></div>
+<div class="name">Speak.</div>
+<div class="bottom">
+  <div class="sig"><img src="../../../assets/signature.png" alt="Signature of Anthon Bäckström"><span>Made by Anthon Bäckström</span></div>
+  <button class="small" id="btnLicenses">Licenses</button>
+</div>
+
+<div id="licenses" class="hidden">
+  <h2>Licenses</h2>
+  <p class="status" style="margin-top: 0">Speak is built on these open parts. Everything runs on this computer.</p>
+  <dl>
+    <dt>whisper.cpp</dt><dd>MIT</dd>
+    <dt>OpenAI Whisper large-v3 turbo</dt><dd>MIT</dd>
+    <dt>KB-Whisper, KBLab</dt><dd>Apache 2.0</dd>
+    <dt>Klang Pianissimo, KlangAI</dt><dd>CC BY 4.0</dd>
+    <dt>NVIDIA NeMo</dt><dd>Apache 2.0</dd>
+    <dt>NVIDIA Nemotron 3 Diarization</dt><dd>OpenMDW</dd>
+    <dt>sherpa-onnx</dt><dd>Apache 2.0</dd>
+    <dt>pyannote segmentation 3.0</dt><dd>MIT</dd>
+    <dt>3D-Speaker</dt><dd>Apache 2.0</dd>
+    <dt>Silero VAD</dt><dd>MIT</dd>
+    <dt>Electron</dt><dd>MIT</dd>
+    <dt>FFmpeg (ffmpeg-static)</dt><dd>GPL 3.0+</dd>
+    <dt>uiohook-napi</dt><dd>MIT</dd>
+    <dt>Ollama (separate app)</dt><dd>MIT</dd>
+  </dl>
+  <p class="status" id="version" style="margin-top: 24px"></p>
+  <button class="small" id="btnBack">Back</button>
+</div>
+<script src="../icon.js"></script>
+<script src="about.js"></script>
+</body></html>

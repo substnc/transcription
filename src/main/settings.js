@@ -36,6 +36,7 @@ const DEFAULTS = {
   defaultInbox: 0,
   launchAtLogin: false,
   showInDock: true, // ikon i Dock så att man ser att appen kör
+  welcomed: false, // välkomstsidan i huvudfönstret har visats och klickats bort
 };
 
 class Settings {

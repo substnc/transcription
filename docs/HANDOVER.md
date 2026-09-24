@@ -21,6 +21,21 @@ Electron-menyradsapp (ikon i Dock, valbart). Klick på Dock-ikonen visar det som
 - Inspelningar i iCloud Drive/01_CLAUDE_CODE/speak/inspelningar (valbart), raderas efter sparad anteckning
   om inte "Behåll ljudfilerna" är ikryssat. Rester äldre än ett dygn städas vid start.
 
+## Utseende (sub.stnc® light, designfil: claude.ai artifact "Speak i sub.stnc® stil", sidan sub.stnc® light)
+- Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
+  knappar som piller, av/på-reglage i stället för kryssrutor. Helvetica Neue (Inter används inte längre).
+- Ikonen "röst blir text": en vågform av prickar som rinner ut i en rad. Ritas i kod: src/main/icon-art.js
+  (appikon, menyrad, Dock-animation) och src/renderer/icon.js + icon.css (fönstren). npm run icons skriver om
+  assets/icon.png och assets/trayTemplate*.png.
+- Ikonen rör sig: 'live' (vågen andas) när du dikterar eller spelar in möte, 'type' (raden tänds) när texten tas
+  fram. Gäller menyraden, Dock-ikonen, statuspillret och nivåmätaren i mötesläget.
+- Fönster: Huvudfönster (src/renderer/home, välkomstsida första gången, inställningen welcomed),
+  Om Speak (src/renderer/about, signaturen i assets/signature.png, licenser bakom knappen),
+  Inställningar, Mötesläge, statuspill.
+- Menyn i menyraden: Öppna Speak, Diktera (tips), Nytt möte, Inställningar, Om Speak, Avsluta.
+  Genvägen ⌥⇧D finns kvar men syns inte i menyn.
+- Talare visas som runda brickor: J på svart är du, övriga har nummer och egen stil (grå, ring, ljusgrå).
+
 ## Motorer
 - whisper.cpp (resources/bin/whisper-cli, byggs i CI, Metal). ggml-modeller i models/whisper-cpp-<namn>.
 - Klang Pianissimo (KlangAI/pianissimo-sv) körs exakt som modellkortet: Python + PyTorch + NeMo,

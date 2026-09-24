@@ -1,113 +1,143 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; script-src 'self'; connect-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'none'">
 <title>Speak – Mötesläge</title>
 <link rel="stylesheet" href="../shared.css">
+<link rel="stylesheet" href="../icon.css">
 <style>
-  .live { margin-top: 28px; max-height: 38vh; overflow-y: auto; border-top: 1px solid var(--rule); padding-top: 12px; -webkit-user-select: text; }
-  .live p { margin: 0 0 8px; color: var(--sub); font-size: 15px; line-height: 1.45; }
-  .live p:last-child { color: var(--text); }
-  .live .t { color: var(--muted); font-size: 12px; margin-right: 10px; font-variant-numeric: tabular-nums; }
-  .modal-bg { position: fixed; inset: 0; background: rgba(10,10,10,.5); display: flex; align-items: center; justify-content: center; z-index: 10; }
-  .modal { background: var(--bg); padding: 36px 40px; width: 520px; max-width: 90vw; }
-  .modal ul { padding-left: 18px; margin: 8px 0 18px; }
-  .timer { font-size: 150px; font-weight: 500; line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 6px 0 24px; }
-  .bars { display: flex; align-items: flex-end; gap: 4px; height: 56px; }
-  .bars i { display: block; width: 4px; background: var(--muted); height: 6px; transition: height .12s; }
-  .bars i.hot { background: var(--text); }
-  .hero { font-size: 72px; font-weight: 500; line-height: 1.02; letter-spacing: -0.02em; margin: 0 0 16px; }
-  .titleinput { font-size: 32px; font-weight: 500; padding: 10px 0; max-width: 620px; }
-  .titleinput::placeholder { color: var(--muted); }
-  .two { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 56px; align-items: start; }
-  .side textarea { padding: 0; min-height: 110px; border-bottom-color: transparent; font-size: 15px; color: var(--sub); }
-  .side textarea:focus { border-bottom-color: var(--rule); }
-  .legend { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin-bottom: 18px; }
+  body { min-height: 100vh; display: flex; flex-direction: column; }
+  section { display: flex; flex-direction: column; flex-grow: 1; }
+  .titleinput { height: 56px; font-size: 20px; padding: 0 20px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 24px; }
+  .actions { display: flex; gap: 12px; margin-top: 24px; }
+  .actions button { height: 48px; padding: 0 28px; font-size: 16px; }
+  .rec-dot { width: 10px; height: 10px; border-radius: 999px; background: #ffffff; display: inline-block; margin-right: 10px; }
+  .stop-sq { width: 10px; height: 10px; border-radius: 2px; background: #ffffff; display: inline-block; margin-right: 10px; }
+  .bottom { margin-top: auto; padding-top: 32px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; }
+
+  .recline { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--soft); }
+  .recline .dot { width: 8px; height: 8px; }
+  .timer { font-size: 150px; font-weight: 500; line-height: 140px; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; margin: 16px 0 8px; }
+  #meter { margin: 8px 0 0; }
+  .live { flex-grow: 1; min-height: 140px; margin-top: 24px; background: var(--tile); border-radius: 16px; padding: 24px; overflow-y: auto; -webkit-user-select: text; }
+  .live .head { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; color: var(--soft); margin-bottom: 12px; }
+  .live p { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 16px; margin: 0 0 8px; color: var(--soft); font-size: 15px; line-height: 22px; }
+  .live p:last-child { color: var(--ink); }
+  .live .t { color: var(--soft); font-variant-numeric: tabular-nums; }
+
+  .steps { display: flex; gap: 20px; flex-wrap: wrap; margin: 16px 0; }
+  .steps .chip::before { background: transparent; box-shadow: inset 0 0 0 1.5px var(--muted); }
+  .steps .chip { color: var(--muted); }
+  .steps .chip.done { color: var(--soft); }
+  .steps .chip.done::before { background: var(--soft); box-shadow: none; }
+  .steps .chip.active { color: var(--ink); }
+  .steps .chip.active::before { background: var(--ink); box-shadow: none; }
+  #processing .bar { max-width: 640px; }
+  .working { display: flex; align-items: center; gap: 20px; }
+
+  .two { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 46px; align-items: start; flex-grow: 1; }
+  .side { display: flex; flex-direction: column; gap: 18px; }
+  .side h1 { font-size: 36px; line-height: 40px; margin: 0; }
+  .side .blk { display: flex; flex-direction: column; gap: 6px; }
+  .side .blk .row { justify-content: space-between; }
+  .side textarea { min-height: 64px; }
+  .side .actions { flex-direction: column; margin-top: 8px; }
+  .side .actions .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .side .actions button { width: 100%; height: 44px; font-size: 14px; padding: 0 12px; white-space: nowrap; }
+  .legend { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
   .legend .sp { display: flex; align-items: center; gap: 8px; }
-  .legend input { width: 140px; border-bottom-color: transparent; padding: 2px 0; font-weight: 500; }
-  .legend input:focus { border-bottom-color: var(--rule); }
-  .segments { -webkit-user-select: text; }
-  .seg { display: grid; grid-template-columns: 56px 12px minmax(0, 1fr); gap: 18px; align-items: stretch; margin-bottom: 14px; }
-  .seg .t { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; padding-top: 3px; }
-  .seg .lane { width: 12px; min-height: 44px; cursor: pointer; }
-  .seg .body { display: flex; flex-direction: column; gap: 2px; }
-  .seg .sp { font-weight: 500; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
-  .seg .sp .lang { font-size: 11px; color: var(--muted); font-weight: 400; }
-  .seg textarea { min-height: 0; padding: 0; border-bottom-color: transparent; color: var(--sub); font-size: 16px; }
-  .seg textarea:focus { border-bottom-color: var(--rule); }
-  .seg.flash .lane { outline: 2px solid var(--text); outline-offset: 2px; }
-  .steps { display: flex; gap: 18px; flex-wrap: wrap; margin: 8px 0 14px; }
-  .steps .chip.active { color: var(--text); }
-  .steps .chip.done { color: var(--sub); }
-  .savebox { margin-top: 28px; }
+  .legend input { width: 130px; height: 32px; padding: 0 10px; font-weight: 500; background: transparent; }
+  .legend input:focus { background: var(--tile); box-shadow: none; }
+  .segments { background: var(--tile); border-radius: 16px; padding: 24px; -webkit-user-select: text; max-height: calc(100vh - 170px); overflow-y: auto; }
+  .seg { display: grid; grid-template-columns: 44px 22px minmax(0, 1fr); gap: 12px; align-items: start; margin-bottom: 16px; }
+  .seg .t { color: var(--soft); font-variant-numeric: tabular-nums; font-size: 13px; line-height: 22px; }
+  .seg .body { display: flex; flex-direction: column; }
+  .seg .sp { font-weight: 500; font-size: 13px; line-height: 22px; display: flex; gap: 6px; align-items: baseline; }
+  .seg .sp .lang { font-size: 13px; color: var(--soft); font-weight: 400; }
+  .seg textarea { resize: none; min-height: 0; padding: 0; background-color: transparent; border-radius: 0; font-size: 15px; line-height: 22px; color: var(--ink); }
+  .seg textarea:focus { box-shadow: none; background: #ffffff; }
+  .seg.flash .badge { outline: 2px solid var(--ink); outline-offset: 2px; }
+  /* Talare: en rund bricka med nummer. Jag = svart med J, sedan grå, ring, ljusgrå, grå ring. */
+  .badge { width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 500; flex: none; box-sizing: border-box; }
+  .badge.s0 { background: var(--ink); color: #ffffff; }
+  .badge.s1 { background: var(--soft); color: #ffffff; }
+  .badge.s2 { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+  .badge.s3 { background: var(--off); color: var(--ink); }
+  .badge.s4 { background: transparent; color: var(--soft); box-shadow: inset 0 0 0 1.5px var(--soft); }
+  .savebox .radio { padding: 4px 0; }
+
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; z-index: 10; }
+  .modal { background: #ffffff; border-radius: 16px; padding: 32px; width: 520px; max-width: 90vw; }
+  .modal h2 { font-size: 32px; line-height: 36px; letter-spacing: -0.02em; margin-bottom: 12px; }
+  .modal ul { padding-left: 18px; margin: 8px 0 18px; }
+  #errorBox { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 </style></head>
 <body>
 <div class="drag"></div>
-<img class="brand" src="../../../assets/substnc-logo.svg" alt="sub.stnc®">
-<div id="errorBox" class="card hidden"><div class="row between"><span id="errorText" style="color: var(--bad)"></span><button id="errorClose" class="small">Stäng</button></div></div>
+<div id="errorBox" class="card hidden"><span id="errorText"></span><button id="errorClose" class="small">Stäng</button></div>
 
 <section id="idle">
-  <div class="hero">Nytt möte.</div>
-  <p class="sub">Spela in eller ladda upp. Talare, tidsstämplar och sammanfattning görs på den här datorn.</p>
-  <div class="field"><input type="text" id="title" class="titleinput" placeholder="Mötets titel"></div>
-  <div class="row" style="gap: 32px; align-items: flex-end; margin-bottom: 8px">
-    <div class="field" style="width: 260px; margin: 0"><label for="language">Språk i mötet</label><select id="language"><option value="">Som i Inställningar</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option><option value="auto">Svenska och engelska</option></select></div>
-    <div class="field" style="width: 220px; margin: 0"><label for="speakerCount">Antal talare, om du vet</label><input type="text" id="speakerCount" placeholder="t.ex. 25" inputmode="numeric"></div>
-    <div class="field" style="width: 300px; margin: 0"><label for="sourceMode">Ljudkälla</label><select id="sourceMode"><option value="both">Mikrofon och datorns ljud (videomöte)</option><option value="system">Bara datorns ljud (jag lyssnar bara)</option><option value="mic">Bara mikrofon (möte i rummet)</option></select></div>
+  <div class="label">Mötesläge</div>
+  <div class="hero" style="font-size: 64px; line-height: 68px;">Nytt möte.<span class="dim">Spela in eller ladda upp.</span></div>
+  <div style="margin-top: 24px"><label for="title">Mötets titel</label><input type="text" id="title" class="titleinput" placeholder="Till exempel Kickoff Delicato"></div>
+  <div class="grid3">
+    <div><label for="sourceMode">Ljudkälla</label><select id="sourceMode"><option value="both">Mikrofon och datorns ljud (videomöte)</option><option value="system">Bara datorns ljud (jag lyssnar bara)</option><option value="mic">Bara mikrofon (möte i rummet)</option></select></div>
+    <div><label for="language">Språk i mötet</label><select id="language"><option value="">Som i Inställningar</option><option value="auto">Svenska och engelska</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
+    <div><label for="speakerCount">Antal talare, om du vet</label><input type="text" id="speakerCount" placeholder="Till exempel 4" inputmode="numeric"></div>
   </div>
-  <p class="status" style="margin: 0 0 8px">Mikrofonen dämpas automatiskt medan datorn spelar tal, så rösterna dubblas inte.</p>
-  <div class="row">
-    <button class="primary" id="btnRecord">Spela in</button>
+  <p class="status" style="margin: 12px 0 0">Mikrofonen dämpas automatiskt medan datorn spelar tal, så rösterna dubblas inte.</p>
+  <div class="actions">
+    <button class="primary" id="btnRecord"><span class="rec-dot"></span>Spela in</button>
     <button id="btnUpload">Ladda upp fil</button>
   </div>
-  <p class="status" style="margin-top: 40px">Innan du spelar in: säg till alla i mötet. Stoppa om någon säger nej.</p>
+  <div class="bottom"><span class="status" style="font-size: 15px; max-width: 420px">Innan du spelar in: säg till alla i mötet. Stoppa om någon säger nej.</span><span style="font-size: 13px">©sub.stnc®</span></div>
 </section>
 
 <section id="recording" class="hidden">
-  <div class="label">Spelar in.</div>
+  <div class="recline"><span class="dot"></span>Spelar in · <span id="sources">Mikrofon</span></div>
   <div class="timer" id="timer">00:00</div>
-  <div class="bars" id="bars"></div>
-  <div class="row" style="margin-top: 28px">
-    <button class="primary" id="btnStop">Stoppa och transkribera</button>
-    <button id="btnCancel" class="danger">Avbryt</button>
+  <div id="meter"></div>
+  <div class="actions">
+    <button class="primary" id="btnStop"><span class="stop-sq"></span>Stoppa och transkribera</button>
+    <button id="btnCancel">Avbryt</button>
   </div>
-  <p class="status" style="margin-top: 40px"><span id="sources">Mikrofon</span> · Sparas löpande till fil så att inget går förlorat.</p>
-  <p class="status" id="liveStatus" style="margin: 4px 0 0"></p>
-  <div class="live" id="liveText"></div>
+  <div class="live" id="liveBox">
+    <div class="head"><span>Livetext</span><span id="liveStatus">Utkast. Den färdiga texten kommer när du stoppar.</span></div>
+    <div id="liveText"></div>
+  </div>
+  <div class="bottom" style="padding-top: 16px"><span class="status">Sparas löpande till fil så att inget går förlorat.</span><span style="font-size: 13px">©sub.stnc®</span></div>
 </section>
 
 <section id="processing" class="hidden">
-  <h1>Arbetar.</h1>
+  <div class="working"><span id="workIcon"></span><h1 style="margin: 0">Transkriberar.</h1></div>
   <div class="steps">
     <span class="chip" data-step="load">Laddar</span><span class="chip" data-step="convert">Konverterar</span>
     <span class="chip" data-step="diarize">Talare</span><span class="chip" data-step="transcribe">Transkriberar</span><span class="chip" data-step="summarize">Sammanfattar</span>
   </div>
   <div class="bar"><i id="progressBar"></i></div>
-  <p class="status" id="progressText" style="margin:12px 0 0">Startar…</p>
+  <p class="status" id="progressText" style="margin: 12px 0 0">Startar…</p>
 </section>
 
 <section id="result" class="hidden">
   <div class="two">
     <div class="side">
-      <h1 id="resultTitle">Möte</h1>
-      <div class="status" id="meta" style="margin-bottom: 28px"></div>
-      <div class="row between" style="margin-bottom: 4px"><h2 style="margin:0">Sammanfattning</h2><button class="small" id="btnResummarize">Skapa om</button></div>
-      <textarea id="summary"></textarea>
-      <div class="status" id="summaryBy" style="margin-bottom: 22px"></div>
-      <h2>Beslut</h2>
-      <textarea id="decisions" placeholder="En per rad"></textarea>
-      <h2 style="margin-top: 18px">Att göra</h2>
-      <textarea id="todos" placeholder="En per rad, uppgift @namn"></textarea>
-      <h2 style="margin-top: 28px">Spara till Obsidian</h2>
-      <div class="savebox">
+      <div class="blk">
+        <div class="status" id="meta"></div>
+        <h1 id="resultTitle">Möte</h1>
+      </div>
+      <div class="blk"><div class="row"><span class="label">Sammanfattning</span><button class="link" id="btnResummarize">Skapa om</button></div>
+        <textarea id="summary"></textarea><span class="status" id="summaryBy"></span></div>
+      <div class="blk"><span class="label">Beslut</span><textarea id="decisions" placeholder="Ett per rad"></textarea></div>
+      <div class="blk"><span class="label">Att göra</span><textarea id="todos" placeholder="En per rad, uppgift @namn"></textarea></div>
+      <div class="blk savebox"><span class="label">Spara till</span>
         <div id="inboxes"></div>
         <div class="radio"><input type="radio" name="inbox" id="inboxCustom" value="custom"><label for="inboxCustom">Annan mapp <small id="customPath"></small></label><button class="small" id="btnChoose">Välj</button></div>
-        <div class="row" style="margin-top:14px">
-          <button class="primary" id="btnSave">Spara till Obsidian</button>
-          <button id="btnCopy">Kopiera som text</button>
-          <button id="btnNew">Börja om</button>
-        </div>
-        <div class="status" id="saveStatus" style="margin-top: 10px"></div>
       </div>
+      <div class="actions">
+        <button class="primary" id="btnSave">Spara till Obsidian</button>
+        <div class="pair"><button id="btnCopy">Kopiera som text</button><button id="btnNew">Börja om</button></div>
+      </div>
+      <div class="status" id="saveStatus"></div>
     </div>
     <div>
       <div class="legend" id="speakers"></div>
@@ -118,7 +148,7 @@
 
 <div id="consent" class="modal-bg hidden">
   <div class="modal">
-    <h2 style="font-size: 32px">Säg till alla i mötet.</h2>
+    <h2>Säg till alla i mötet.</h2>
     <p>Berätta att det spelas in och transkriberas. Ljud och text stannar på den här datorn, men de andra behöver få veta och säga ja.</p>
     <ul>
       <li>Säg tydligt att inspelning startar.</li>
@@ -126,12 +156,13 @@
       <li>Stoppa om någon säger nej.</li>
     </ul>
     <label class="check"><input type="checkbox" id="consentCheck"> Jag har informerat deltagarna och alla har sagt ja</label>
-    <div class="row" style="justify-content:flex-end;margin-top:20px">
+    <div class="row" style="justify-content: flex-end; margin-top: 20px">
       <button id="consentCancel">Avbryt</button>
       <button class="primary" id="consentOk" disabled>Starta inspelning</button>
     </div>
   </div>
 </div>
 
+<script src="../icon.js"></script>
 <script src="meeting.js"></script>
 </body></html>

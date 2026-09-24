@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'none'">
+<title>Speak</title>
+<link rel="stylesheet" href="../shared.css">
+<link rel="stylesheet" href="../icon.css">
+<style>
+  body { height: 100vh; display: flex; flex-direction: column; padding: 64px 40px 32px; }
+  section { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+  .appicon { width: 88px; height: 88px; border-radius: 20px; background: #000000; display: flex; align-items: center; justify-content: center; flex: none; }
+  .appicon.big { width: 120px; height: 120px; border-radius: 27px; }
+  .brandrow { display: flex; align-items: center; gap: 24px; margin-bottom: 32px; }
+  .brandrow .name { font-size: 64px; line-height: 64px; font-weight: 500; letter-spacing: -0.03em; }
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; flex-grow: 1; min-height: 0; }
+  .tile { border-radius: 16px; padding: 32px; display: flex; flex-direction: column; gap: 16px; }
+  .tile.light { background: var(--tile); }
+  .tile.dark { background: #000000; color: #ffffff; }
+  .tile .big { font-size: 36px; line-height: 40px; font-weight: 500; letter-spacing: -0.02em; }
+  .tile .big .dim { display: block; color: var(--muted); }
+  .tile.dark .big .dim, .tile.dark .label, .tile.dark .status, .tile.dark p { color: #9a9a9a; }
+  .tile .end { margin-top: auto; display: flex; align-items: center; gap: 12px; }
+  .tile .end .status { margin-left: auto; }
+  .tile.light button { background: #ffffff; }
+  .tile.dark button { background: #2a2a2a; color: #ffffff; }
+  .tile.dark button.primary { background: #ffffff; color: #000000; }
+  .key { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; height: 44px; padding: 0 12px; border-radius: 10px; background: #ffffff; box-shadow: inset 0 -2px 0 #d5d7dc; font-size: 18px; font-weight: 500; color: var(--ink); }
+  .keyrow { display: flex; align-items: center; gap: 12px; font-size: 15px; color: var(--soft); }
+  .foot { margin-top: 24px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+  .foot .links { display: flex; gap: 20px; }
+  .foot .links button { font-size: 13px; }
+
+  .welcome h1 { font-size: 96px; line-height: 92px; letter-spacing: -0.03em; margin: 24px 0 40px; }
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .step { background: var(--tile); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 10px; }
+  .step .n { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; }
+  .step .n span { width: 24px; height: 24px; border-radius: 999px; background: #000000; color: #ffffff; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .step p { margin: 0; font-size: 15px; }
+  .step button { align-self: flex-start; background: #ffffff; }
+</style></head>
+<body>
+<div class="drag"></div>
+
+<section id="welcome" class="welcome hidden">
+  <div class="appicon big" id="iconBig"></div>
+  <h1>Välkommen<span class="dim" style="display: block; color: var(--muted)">till Speak.</span></h1>
+  <div class="steps">
+    <div class="step"><div class="n"><span>1</span>Behörigheter</div><p>Mikrofon, tillgänglighet och tangentbord.</p><span class="chip" id="wPerm">–</span><button class="small" id="wPermBtn">Öppna Inställningar</button></div>
+    <div class="step"><div class="n"><span>2</span>Modeller</div><p>Hämtas en gång. Sedan körs allt utan nät.</p><span class="chip" id="wModels">–</span><button class="small" id="wModelsBtn">Öppna Inställningar</button></div>
+    <div class="step"><div class="n"><span>3</span>Testa</div><p>Håll in <span id="wKey">tangenten</span> och säg något.</p><button class="small" id="wTest">Testa diktering</button><span class="status" id="wTestStatus"></span></div>
+  </div>
+  <div class="foot" style="margin-top: auto"><span class="status">Visas bara första gången.</span><button class="primary" id="btnStart" style="height: 48px; padding: 0 28px; font-size: 16px">Kom igång</button></div>
+</section>
+
+<section id="home" class="hidden">
+  <div class="brandrow"><div class="appicon" id="icon"></div><div class="name">Speak.</div></div>
+  <div class="tiles">
+    <div class="tile light">
+      <div class="label">Diktering</div>
+      <div class="big">Håll in och prata.<span class="dim">Släpp, så skrivs det.</span></div>
+      <div class="keyrow"><span class="key" id="keyCap">⌃</span><span id="keyText">Var du än skriver</span></div>
+      <div class="end"><button id="btnTest">Testa diktering</button><span class="status" id="dictModel"></span></div>
+      <span class="status" id="testStatus"></span>
+    </div>
+    <div class="tile dark">
+      <div class="label">Möten</div>
+      <div class="big">Spela in ett möte.<span class="dim">Få text, talare och sammanfattning.</span></div>
+      <p style="margin: 0">Videomöte, möte i rummet eller en ljudfil du redan har.</p>
+      <div class="end"><button class="primary" id="btnMeeting">Nytt möte</button><button id="btnUpload">Ladda upp fil</button><span class="status" id="meetModel"></span></div>
+    </div>
+  </div>
+  <div class="foot"><span class="status" id="footStatus">Allt körs på den här datorn.</span><span class="links"><button class="link" id="btnSettings">Inställningar</button><button class="link" id="btnAbout">Om Speak</button></span></div>
+</section>
+
+<script src="../icon.js"></script>
+<script src="home.js"></script>
+</body></html>

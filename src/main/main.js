@@ -10,6 +10,7 @@ const { EngineClient } = require('./engine-client');
 const { Hotkey, KEY_LABELS, TOGGLE_SHORTCUT } = require('./hotkey');
 const { pasteText, accessibilityGranted } = require('./paste');
 const windows = require('./windows');
+const art = require('./icon-art');
 const { WavWriter, convertToWav, concatFloat32 } = require('../engine/audio');
 const { buildMeetingNote } = require('../engine/markdown');
 
@@ -35,6 +36,8 @@ let captureWin = null;
 let overlayWin = null;
 let meetingWin = null;
 let settingsWin = null;
+let homeWin = null;
+let aboutWin = null;
 
 // Tillstånd för ljudinspelning. mode: null | 'dictation' | 'meeting'
 const rec = { mode: null, chunks: [], wav: null, wavMic: null, wavSys: null, startedAt: 0, processing: false };
@@ -92,6 +95,7 @@ async function startDictation() {
   rec.chunks = [];
   rec.startedAt = Date.now();
   overlay('listening', 'Lyssnar…');
+  setIconState('live');
   captureSend({ cmd: 'start' });
 }
 
@@ -101,16 +105,17 @@ async function stopDictation() {
   rec.mode = null;
   const samples = concatFloat32(rec.chunks);
   rec.chunks = [];
-  if (samples.length < 16000 * 0.4) return overlay('hidden');
+  if (samples.length < 16000 * 0.4) { setIconState('idle'); return overlay('hidden'); }
   rec.processing = true;
-  overlay('processing', 'Bearbetar…');
+  setIconState('type');
+  overlay('processing', 'Transkriberar…');
   try {
     const s = settings.get();
     const policy = settings.policy();
     const r = await engine.call('dictate', { samples, policy, whisper: settings.modelFor('dictation'), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
     if (!r.text) return overlay('hidden');
     const how = await pasteText(r.text, { autoPaste: s.autoPaste, restoreClipboard: s.restoreClipboard });
-    overlay('done', how === 'pasted' ? 'Inklistrat' : 'Kopierat till urklipp');
+    overlay('done', how === 'pasted' ? 'Inklistrat' : 'Kopierat, tryck ⌘V');
     setTimeout(() => overlay('hidden'), 900);
   } catch (e) {
     overlay('error', 'Fel: ' + e.message);
@@ -118,6 +123,7 @@ async function stopDictation() {
     console.error(e);
   } finally {
     rec.processing = false;
+    setIconState('idle');
   }
 }
 
@@ -137,6 +143,7 @@ function startMeetingRecording(opts = {}) {
   rec.startedAt = Date.now();
   rec.systemAudio = null;
   captureSend({ cmd: 'start', meter: true, systemAudio: mode !== 'mic', mic: mode !== 'system' });
+  setIconState('live');
   startLive();
   return rec.wav.filePath;
 }
@@ -150,7 +157,7 @@ function startLive() {
   rec.live = live;
   engine.call('liveStart', { model }).then(() => {
     if (rec.live !== live) return;
-    sendToMeeting('meeting:live-status', { on: true, text: `Livetext med ${model}. Grov version, den noggranna görs när du stoppar.` });
+    sendToMeeting('meeting:live-status', { on: true, text: 'Utkast. Den färdiga texten kommer när du stoppar.' });
     live.timer = setInterval(() => pumpLive(live), 1000);
   }).catch((e) => {
     if (rec.live === live) rec.live = null;
@@ -205,6 +212,7 @@ function stopMeetingRecording() {
   if (rec.mode !== 'meeting') return null;
   captureSend({ cmd: 'stop' });
   stopLive();
+  setIconState('idle');
   rec.mode = null;
   const p = rec.wav.finalize();
   const seconds = rec.wav.seconds;
@@ -223,10 +231,15 @@ async function transcribeMeeting(wavPath, opts = {}) {
   const whisper = settings.modelFor('meeting');
   const c = channelPaths(wavPath);
   const channels = fs.existsSync(c.mic) && fs.existsSync(c.sys) ? c : null;
-  const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
-  sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
-  const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
-  return { ...r, summary, wavPath, model: `whisper-${whisper}` };
+  setIconState('type');
+  try {
+    const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
+    sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
+    const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
+    return { ...r, summary, wavPath, model: `whisper-${whisper}` };
+  } finally {
+    setIconState('idle');
+  }
 }
 
 // ---------- IPC ----------
@@ -256,7 +269,7 @@ function registerIpc() {
   });
   ipcMain.on('capture:error', (_e, msg) => {
     console.error('Mikrofonfel:', msg);
-    if (rec.mode === 'dictation') { rec.mode = null; overlay('error', 'Mikrofonfel'); setTimeout(() => overlay('hidden'), 3000); }
+    if (rec.mode === 'dictation') { rec.mode = null; setIconState('idle'); overlay('error', 'Mikrofonfel'); setTimeout(() => overlay('hidden'), 3000); }
     else if (rec.mode === 'meeting') { stopMeetingRecording(); sendToMeeting('meeting:error', msg); }
   });
 
@@ -311,7 +324,10 @@ function registerIpc() {
   });
   ipcMain.handle('open:path', (_e, p) => shell.openPath(p));
   ipcMain.handle('open:folder', (_e, p) => shell.showItemInFolder(p));
-  ipcMain.handle('open:meeting', () => openMeeting());
+  ipcMain.handle('open:meeting', (_e, opts) => openMeeting(opts || {}));
+  ipcMain.handle('open:settings', () => openSettings());
+  ipcMain.handle('open:about', () => openAbout());
+  ipcMain.handle('app:info', () => ({ version: app.getVersion() }));
   ipcMain.handle('test:dictate', async () => { await startDictation(); });
   ipcMain.handle('test:stop', async () => { await stopDictation(); });
 
@@ -373,9 +389,12 @@ function registerIpc() {
 }
 
 // ---------- Fönster och meny ----------
-function openMeeting() {
-  if (meetingWin && !meetingWin.isDestroyed()) return meetingWin.focus();
-  meetingWin = windows.createMeeting();
+function openMeeting(opts = {}) {
+  if (meetingWin && !meetingWin.isDestroyed()) {
+    if (opts.upload) meetingWin.webContents.executeJavaScript('upload()').catch(() => {});
+    return meetingWin.focus();
+  }
+  meetingWin = windows.createMeeting(opts);
   meetingWin.on('closed', () => {
     meetingWin = null;
     if (rec.mode === 'meeting') stopMeetingRecording();
@@ -388,11 +407,72 @@ function openSettings() {
   settingsWin.on('closed', () => (settingsWin = null));
 }
 
+function openHome() {
+  if (homeWin && !homeWin.isDestroyed()) return homeWin.focus();
+  homeWin = windows.createHome();
+  homeWin.on('closed', () => (homeWin = null));
+}
+
+function openAbout() {
+  if (aboutWin && !aboutWin.isDestroyed()) return aboutWin.focus();
+  aboutWin = windows.createAbout();
+  aboutWin.on('closed', () => (aboutWin = null));
+}
+
 function trayIcon() {
-  const p = path.join(__dirname, '..', '..', 'assets', 'micTemplate.png');
-  const img = nativeImage.createFromPath(p);
+  const img = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'trayTemplate.png'));
   img.setTemplateImage(true);
   return img;
+}
+function dockIcon() {
+  return nativeImage.createFromPath(path.join(__dirname, '..', '..', 'assets', 'icon.png'));
+}
+
+// ---------- Ikonen i rörelse ----------
+// Menyradsikonen och Dock-ikonen andas medan du pratar ('live') och "skriver" medan texten tas fram ('type').
+// Bildrutorna ritas en gång (src/main/icon-art.js) och byts sedan tio gånger i sekunden.
+const anim = { state: 'idle', timer: null, frame: 0, tray: {}, dock: {} };
+function trayFrames(state) {
+  if (!anim.tray[state]) {
+    anim.tray[state] = art.frames(state, { size: 32, tile: false }).map((b) => {
+      const img = nativeImage.createFromBuffer(b, { scaleFactor: 2 });
+      img.setTemplateImage(true);
+      return img;
+    });
+  }
+  return anim.tray[state];
+}
+// Dock-bilderna är större och tar någon sekund att rita. De ritas en i taget i bakgrunden efter start.
+function warmDockFrames() {
+  const jobs = [];
+  for (const state of ['live', 'type']) {
+    const n = Math.round(art.PERIOD[state] * 10);
+    const list = [];
+    for (let i = 0; i < n; i++) jobs.push(() => list.push(nativeImage.createFromBuffer(art.render({ size: 256, state, t: i / 10 }))));
+    jobs.push(() => (anim.dock[state] = list));
+  }
+  const next = () => { const job = jobs.shift(); if (job) { job(); setTimeout(next, 30); } };
+  setTimeout(next, 3000);
+}
+function setIconState(state) {
+  if (anim.state === state) return;
+  anim.state = state;
+  clearInterval(anim.timer);
+  anim.timer = null;
+  const dockOn = process.platform === 'darwin' && app.dock && settings.get('showInDock');
+  if (state === 'idle') {
+    if (tray) tray.setImage(trayIcon());
+    if (dockOn) app.dock.setIcon(dockIcon());
+    return;
+  }
+  const t = trayFrames(state);
+  anim.frame = 0;
+  anim.timer = setInterval(() => {
+    const i = anim.frame++;
+    if (tray) tray.setImage(t[i % t.length]);
+    const d = anim.dock[state];
+    if (dockOn && d) app.dock.setIcon(d[i % d.length]);
+  }, 100);
 }
 
 function buildTray() {
@@ -407,17 +487,18 @@ function buildTray() {
   }
   const s = settings.get();
   const keyLabel = KEY_LABELS[s.hotkey] || s.hotkey;
+  const key = (keyLabel.match(/[⌃⌥⌘⇧]/) || [keyLabel])[0];
+  // Modeller och Ollama visas i huvudfönstret. Genvägen ⌥⇧D fungerar fortfarande, men syns inte här.
   const menu = Menu.buildFromTemplate([
-    { label: s.hotkeyMode === 'hold' ? `Diktera: håll in ${keyLabel}` : `Diktera: tryck ${keyLabel} (av/på)`, enabled: false },
-    { label: `Växla diktering: ${TOGGLE_SHORTCUT.replace('Alt', '⌥').replace('Shift', '⇧').replace(/\+/g, '')}`, click: toggleDictation },
+    { label: 'Öppna Speak', click: openHome },
     { type: 'separator' },
-    { label: 'Mötesläge…', click: openMeeting },
-    { label: 'Inställningar och modeller…', click: openSettings },
+    { label: s.hotkeyMode === 'hold' ? `Diktera: håll in ${key}` : `Diktera: tryck ${key}`, enabled: false },
+    { label: 'Nytt möte…', click: () => openMeeting() },
     { type: 'separator' },
-    { label: `Diktering: ${settings.modelFor('dictation') || '–'} · Möten: ${settings.modelFor('meeting') || '–'}`, enabled: false },
-    { label: `Allt körs lokalt${s.useLlm && s.ollamaModel ? ` · Ollama: ${s.ollamaModel}` : ''}`, enabled: false },
+    { label: 'Inställningar…', accelerator: 'Command+,', click: openSettings },
+    { label: 'Om Speak', click: openAbout },
     { type: 'separator' },
-    { label: 'Avsluta Speak', role: 'quit' },
+    { label: 'Avsluta Speak', accelerator: 'Command+Q', role: 'quit' },
   ]);
   tray.setContextMenu(menu);
 }
@@ -437,8 +518,12 @@ async function firstRunCheck() {
   const st = await engine.call('status');
   const s = settings.get();
   const d = settings.modelFor('dictation');
-  if (!st.whisper[d] || !st.whisper[d].installed || !st.aux.vad.installed) {
-    openSettings();
+  const missing = !st.whisper[d] || !st.whisper[d].installed || !st.aux.vad.installed;
+  // Huvudfönstret öppnas vid start, men inte när appen startar i bakgrunden vid inloggning.
+  const atLogin = process.platform === 'darwin' && app.getLoginItemSettings().wasOpenedAtLogin;
+  if (!s.welcomed || !atLogin) openHome();
+  if (missing) {
+    if (s.welcomed) openSettings();
     notify('Speak behöver modeller', 'Importera KB-Whisper eller ladda ner turbo i Inställningar, och hämta talarmodellerna.');
   } else {
     engine.call('warmup').catch((e) => console.error('warmup', e.message));
@@ -480,6 +565,7 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin') systemPreferences.askForMediaAccess('microphone').catch(() => {});
   if (process.env.DIKTERA_SMOKE) return require('./smoke')({ engine, openMeeting, openSettings, transcribeMeeting, startDictation, stopDictation, wins: () => ({ meetingWin, settingsWin, captureWin, overlayWin }) });
   cleanRecordings();
+  warmDockFrames();
   await firstRunCheck();
 
   engine.on('exit', () => {
@@ -490,11 +576,11 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => { /* menyradsapp: fortsätt köra */ });
 // Klick på Dock-ikonen visar det som pågår: mötesfönstret om det är öppet eller ett möte spelas in,
-// annars Inställningar om det är öppet, annars mötesläget.
+// annars Inställningar om det är öppet, annars huvudfönstret.
 function showCurrent() {
   if ((meetingWin && !meetingWin.isDestroyed()) || rec.mode === 'meeting') return openMeeting();
   if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
-  openMeeting();
+  openHome();
 }
 app.on('activate', () => { if (app.isReady()) showCurrent(); });
 app.on('before-quit', () => {

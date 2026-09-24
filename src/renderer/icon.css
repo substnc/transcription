@@ -1,0 +1,25 @@
+/* Speaks prickikon i rörelse. Samma lägen som menyraden och Dock-ikonen (src/main/icon-art.js).
+   .live: vågen andas och raden är släckt. .type: vågen vilar och raden tänds en prick i taget. */
+.speak-icon circle { transition: opacity .2s; }
+@keyframes pk1 { 0%, 8% { opacity: .14 } 11%, 89% { opacity: 1 } 92%, 100% { opacity: .14 } }
+@keyframes pk2 { 0%, 15% { opacity: .14 } 18%, 82% { opacity: 1 } 85%, 100% { opacity: .14 } }
+@keyframes pk3 { 0%, 22% { opacity: .14 } 25%, 75% { opacity: 1 } 78%, 100% { opacity: .14 } }
+@keyframes pk4 { 0%, 29% { opacity: .14 } 32%, 68% { opacity: 1 } 71%, 100% { opacity: .14 } }
+@keyframes pk5 { 0%, 36% { opacity: .14 } 39%, 61% { opacity: 1 } 64%, 100% { opacity: .14 } }
+@keyframes pk6 { 0%, 43% { opacity: .14 } 46%, 54% { opacity: 1 } 57%, 100% { opacity: .14 } }
+.speak-icon.live .k1 { animation: pk1 1.2s ease-in-out infinite; }
+.speak-icon.live .k2 { animation: pk2 1.2s ease-in-out infinite; }
+.speak-icon.live .k3 { animation: pk3 1.2s ease-in-out infinite; }
+.speak-icon.live .k4 { animation: pk4 1.2s ease-in-out infinite; }
+.speak-icon.live .k5 { animation: pk5 1.2s ease-in-out infinite; }
+.speak-icon.live .k6 { animation: pk6 1.2s ease-in-out infinite; }
+.speak-icon.live .row { opacity: .14; }
+.speak-icon.type .w { opacity: .28; }
+.speak-icon.type .k0 { opacity: .6; }
+.speak-icon.type .row { animation: typing 1.6s infinite; }
+@keyframes typing { 0% { opacity: .14 } 12% { opacity: 1 } 70% { opacity: 1 } 88% { opacity: .14 } 100% { opacity: .14 } }
+
+/* Nivåmätaren i mötesläget: kolumner av prickar som tänds efter ljudnivån. */
+.dot-meter { display: block; width: 100%; height: 72px; }
+.dot-meter circle { fill: var(--ink, #000); opacity: .14; transition: opacity .12s; }
+.dot-meter circle.on { opacity: 1; }

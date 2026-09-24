@@ -1,95 +1,97 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self'; script-src 'self'; connect-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'none'">
 <title>Speak – Inställningar</title>
 <link rel="stylesheet" href="../shared.css">
 <style>
-  .model { display: grid; grid-template-columns: 140px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; }
-  .model input[type=radio] { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0 8px 0 0; border: 1px solid var(--text); border-radius: 50%; vertical-align: -3px; display: inline-grid; place-items: center; }
-  .model input[type=radio]:checked::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--text); }
-  .model input[type=radio]:disabled { opacity: .35; }
-  .perm { padding: 10px 0; }
-  section.card h2 { margin-bottom: 4px; }
-  .model:last-child { border-bottom: 0; }
-  .model .name { font-weight: 600; }
-  .model .note { font-size: 12px; color: var(--muted); }
-  .model .bar { margin-top: 4px; }
-  .perm { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .perm { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; }
+  .card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+  .card .head h2 { margin: 0; }
+  .model { display: grid; grid-template-columns: 150px 1fr auto; gap: 16px; align-items: center; padding: 8px 0; }
+  .model .name { font-weight: 500; }
+  .model .note { font-size: 12px; color: var(--soft); }
+  .model .bar { margin-top: 6px; }
+  .line { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+  .line .label { font-size: 15px; color: var(--ink); }
+  #inboxList .row { flex-wrap: nowrap; }
+  #inboxList input[type=radio] { appearance: none; -webkit-appearance: none; width: 18px; height: 18px; margin: 0; border: 1.5px solid var(--ink); border-radius: 50%; flex: none; display: grid; place-items: center; }
+  #inboxList input[type=radio]:checked::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
 </style></head>
 <body>
 <div class="drag"></div>
-<img class="brand" src="../../../assets/substnc-logo.svg" alt="sub.stnc®">
-<h1>Inställningar.</h1>
-<p class="sub">Allt körs på den här datorn. Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>
+<div class="label">Speak</div>
+<h1>Inställningar.<span class="dim">Allt stannar på datorn.</span></h1>
+<p class="sub">Den enda nätverkstrafiken är nedladdning av modeller, som du startar själv här.</p>
 
 <section class="card">
-  <h2>Behörigheter</h2>
-  <div class="perm"><span>Mikrofon</span><span class="row"><span class="chip" id="permMic">–</span><button id="btnMic">Be om åtkomst</button></span></div>
-  <div class="perm"><span>Tillgänglighet (för ⌘V och håll-in-tangent)</span><span class="row"><span class="chip" id="permAcc">–</span><button id="btnAcc">Öppna systeminställningar</button></span></div>
-  <div class="perm"><span>Skärminspelning (för datorns ljud i möten)</span><span class="row"><span class="chip" id="permScreen">–</span><button id="btnScreen">Öppna systeminställningar</button></span></div>
-  <div class="perm"><span>Inmatningsövervakning (håll-in-tangent)</span><span class="row"><span class="chip" id="permHook">–</span><button id="btnInput">Öppna systeminställningar</button></span></div>
-  <p class="status">Om håll-in-tangenten inte fungerar: ge Speak Tillgänglighet och Inmatningsövervakning i Systeminställningar → Integritet och säkerhet, och starta om appen. Genvägen <span id="toggleShortcut"></span> fungerar alltid som av/på-knapp.</p>
+  <div class="head"><h2>Behörigheter</h2></div>
+  <div class="perm"><span>Mikrofon</span><span class="row"><span class="chip" id="permMic">–</span><button class="small" id="btnMic">Be om åtkomst</button></span></div>
+  <div class="perm"><span>Tillgänglighet, för ⌘V och tangenten</span><span class="row"><span class="chip" id="permAcc">–</span><button class="small" id="btnAcc">Öppna</button></span></div>
+  <div class="perm"><span>Inmatningsövervakning, för tangenten</span><span class="row"><span class="chip" id="permHook">–</span><button class="small" id="btnInput">Öppna</button></span></div>
+  <div class="perm"><span>Skärminspelning, för datorns ljud</span><span class="row"><span class="chip" id="permScreen">–</span><button class="small" id="btnScreen">Öppna</button></span></div>
+  <p class="status" style="margin: 10px 0 0">Reagerar inte tangenten: ge Speak Tillgänglighet och Inmatningsövervakning i Systeminställningar → Integritet och säkerhet, och starta om appen. Genvägen <span id="toggleShortcut"></span> fungerar alltid som av/på.</p>
 </section>
 
 <section class="card">
-  <h2>Diktering</h2>
-  <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px">
-    <div class="field"><label for="hotkey">Tangent att hålla in</label><select id="hotkey"></select></div>
+  <div class="head"><h2>Diktering</h2></div>
+  <div class="grid2">
+    <div class="field"><label for="hotkey">Tangent</label><select id="hotkey"></select></div>
     <div class="field"><label for="hotkeyMode">Beteende</label><select id="hotkeyMode"><option value="hold">Håll in för att prata</option><option value="toggle">Tryck en gång för av/på</option></select></div>
     <div class="field"><label for="language">Språk</label><select id="language"><option value="auto">Svenska och engelska, även blandat</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
   </div>
-  <label class="check"><input type="checkbox" id="autoPaste"> Klistra in automatiskt där markören står (⌘V)</label>
+  <label class="check"><input type="checkbox" id="autoPaste"> Klistra in där markören står (⌘V)</label>
   <label class="check"><input type="checkbox" id="voiceCommands"> Röstkommandon: "ny rad", "nytt stycke", "new line", "new paragraph"</label>
-  <div class="row" style="margin-top:8px"><button id="btnTest">Testa: spela in 3 sekunder</button><span class="status" id="testStatus"></span></div>
+  <div class="row" style="margin-top: 12px"><button id="btnTest">Testa: spela in 3 sekunder</button><span class="status" id="testStatus"></span></div>
 </section>
 
 <section class="card">
-  <h2>Taligenkänning (whisper)</h2>
-  <p class="status">En snabb modell för diktering, en noggrann för möten. Båda klarar svenska och engelska. Modellerna sparas i <code id="modelsDir"></code>.</p>
-  <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px">
-    <div class="field"><label for="whisperDictation">Diktering (snabb)</label><select id="whisperDictation"></select></div>
-    <div class="field"><label for="whisperMeeting">Möten (noggrann)</label><select id="whisperMeeting"></select></div>
-    <div class="field"><label for="liveModel">Livetext under möten</label><select id="liveModel"></select></div>
+  <div class="head"><h2>Modeller</h2><span class="chip" id="engineStatus">–</span></div>
+  <div class="grid3">
+    <div class="field"><label for="whisperDictation">Diktering</label><select id="whisperDictation"></select></div>
+    <div class="field"><label for="whisperMeeting">Möten</label><select id="whisperMeeting"></select></div>
+    <div class="field"><label for="liveModel">Livetext</label><select id="liveModel"></select></div>
   </div>
-  <div class="row"><span class="label">Motor</span><span class="chip" id="engineStatus">–</span></div>
-  <div id="whisperList" style="margin-top:14px"></div>
-  <div class="row" style="margin-top: 14px"><button id="btnImport">Importera modell</button><span class="status">Välj .tar.bz2-filen (eller en ggml-*.bin) från Actions → "Konvertera KB-Whisper".</span></div>
-  <div class="field" style="margin-top:18px">
+  <div id="whisperList"></div>
+  <div class="row" style="margin-top: 12px"><button id="btnImport">Importera modell</button><span class="status">.tar.bz2 eller ggml-*.bin från Actions → "Konvertera KB-Whisper".</span></div>
+  <p class="status">Modellerna sparas i <code id="modelsDir"></code>.</p>
+  <div class="field" style="margin-top: 16px">
     <label for="vocabulary">Ordlista: namn och facktermer, ett per rad</label>
     <textarea id="vocabulary" rows="5" placeholder="sub.stnc&#10;Berghs&#10;Anthon Bäckström&#10;sonic branding"></textarea>
-    <p class="status">Skickas med till taligenkänningen som ledtråd så att namn och ovanliga ord stavas rätt. Håll den kort, cirka 30–50 ord räcker. Bara de ord som faktiskt sägs behöver stå här.</p>
+    <p class="status">Ledtråd till taligenkänningen så att namn stavas rätt. 30–50 ord räcker. Påverkar inte Pianissimo.</p>
   </div>
 </section>
 
 <section class="card">
-  <h2>Mötesläge</h2>
-  <div class="row"><span class="label">Talarmodeller (röst, talare, röstavtryck, 50 MB)</span><span class="chip" id="auxStatus">–</span><button id="btnAux">Ladda ner</button></div>
-  <label class="check" style="margin-top:14px"><input type="checkbox" id="diarize"> Separera talare</label>
-  <div class="field" style="max-width:520px;margin-top:6px"><label for="diarizer">Talarigenkänning</label><select id="diarizer"><option value="nemotron">NVIDIA Nemotron 3 när den är installerad (max 8 talare)</option><option value="standard">Inbyggd (ingen gräns för antal talare)</option></select></div>
-  <div class="row"><span class="label">Nemotron 3 Diarization (NeMo, cirka 0,5 GB, delar Python-miljö med Pianissimo)</span><span class="chip" id="nemotronStatus">–</span><button id="btnNemotron">Installera</button></div>
-  <p class="status">Vid videomöten spelas mikrofonen och datorns ljud in var för sig. Allt från mikrofonen blir "Jag", och bara datorns ljud behöver delas upp i talare.</p>
-  <label class="check"><input type="checkbox" id="captureSystemAudio"> Ta med datorns ljud i inspelningen (videomöten). Kräver macOS 14.2 och Skärminspelning.</label>
-  <label class="check"><input type="checkbox" id="keepRecordings"> Behåll ljudfilerna (annars tas de bort när anteckningen är sparad eller mötet kastas)</label>
-  <div class="row" style="margin-top:6px"><span class="label">Inspelningar sparas i</span><code id="recordingsDir"></code><button class="small" id="btnRecordingsDir">Välj</button></div>
-  <div class="field" style="margin-top:8px"><label>Mappar att spara anteckningar i</label><div id="inboxList" class="stack"></div></div>
+  <div class="head"><h2>Möten</h2></div>
+  <div class="line"><span class="label">Talarmodeller (50 MB)</span><span class="row"><span class="chip" id="auxStatus">–</span><button class="small" id="btnAux">Ladda ner</button></span></div>
+  <label class="check"><input type="checkbox" id="diarize"> Separera talare</label>
+  <div class="field" style="margin-top: 6px"><label for="diarizer">Talarigenkänning</label><select id="diarizer"><option value="nemotron">NVIDIA Nemotron 3 när den är installerad (max 8 talare)</option><option value="standard">Inbyggd (ingen gräns för antal talare)</option></select></div>
+  <div class="line"><span class="label">Nemotron 3 Diarization (cirka 0,5 GB)</span><span class="row"><span class="chip" id="nemotronStatus">–</span><button class="small" id="btnNemotron">Installera</button></span></div>
+  <p class="status">Vid videomöten spelas mikrofonen och datorns ljud in var för sig. Mikrofonen blir "Jag", bara datorns ljud delas upp i talare.</p>
+  <label class="check"><input type="checkbox" id="captureSystemAudio"> Ta med datorns ljud (videomöten, kräver Skärminspelning)</label>
+  <label class="check"><input type="checkbox" id="keepRecordings"> Behåll ljudfilerna efter att anteckningen sparats</label>
+  <div class="line"><span class="label">Inspelningar sparas i</span><button class="small" id="btnRecordingsDir">Välj</button></div>
+  <code id="recordingsDir"></code>
+  <div class="field" style="margin-top: 16px"><label>Mappar att spara anteckningar i</label><div id="inboxList" class="stack"></div></div>
 </section>
 
 <section class="card">
-  <h2>Textstädning och sammanfattning (Ollama)</h2>
-  <p class="status">Om <a id="ollamaLink" href="#">Ollama</a> körs på datorn används en lokal språkmodell för att städa dikterad text och sammanfatta möten. Annars används enkla regler. Tips: <code>ollama pull qwen2.5:7b</code> eller <code>ollama pull gemma3:4b</code>.</p>
-  <div class="field" style="max-width:420px"><label for="llmMode">Använd språkmodellen</label><select id="llmMode"><option value="all">För möten och diktering</option><option value="meetings">Bara för möten (snabbare diktering)</option><option value="off">Aldrig, använd bara regler</option></select></div>
-  <div class="row" style="margin-top:8px">
-    <span class="chip" id="llmStatus">–</span>
-    <select id="ollamaModel" style="width:auto;min-width:220px"></select>
-    <button id="btnLlmRefresh">Uppdatera</button>
+  <div class="head"><h2>Sammanfattning och städning</h2><span class="chip" id="llmStatus">–</span></div>
+  <p class="status" style="margin-top: 0">Körs <a id="ollamaLink" href="#">Ollama</a> på datorn används en lokal språkmodell, annars enkla regler. Tips: <code>ollama pull qwen2.5:7b</code>.</p>
+  <div class="grid2">
+    <div class="field"><label for="llmMode">Använd språkmodellen</label><select id="llmMode"><option value="all">För möten och diktering</option><option value="meetings">Bara för möten (snabbare diktering)</option><option value="off">Aldrig, bara regler</option></select></div>
+    <div class="field"><label for="ollamaModel">Modell</label><select id="ollamaModel"></select></div>
   </div>
+  <button class="small" id="btnLlmRefresh">Uppdatera</button>
 </section>
 
 <section class="card">
-  <h2>Allmänt</h2>
+  <div class="head"><h2>Allmänt</h2></div>
   <label class="check"><input type="checkbox" id="launchAtLogin"> Starta Speak när jag loggar in</label>
-  <label class="check"><input type="checkbox" id="showInDock"> Visa i Dock (punkt under ikonen när appen kör)</label>
-  <div class="row" style="margin-top:8px"><button id="btnMeeting">Öppna mötesläge</button><button id="btnRecordings">Visa inspelningar</button><button id="btnLogs">Visa loggar</button></div>
+  <label class="check"><input type="checkbox" id="showInDock"> Visa i Dock</label>
+  <div class="row" style="margin-top: 12px"><button id="btnMeeting">Öppna mötesläge</button><button id="btnRecordings">Visa inspelningar</button><button id="btnLogs">Visa loggar</button></div>
 </section>
 <script src="settings.js"></script>
 </body></html>

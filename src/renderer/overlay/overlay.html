@@ -1,18 +1,18 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<link rel="stylesheet" href="../icon.css">
 <style>
-  @import url("../fonts/fonts.css");
-  html, body { margin: 0; background: transparent; overflow: hidden; font-family: 'Inter', -apple-system, system-ui, sans-serif; -webkit-user-select: none; }
-  .pill { display: flex; align-items: center; gap: 12px; margin: 4px auto; width: max-content; max-width: 210px; height: 36px; padding: 0 18px 0 14px;
-    background: #0A0A0A; color: #BBB2AB; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dot { width: 8px; height: 8px; background: #BBB2AB; flex: none; }
-  .listening .dot { animation: pulse 1s ease-in-out infinite; }
-  .processing .dot { animation: blink .7s steps(2) infinite; }
-  .done .dot, .error .dot { background: #BBB2AB; }
-  .error { background: #642828; }
-  @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.5); opacity: .5 } }
-  @keyframes blink { to { opacity: 0 } }
+  html, body { margin: 0; background: transparent; overflow: hidden; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-user-select: none; }
+  .pill { display: flex; align-items: center; gap: 8px; margin: 4px auto; width: max-content; max-width: 210px; height: 36px; padding: 0 16px 0 10px; border-radius: 999px;
+    background: #000000; color: #ffffff; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill .check, .pill .bang { display: none; }
+  .done #icon, .error #icon { display: none; }
+  .done .check { display: block; margin-left: 2px; }
+  .error { background: #ffffff; color: #000000; }
+  .error .bang { display: flex; width: 16px; height: 16px; border-radius: 999px; background: #000000; color: #ffffff; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; margin-left: 2px; }
+  #text { overflow: hidden; text-overflow: ellipsis; }
 </style></head>
-<body><div id="pill" class="pill listening"><span class="dot"></span><span id="text">Lyssnar…</span></div>
+<body><div id="pill" class="pill listening"><span id="icon"></span><svg class="check" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8.4l3.2 3.2L13 4.8" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bang">!</span><span id="text">Lyssnar…</span></div>
+<script src="../icon.js"></script>
 <script src="overlay.js"></script></body></html>

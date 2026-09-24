@@ -1,6 +1,5 @@
 const $ = (id) => document.getElementById(id);
 const api = window.diktera;
-const SPEAKER_COLORS = ['var(--sp1)', 'var(--sp2)', 'var(--sp3)', 'var(--sp4)', 'var(--sp5)', 'var(--sp6)'];
 
 const state = { result: null, speakerNames: {}, customFolder: null, settings: null, audioPath: null, consent: false, startedAt: null };
 let timerHandle = null;
@@ -33,27 +32,20 @@ function fail(msg) {
 }
 $('errorClose').onclick = () => $('errorBox').classList.add('hidden');
 
-function speakerColor(name) {
-  const i = state.result ? state.result.speakers.indexOf(name) : 0;
-  return SPEAKER_COLORS[Math.max(0, i) % SPEAKER_COLORS.length];
+// Talare som en rund bricka: "Jag" (mikrofonen) får J på svart, övriga ett nummer och en egen stil.
+function badge(speaker) {
+  const b = document.createElement('span');
+  const others = state.result.speakers.filter((s) => s !== 'Jag');
+  const i = others.indexOf(speaker);
+  b.className = `badge s${speaker === 'Jag' ? 0 : (i % 4) + 1}`;
+  b.textContent = speaker === 'Jag' ? 'J' : String(i + 1);
+  return b;
 }
 
-// ---- Nivåmätare: 40 staplar som "rullar" ----
-const BAR_COUNT = 40;
-const levels = new Array(BAR_COUNT).fill(0);
-(function buildBars() {
-  const el = $('bars');
-  for (let i = 0; i < BAR_COUNT; i++) el.appendChild(document.createElement('i'));
-})();
-function pushLevel(level) {
-  levels.shift();
-  levels.push(level);
-  const bars = $('bars').children;
-  for (let i = 0; i < BAR_COUNT; i++) {
-    bars[i].style.height = `${8 + Math.round(levels[i] * 56)}px`;
-    bars[i].classList.toggle('hot', levels[i] > 0.6);
-  }
-}
+// ---- Nivåmätare: prickar som rullar, samma formspråk som ikonen ----
+const meter = window.SpeakIcon.meter($('meter'));
+const pushLevel = (level) => meter.push(level);
+$('workIcon').appendChild(window.SpeakIcon.svg(56, '#000000', 'type'));
 
 // ---- Samtycke ----
 $('btnRecord').onclick = () => {
@@ -69,7 +61,7 @@ $('consentOk').onclick = async () => {
   try {
     state.audioPath = await api.meeting.start({ sourceMode: $('sourceMode').value });
     state.startedAt = Date.now();
-    levels.fill(0);
+    meter.reset();
     $('liveText').innerHTML = '';
     $('liveStatus').textContent = '';
     $('sources').textContent = 'Mikrofon';
@@ -118,7 +110,7 @@ $('btnCancel').onclick = async () => {
   show('idle');
 };
 
-$('btnUpload').onclick = async () => {
+async function upload() {
   state.consent = false;
   show('processing');
   setProgress({ phase: 'convert', text: 'Väljer fil…' });
@@ -131,7 +123,8 @@ $('btnUpload').onclick = async () => {
   } catch (e) {
     fail('Kunde inte läsa filen: ' + e.message);
   }
-};
+}
+$('btnUpload').onclick = upload;
 
 // ---- Progress ----
 const STEP_ORDER = ['load', 'convert', 'diarize', 'transcribe', 'summarize'];
@@ -177,10 +170,7 @@ function renderSpeakers() {
   for (const s of state.result.speakers) {
     const wrap = document.createElement('div');
     wrap.className = 'sp';
-    const dot = document.createElement('span');
-    dot.className = 'dot';
-    dot.style.background = speakerColor(s);
-    dot.style.width = '12px'; dot.style.height = '12px';
+    const dot = badge(s);
     const input = document.createElement('input');
     input.type = 'text';
     input.value = state.speakerNames[s];
@@ -204,16 +194,13 @@ function renderSegments() {
     row.className = 'seg';
     row.dataset.i = String(i);
     const t = document.createElement('div'); t.className = 't'; t.textContent = fmt(seg.start);
-    // Vertikal tidsaxel: en färgad stapel per replik, höjd efter längd.
-    const lane = document.createElement('div'); lane.className = 'lane';
-    lane.style.background = speakerColor(seg.speaker);
-    lane.style.minHeight = `${Math.max(44, Math.min(160, Math.round((seg.end - seg.start) * 6)))}px`;
+    const lane = badge(seg.speaker);
     lane.title = `${fmt(seg.start)} – ${fmt(seg.end)}`;
     const body = document.createElement('div'); body.className = 'body';
     const sp = document.createElement('div'); sp.className = 'sp';
     const name = document.createElement('span'); name.textContent = state.speakerNames[seg.speaker] || seg.speaker;
     sp.append(name);
-    if (seg.lang) { const l = document.createElement('span'); l.className = 'lang'; l.textContent = seg.lang; sp.appendChild(l); }
+    if (seg.lang) { const l = document.createElement('span'); l.className = 'lang'; l.textContent = `· ${seg.lang}`; sp.appendChild(l); }
     const ta = document.createElement('textarea'); ta.value = seg.text; ta.rows = Math.max(1, Math.ceil(seg.text.length / 80));
     ta.oninput = () => (state.result.segments[i].text = ta.value);
     body.append(sp, ta);
@@ -328,3 +315,5 @@ $('btnNew').onclick = async () => {
 };
 
 show('idle');
+// Öppnat via "Ladda upp fil" i huvudfönstret: välj fil direkt.
+if (new URLSearchParams(location.search).get('upload')) upload();

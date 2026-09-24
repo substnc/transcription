@@ -8,7 +8,7 @@ const PRELOAD = R('preload.js');
 function base(extra = {}) {
   return {
     show: false,
-    backgroundColor: '#BBB2AB',
+    backgroundColor: '#ffffff',
     webPreferences: { preload: PRELOAD, contextIsolation: true, nodeIntegration: false, sandbox: false, backgroundThrottling: false },
     ...extra,
   };
@@ -42,9 +42,25 @@ function positionOverlay(w) {
   w.setPosition(Math.round(x + (width - ww) / 2), Math.round(y + height - wh - 24));
 }
 
-function createMeeting() {
+// Huvudfönstret: Diktering och Möten (och välkomstsidan första gången).
+function createHome() {
+  const w = new BrowserWindow(base({ width: 1000, height: 780, minWidth: 760, minHeight: 600, title: 'Speak', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
+  w.loadFile(R('home', 'home.html'));
+  w.once('ready-to-show', () => w.show());
+  return w;
+}
+
+function createAbout() {
+  const w = new BrowserWindow(base({ width: 460, height: 640, resizable: false, minimizable: false, maximizable: false, fullscreenable: false, title: 'Om Speak', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
+  w.loadFile(R('about', 'about.html'));
+  w.once('ready-to-show', () => w.show());
+  return w;
+}
+
+// opts.upload: välj en ljudfil direkt när fönstret öppnas.
+function createMeeting(opts = {}) {
   const w = new BrowserWindow(base({ width: 1000, height: 780, minWidth: 760, minHeight: 560, title: 'Speak – Mötesläge', titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 16 } }));
-  w.loadFile(R('meeting', 'meeting.html'));
+  w.loadFile(R('meeting', 'meeting.html'), opts.upload ? { query: { upload: '1' } } : undefined);
   w.once('ready-to-show', () => w.show());
   return w;
 }
@@ -56,4 +72,4 @@ function createSettings() {
   return w;
 }
 
-module.exports = { createCapture, createOverlay, positionOverlay, createMeeting, createSettings };
+module.exports = { createCapture, createOverlay, positionOverlay, createHome, createAbout, createMeeting, createSettings };

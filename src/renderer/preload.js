@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('diktera', {
     onProgress: on('models:progress'),
   },
   llm: { status: () => ipcRenderer.invoke('llm:status') },
+  app: { info: () => ipcRenderer.invoke('app:info') },
   perm: {
     status: () => ipcRenderer.invoke('perm:status'),
     request: (what) => ipcRenderer.invoke('perm:request', what),
@@ -30,7 +31,9 @@ contextBridge.exposeInMainWorld('diktera', {
     external: (url) => ipcRenderer.invoke('open:external', url),
     path: (p) => ipcRenderer.invoke('open:path', p),
     folder: (p) => ipcRenderer.invoke('open:folder', p),
-    meeting: () => ipcRenderer.invoke('open:meeting'),
+    meeting: (opts) => ipcRenderer.invoke('open:meeting', opts),
+    settings: () => ipcRenderer.invoke('open:settings'),
+    about: () => ipcRenderer.invoke('open:about'),
     logs: () => ipcRenderer.invoke('open:logs'),
   },
   test: {
