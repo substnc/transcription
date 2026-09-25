@@ -1,87 +1,113 @@
 # Handover: Speak.
 
-Fortsätt på appen Speak. i repot substnc/transcription, branch claude/ai-dictation-app-mac-31cco2
-(senaste commit 67e3609). Läs README.md, docs/HANDOVER.md och de senaste commit-meddelandena först.
+Fortsätt på appen Speak. i repot substnc/transcription, branch claude/ai-dictation-app-mac-31cco2.
+Läs README.md, docs/HANDOVER.md och de senaste commit-meddelandena först.
 
 ## Om mig
 Anthon, MacBook Pro M1 Max 32 GB, macOS 27. Svara kort på svenska i vardagsord.
 Krav: allt ljud och all text stannar på datorn. Inga molnsteg (undantag: modellnedladdning en gång).
-Arbetssätt: jag testar på min Mac, du felsöker. Ge ALLTID xattr-raden tillsammans med länken till ett nytt bygge:
-    xattr -cr "/Applications/Speak.app"
-Vid varje nytt bygge: ge Anthon raden som tar bort den gamla versionen och installerar den nya
-(förutsätter att artefakten Speak-arm64 är nedladdad och uppackad i Hämtade filer):
+Arbetssätt: jag testar på min Mac, du felsöker. Vill se en skiss i designfilen innan större utseendeändringar.
+
+Vid varje nytt bygge: ge länken till bygget och raden som tar bort den gamla versionen och installerar den nya
+(artefakten Speak-arm64 nedladdad och uppackad i Hämtade filer):
     pkill -x Speak; rm -rf "/Applications/Speak.app" "/Applications/sub.stnc® - Speak.app" && ditto -x -k ~/Downloads/Speak-arm64/Speak-*-arm64.zip /Applications && xattr -cr "/Applications/Speak.app" && open "/Applications/Speak.app"
-(Appen hette "sub.stnc® - Speak" före 24 sep 2026. Modeller och inställningar ligger kvar i
-~/Library/Application Support/sub.stnc® - Speak, appen pekar dit med app.setPath.)
+Ge också alltid den korta raden separat:
+    xattr -cr "/Applications/Speak.app"
+
+## Namnet
+Appen heter "Speak." (filen Speak.app, CFBundleDisplayName "Speak."). Före 24 sep 2026: "sub.stnc® - Speak".
+CFBundleName får INTE ändras från productName ("Speak"): Electron letar då efter fel hjälpapp och kraschar
+("Unable to find helper app"). Modeller och inställningar ligger kvar i ~/Library/Application Support/sub.stnc® - Speak,
+main.js pekar dit med app.setPath före single-instance-låset.
 
 ## Läge just nu
-Electron-menyradsapp (ikon i Dock, valbart). Klick på Dock-ikonen visar det som pågår.
-- Diktering: håll in vänster Option, klistras in med ⌘V. Modell: turbo-metal (whisper.cpp på Metal).
-- Mötesläge: mikrofon + datorns ljud med ekoskydd, talare, tidsstämplar, sammanfattning via Ollama,
-  export till Obsidian (01_CLAUDE_COWORK eller 02_CLAUDE_PRIVATE/99_inbox). Knappar: Spara till Obsidian,
-  Kopiera som text, Börja om.
-- Livetext under inspelning (grov), noggrann körning när man stoppar.
-- Tre modellval i Inställningar: Diktering (turbo-metal), Möten (kb-large-metal), Livetext (pianissimo-sv).
-- Ordlista (namn/fackord) skickas som --prompt till whisper.cpp. Påverkar inte Pianissimo.
-- Inspelningar: standard lokalt i Application Support (ingen synk). Anthon har själv valt iCloud Drive/01_CLAUDE_CODE/speak/inspelningar. Raderas efter sparad anteckning
-  om inte "Behåll ljudfilerna" är ikryssat. Rester äldre än ett dygn städas vid start.
+Electron-menyradsapp med ikon i Dock (valbart).
+- Huvudfönster (src/renderer/home): Diktering och Möten. Välkomstsida första gången (inställningen welcomed).
+  Inställningar öppnas i samma fönster med "← Tillbaka" uppe till vänster (settings.html?from=home).
+- Diktering: håll in vänster Control (Anthons val), klistras in med ⌘V. turbo-metal (whisper.cpp på Metal).
+  Statuspillret: Lyssnar…, Transkriberar…, bock + Inklistrat.
+- Mötesläge: mikrofon + datorns ljud, livetext med Pianissimo, talare, sammanfattning via Ollama, Obsidian-export.
+- Inställningen "När mötet stoppas" (meetingSource):
+  - 'live' (standard): livetexten blir mötets text. Talare läggs på, sedan korrläser den lokala språkmodellen
+    transkriptet (10 rader i taget med 3 raders sammanhang, mötets titel och ordlistan) och rättar hörfel,
+    sedan sammanfattning. Ingen ny transkribering. Kod: main.js meetingFromLive, server.js meetingFromLive,
+    llm.js correctLines, summarize.js CORRECT_SYSTEM.
+  - 'full': hela mötet körs om med modellen under Möten.
+  - Uppladdade filer körs alltid 'full'. En egen mote-….wav med .mic/.sys bredvid körs med kanalerna.
+- Långa möten (>15 min) delas i stycken om cirka 10 min i en tyst stund (pipeline.js splitLong), både för
+  whisper.cpp och Pianissimo. whisper-cli har en vakt: står den still 5 min avbryts den, stycket körs om
+  enklare (greedy), och fastnar det igen står en markering i texten i stället. Förlopp i procent.
+- Sammanfattning: Ollama med num_ctx 32768. Långa transkript (>60 000 tecken) sammanfattas del för del och
+  sedan som helhet (llm.js summarize).
+- Pianissimo och Nemotron kör på Macens grafikkrets (MPS) med PYTORCH_ENABLE_MPS_FALLBACK=1. Fungerar något
+  inte på MPS byter modellen till cpu och kör om. SPEAK_DEVICE=cpu tvingar processorn. OTESTAT på Anthons Mac:
+  kolla engine.log efter "arbetaren redo … mps".
+- Modellval: Diktering turbo-metal, Möten kb-large-metal (Anthon kan ha bytt till Pianissimo), Livetext pianissimo-sv.
+- Inspelningar: standard lokalt i Application Support (ingen synk). Anthon har själv valt
+  iCloud Drive/01_CLAUDE_CODE/speak/inspelningar. Raderas efter sparad anteckning om inte "Behåll ljudfilerna".
+  Rester äldre än ett dygn städas vid start.
 
-## Utseende (sub.stnc® light, designfil: claude.ai artifact "Speak i sub.stnc® stil", sidan sub.stnc® light)
+## PÅGÅENDE: talare som byter nummer mitt i mötet
+Problem (Anthon): samma person blir plötsligt "Talare 7" i stället för "Talare 1" i långa möten. Att fylla i
+antal talare går smidigt, men hjälper inte mot detta.
+Påbörjad lösning, INTE incheckad, sparad som docs/wip-talardrift.patch (git apply docs/wip-talardrift.patch):
+- merge.js mergeSimilarSpeakers: röstavtryck per talare, slår ihop talare som låter lika (cosinus > 0,6),
+  eller tills antalet stämmer med angivet antal talare. Mikrofonen ("me") rörs aldrig.
+- pipeline.js fixSpeakerDrift: tar röstavtryck (3D-Speaker via sherpa SpeakerEmbeddingExtractor, samma modell
+  som talarmodellerna) från varje talares längsta stycken, högst 60 s, och kör sammanslagningen. Anropas sist i
+  speakerTimeline, på datorns ljud när kanaler finns.
+- meeting.js: skriver man samma namn på två talare i resultatet slås de ihop. Hjälptext under talarna.
+- test/speaker-drift.test.js: tre tester (alla 46 tester gick igenom med patchen).
+Att göra: lägg på patchen, kontrollera SpeakerEmbeddingExtractor-anropet mot riktigt ljud (Mac-testet), fundera på
+tröskeln, bygg och låt Anthon testa på ett långt möte. Idé för senare: röstprofiler (spela in återkommande personer
+en gång, känn igen dem med namn).
+
+## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
-  knappar som piller, av/på-reglage i stället för kryssrutor. Helvetica Neue (Inter används inte längre).
-- Ikonen "röst blir text": en vågform av prickar som rinner ut i en rad. Ritas i kod: src/main/icon-art.js
-  (appikon, menyrad, Dock-animation) och src/renderer/icon.js + icon.css (fönstren). npm run icons skriver om
-  assets/icon.png och assets/trayTemplate*.png.
-- Ikonen rör sig: 'live' (vågen andas) när du dikterar eller spelar in möte, 'type' (raden tänds) när texten tas
-  fram. Gäller menyraden, Dock-ikonen, statuspillret och nivåmätaren i mötesläget.
-- Fönster: Huvudfönster (src/renderer/home, välkomstsida första gången, inställningen welcomed),
-  Om Speak (src/renderer/about, signaturen i assets/signature.png, licenser bakom knappen),
-  Inställningar, Mötesläge, statuspill.
-- Menyn i menyraden: Öppna Speak, Diktera (tips), Nytt möte, Inställningar, Om Speak, Avsluta.
-  Genvägen ⌥⇧D finns kvar men syns inte i menyn.
-- Talare visas som runda brickor: J på svart är du, övriga har nummer och egen stil (grå, ring, ljusgrå).
+  knappar som piller, av/på-reglage. Helvetica Neue.
+- Ikonen "röst blir text": vågform av prickar som rinner ut i en rad. src/main/icon-art.js (appikon, menyrad,
+  Dock-animation), src/renderer/icon.js + icon.css (fönstren). npm run icons skriver om assets/icon.png och
+  assets/trayTemplate*.png.
+- Ikonen rör sig: 'live' när du dikterar eller spelar in, 'type' när texten tas fram. Menyrad, Dock, statuspill,
+  nivåmätaren i mötesläget.
+- Om Speak (src/renderer/about): prickikonen, "Speak.", signaturen (assets/signature.png, SVART på genomskinligt;
+  designsystemets anteckning om vit stämmer inte), "Made by Anthon Bäckström", knappen Licenses med licenslista och
+  versionsnummer.
+- Menyn i menyraden: Öppna Speak, Diktera (tips), Nytt möte, Inställningar, Om Speak, Avsluta. ⌥⇧D finns kvar men syns inte.
+- Talare som runda brickor: J på svart är du, övriga har nummer och egen stil.
+- Oanvända filer kvar (fick inte raderas i sessionen): src/renderer/fonts/ (Inter), assets/substnc-logo.svg.
 
 ## Motorer
 - whisper.cpp (resources/bin/whisper-cli, byggs i CI, Metal). ggml-modeller i models/whisper-cpp-<namn>.
-- Klang Pianissimo (KlangAI/pianissimo-sv) körs exakt som modellkortet: Python + PyTorch + NeMo,
-  ASRModel.from_pretrained(...).transcribe(..., timestamps=True). Ingen omvandling.
-  Python-arbetare: resources/pianissimo/worker.py (JSON över stdin/stdout, laddar modeller vid behov).
-  Node-sida: src/engine/pianissimo.js. Installeras med knapp: uv hämtar egen Python 3.11, torch och NeMo
-  (låst commit cf724ac på NeMo main, hämtas som arkiv), sedan modellen. Körs med HF_HUB_OFFLINE=1.
-  Miljön ligger i models/pianissimo-sv och delas med Nemotron (komponenter 'asr' och 'diar').
-- Talare: vid mikrofon + datorns ljud sparas även mote-x.mic.wav och mote-x.sys.wav. Allt som hörs mest i
-  mikrofonen blir "Jag", bara datorns ljud delas upp. Uppdelningen görs med NVIDIA Nemotron 3 Diarization
-  (nvidia/Nemotron-3-Diarization, SortformerEncLabelModel.diarize, max 8 talare) om den är installerad,
-  annars inbyggd (sherpa-onnx: pyannote-segmentering + 3D-Speaker). Med Pianissimo kopplas talare per ord.
-  Kod: src/engine/merge.js (channelActivity, combineChannelDiarization, segmentsFromWords),
-  src/engine/pipeline.js (speakerTimeline, diarizeAudio, meetingPy, meetingCpp, meeting).
-- Sherpa-onnx används även för röstdetektor (VAD) och livetextens uppdelning.
+- Klang Pianissimo körs som modellkortet: Python + PyTorch + NeMo (resources/pianissimo/worker.py,
+  src/engine/pianissimo.js). Installeras med knapp (uv, Python 3.11, torch, NeMo låst commit cf724ac).
+  HF_HUB_OFFLINE=1. Miljön i models/pianissimo-sv, delas med Nemotron.
+- Talare: kanaler (mote-x.mic.wav = "Jag", mote-x.sys.wav delas upp) + NVIDIA Nemotron 3 Diarization (max 8),
+  annars inbyggd (sherpa: pyannote + 3D-Speaker). Med Pianissimo kopplas talare per ord.
+- Sherpa-onnx för röstdetektor (VAD) och livetextens uppdelning.
 
 ## GitHub Actions
-- "Bygg Mac-app": vid varje push. Artefakt Speak-arm64 (dmg).
-- "Testa Pianissimo på Mac": installerar Pianissimo + Nemotron på en Apple Silicon-Mac via appens kod och
-  kör möte, diktering, livetext, två kanaler och två röster. Körs vid ändringar i motor/arbetare.
-- "Konvertera KB-Whisper": manuell, ger ggml-modeller av KB-Whisper.
-- Tester lokalt: npm test (32 tester, inga modeller behövs).
+- "Bygg Mac-app": vid varje push, artefakt Speak-arm64. Tar cirka 2 min.
+- "Testa Pianissimo på Mac": vid ändringar i motor/arbetare, cirka 20 min. Körningen för MPS-ändringen
+  (commit 0390673) var inte färdig vid överlämningen: kolla resultatet.
+- "Konvertera KB-Whisper": manuell.
+- Tester lokalt: npm test (43 tester, inga modeller behövs).
 
-## Senaste testresultat (Mac i CI, enkel M1)
-- Pianissimo: 59 s ljud på 2,9 s (20× realtid). Diktering 4 s ljud på 1,3 s. Modelladdning cirka 14 s.
-- Två kanaler: mikrofonens mening blev "Jag", datorns mening "Talare 1".
-- Två tydligt olika röster: Nemotron 2 talare på 0,5 s, inbyggd 2 talare på cirka 2 s, båda rätt ordning.
-- Två lika syntetiska röster (samma TTS-modell): båda hittade bara 1. Verkliga möten är otestade.
-- Diskutrymme för NeMo-miljön med båda modellerna: cirka 4,5 GB.
+## Senaste testresultat (Mac i CI, enkel M1, före MPS)
+- Pianissimo: 59 s ljud på 2,9 s (20× realtid, på processorn). Klangs "en timme på en sekund" gäller stark GPU.
+- Två kanaler och två tydligt olika röster: rätt. Lika röster: slås ihop.
+- Riktiga möten: talare byter nummer i långa möten (se PÅGÅENDE).
 
 ## Klangs egna siffror (ordfel, CV / FLEURS / dialekter)
-Pianissimo 4,46 / 6,51 / 4,85 %. KB-Whisper large 3,91 / 5,08 / 2,30 %. KB large noggrannare, Pianissimo snabbare.
+Pianissimo 4,46 / 6,51 / 4,85 %. KB-Whisper large 3,91 / 5,08 / 2,30 %. Pianissimo förstår bara svenska.
 
-## Kända begränsningar
-- Appen är osignerad (därav xattr). Ingen automatisk uppdatering.
-- Nemotron: max 8 talare, NeMo märker modellen som experimentell. Vid fler än 8 används den inbyggda.
-- Ordlistan fungerar inte med Pianissimo.
-- Livetexten saknar talare.
+## Övrigt från sessionen
+- LinkedIn-inlägg och bild (sub.stnc® Dark) gjorda. Mejl till Klang (team@klang.ai) om att visa Speak. på
+  deras Pianissimo-sida är skrivet, Anthon skickar själv.
+- Wispr Flow bearbetar ljud i molnet i USA (kontrollerat), Speak. gör allt lokalt.
 
 ## Nästa steg
-1. Anthon testar Nemotron + två kanaler på riktiga videomöten. Blir talarna fortfarande fel: stäng av funktionen.
-2. Mät ett riktigt 18-minutersmöte på M1 Max: KB large mot Pianissimo, tid och kvalitet.
-3. Bestäm modell för Möten utifrån 2 (Pianissimo snabbast, KB large noggrannast).
-4. Eventuellt: talare i livetexten (kanal = Jag/Andra), ordlista för Pianissimo, kortare dikteringsfördröjning.
+1. Lägg på docs/wip-talardrift.patch, testa, bygg (se PÅGÅENDE).
+2. Anthon testar MPS: är Pianissimo snabbare, står "mps" i loggen?
+3. Anthon testar korrläsningen på ett riktigt möte. Överväg större Ollama-modell (t.ex. qwen2.5:14b) om svenskan brister.
+4. Eventuellt: röstprofiler för återkommande personer, talare i livetexten, ordlista för Pianissimo.
