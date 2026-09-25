@@ -124,11 +124,35 @@ const methods = {
       : pipeline.meeting(wavPath, { policy, ...speakers, onProgress });
   },
 
+  // Möte där livetexten används som den är: talare läggs på, och texten städas av den lokala
+  // språkmodellen stycke för stycke (skiljetecken, tvekljud, uppenbara hörfel).
+  async meetingFromLive({ wavPath, segments, diarize, diarizer, channels, speakerCount, useLlm }, id) {
+    const onProgress = (p) => send({ id, progress: p });
+    const r = await pipeline.meetingFromLive(wavPath, { segments, diarize, diarizer, channels, speakerCount, onProgress });
+    r.cleanedBy = 'rules';
+    if (useLlm && settings.ollamaModel && r.segments.length) {
+      let ok = 0;
+      for (let i = 0; i < r.segments.length; i++) {
+        onProgress({ phase: 'cleanup', done: i, total: r.segments.length });
+        try {
+          const t = await llm.cleanupText(r.segments[i].text, { host: settings.ollamaHost, model: settings.ollamaModel, timeoutMs: 60000 });
+          if (t) { r.segments[i].text = t; ok++; }
+        } catch (e) {
+          console.error(`[motor] städning av stycke ${i + 1} misslyckades: ${e.message}`);
+          if (i === 0) break; // Ollama svarar inte: behåll texten som den är
+        }
+      }
+      if (ok) r.cleanedBy = 'llm';
+    }
+    return r;
+  },
+
   async summarize({ segments, useLlm }, id) {
     if (useLlm && settings.ollamaModel) {
       try {
         send({ id, progress: { phase: 'summarize' } });
-        const s = await llm.summarize(transcriptAsText(segments), { host: settings.ollamaHost, model: settings.ollamaModel });
+        const s = await llm.summarize(transcriptAsText(segments), { host: settings.ollamaHost, model: settings.ollamaModel,
+          onProgress: (p) => send({ id, progress: { phase: 'summarize', ...p } }) });
         return { ...s, by: 'llm' };
       } catch (e) {
         return { ...heuristicSummary(segments), by: `rules (språkmodell misslyckades: ${e.message})` };

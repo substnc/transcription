@@ -39,12 +39,14 @@ async function available(host = DEFAULT_HOST) {
   }
 }
 
-async function chat({ host = DEFAULT_HOST, model, system, user, format, timeoutMs = 120000, temperature = 0.2 }) {
+// numCtx: hur mycket text modellen ser på en gång. Ollamas standard är liten (ett par tusen ord), så ett
+// långt möte måste få större kontext, annars läser modellen bara början.
+async function chat({ host = DEFAULT_HOST, model, system, user, format, timeoutMs = 120000, temperature = 0.2, numCtx }) {
   const r = await request(host, '/api/chat', {
     model,
     stream: false,
     format,
-    options: { temperature },
+    options: numCtx ? { temperature, num_ctx: numCtx } : { temperature },
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -61,8 +63,11 @@ async function cleanupText(text, { host, model, timeoutMs } = {}) {
   return t;
 }
 
-async function summarize(transcriptText, { host, model, timeoutMs } = {}) {
-  const out = await chat({ host, model, system: SUMMARY_SYSTEM, user: transcriptText, format: SUMMARY_SCHEMA, timeoutMs: timeoutMs || 300000, temperature: 0.1 });
+// Ungefär så mycket text som får plats i ett anrop (32 000 tokens kontext, med marginal för svaret).
+const SUMMARY_CHUNK_CHARS = 60000;
+
+async function summarizeOnce(text, { host, model, timeoutMs }) {
+  const out = await chat({ host, model, system: SUMMARY_SYSTEM, user: text, format: SUMMARY_SCHEMA, timeoutMs: timeoutMs || 600000, temperature: 0.1, numCtx: 32768 });
   let parsed;
   try {
     parsed = JSON.parse(out);
@@ -73,4 +78,38 @@ async function summarize(transcriptText, { host, model, timeoutMs } = {}) {
   return normalizeSummary(parsed);
 }
 
-module.exports = { DEFAULT_HOST, available, chat, cleanupText, summarize, assertLocal };
+// Delar texten vid radbrytningar i bitar om högst `max` tecken.
+function splitText(text, max) {
+  const parts = [];
+  let cur = '';
+  for (const line of String(text).split('\n')) {
+    if (cur && cur.length + line.length + 1 > max) { parts.push(cur); cur = ''; }
+    cur += (cur ? '\n' : '') + line;
+  }
+  if (cur) parts.push(cur);
+  return parts;
+}
+
+// Korta möten sammanfattas i ett anrop. Långa möten sammanfattas del för del, och delarna sammanfattas
+// sedan till en helhet. Beslut och att göra samlas från alla delar.
+async function summarize(transcriptText, { host, model, timeoutMs, onProgress } = {}) {
+  const parts = splitText(transcriptText, SUMMARY_CHUNK_CHARS);
+  if (parts.length <= 1) return summarizeOnce(transcriptText, { host, model, timeoutMs });
+  const partial = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (onProgress) onProgress({ done: i, total: parts.length + 1 });
+    partial.push(await summarizeOnce(`Del ${i + 1} av ${parts.length} av ett längre möte.\n\n${parts[i]}`, { host, model, timeoutMs }));
+  }
+  if (onProgress) onProgress({ done: parts.length, total: parts.length + 1 });
+  const joined = partial.map((p, i) => `Del ${i + 1}: ${p.summary}\nBeslut: ${p.decisions.join('; ')}\nAtt göra: ${p.todos.map((t) => (t.owner ? `${t.text} (${t.owner})` : t.text)).join('; ')}`).join('\n\n');
+  const whole = await summarizeOnce(`Sammanfattningar av delarna i ett långt möte, i ordning. Gör en sammanfattning av hela mötet.\n\n${joined}`, { host, model, timeoutMs });
+  const seen = new Set();
+  const uniq = (arr, key) => arr.filter((x) => { const k = key(x).toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+  return {
+    summary: whole.summary || partial.map((p) => p.summary).join(' '),
+    decisions: uniq([...whole.decisions, ...partial.flatMap((p) => p.decisions)], (d) => d),
+    todos: uniq([...whole.todos, ...partial.flatMap((p) => p.todos)], (t) => t.text),
+  };
+}
+
+module.exports = { DEFAULT_HOST, available, chat, cleanupText, summarize, splitText, assertLocal };

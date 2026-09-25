@@ -127,7 +127,7 @@ async function upload() {
 $('btnUpload').onclick = upload;
 
 // ---- Progress ----
-const STEP_ORDER = ['load', 'convert', 'diarize', 'transcribe', 'summarize'];
+const STEP_ORDER = ['load', 'convert', 'diarize', 'transcribe', 'cleanup', 'summarize'];
 function setProgress(p) {
   const idx = STEP_ORDER.indexOf(p.phase);
   document.querySelectorAll('.steps .chip').forEach((c) => {
@@ -145,7 +145,13 @@ function setProgress(p) {
     frac = Math.min(1, p.done / p.total);
     text = `Transkriberar talartur ${Math.min(p.total, Math.floor(p.done) + 1)} av ${p.total}`;
   } else if (p.phase === 'diarize') frac = p.done ? 1 : 0;
-  else if (p.phase === 'summarize') frac = 1;
+  else if (p.phase === 'cleanup' && p.total) {
+    frac = Math.min(1, p.done / p.total);
+    text = `Städar texten med den lokala språkmodellen, ${Math.min(p.total, p.done + 1)} av ${p.total}`;
+  } else if (p.phase === 'summarize' && p.total) {
+    frac = Math.min(1, p.done / p.total);
+    text = `Sammanfattar långt möte, del ${Math.min(p.total, p.done + 1)} av ${p.total}`;
+  } else if (p.phase === 'summarize') frac = 1;
   $('progressBar').style.width = `${Math.round(frac * 100)}%`;
   $('progressText').textContent = text;
 }

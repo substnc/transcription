@@ -70,6 +70,7 @@
 <section class="card">
   <div class="head"><h2>Möten</h2></div>
   <div class="line"><span class="label">Talarmodeller (50 MB)</span><span class="row"><span class="chip" id="auxStatus">–</span><button class="small" id="btnAux">Ladda ner</button></span></div>
+  <div class="field"><label for="meetingSource">När mötet stoppas</label><select id="meetingSource"><option value="live">Använd livetexten: lägg på talare, städa och sammanfatta (snabbt)</option><option value="full">Kör om hela mötet med modellen för Möten (noggrannast, tar längre tid)</option></select></div>
   <label class="check"><input type="checkbox" id="diarize"> Separera talare</label>
   <div class="field" style="margin-top: 6px"><label for="diarizer">Talarigenkänning</label><select id="diarizer"><option value="nemotron">NVIDIA Nemotron 3 när den är installerad (max 8 talare)</option><option value="standard">Inbyggd (ingen gräns för antal talare)</option></select></div>
   <div class="line"><span class="label">Nemotron 3 Diarization (cirka 0,5 GB)</span><span class="row"><span class="chip" id="nemotronStatus">–</span><button class="small" id="btnNemotron">Installera</button></span></div>

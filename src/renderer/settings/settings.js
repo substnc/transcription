@@ -15,6 +15,7 @@ async function load() {
   $('hotkeyMode').value = S.hotkeyMode;
   $('language').value = S.language;
   $('diarizer').value = S.diarizer || 'nemotron';
+  $('meetingSource').value = S.meetingSource || 'live';
   $('vocabulary').value = S.vocabulary || '';
   $('llmMode').value = !S.useLlm ? 'off' : S.llmDictation ? 'all' : 'meetings';
   for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) $(id).checked = !!S[id];
@@ -32,6 +33,7 @@ bindSimple('hotkey', 'hotkey');
 bindSimple('hotkeyMode', 'hotkeyMode');
 bindSimple('language', 'language');
 bindSimple('diarizer', 'diarizer');
+bindSimple('meetingSource', 'meetingSource');
 bindSimple('vocabulary', 'vocabulary');
 for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) bindSimple(id, id, 'checked');
 $('llmMode').onchange = async () => {

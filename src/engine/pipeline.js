@@ -426,6 +426,24 @@ class Pipeline {
     return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'pianissimo', timing, diarizer: via };
   }
 
+  // Mötet är redan transkriberat under inspelningen (livetexten). Här läggs bara talare och tider på
+  // de färdiga styckena, så att inget behöver köras om. Mycket snabbare än en ny körning.
+  async meetingFromLive(wavPath, { segments, diarize = true, diarizer, channels, speakerCount = 0, onProgress } = {}) {
+    const samples = audio.readWav(wavPath).samples;
+    const durationSec = samples.length / SAMPLE_RATE;
+    console.error(`[motor] möte från livetexten: ${durationSec.toFixed(1)} s, ${segments.length} stycken`);
+    const t0 = Date.now();
+    const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
+    let segs = (segments || []).map((s) => ({ start: s.start, end: s.end, text: tidy(s.text), lang: 'sv', speaker: 0 }))
+      .filter((s) => s.text && !isHallucination(s.text));
+    if (diar.length) segs = assignSpeakers(segs, diar);
+    const labeled = relabelSpeakers(segs);
+    const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
+    const totalSec = (Date.now() - t0) / 1000;
+    const timing = { diarizeSec: totalSec, transcribeSec: 0, totalSec, speed: durationSec / Math.max(0.001, totalSec) };
+    return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'livetext', timing, diarizer: via };
+  }
+
   async dictatePy(samples) {
     const t0 = Date.now();
     const r = await this.pyWorker().transcribeSamples(samples);

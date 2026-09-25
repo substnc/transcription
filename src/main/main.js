@@ -158,10 +158,12 @@ function startLive() {
   rec.live = null;
   const model = settings.get('liveModel');
   if (!model) return sendToMeeting('meeting:live-status', { on: false, text: 'Livetext av (välj modell i Inställningar).' });
-  const live = { chunks: [], busy: false, timer: null };
+  // segs: allt som livetexten hunnit ta fram. Används som mötets text när mötet stoppas (om inställt så).
+  const live = { chunks: [], busy: false, timer: null, segs: [], ok: false };
   rec.live = live;
   engine.call('liveStart', { model }).then(() => {
     if (rec.live !== live) return;
+    live.ok = true;
     sendToMeeting('meeting:live-status', { on: true, text: 'Utkast. Den färdiga texten kommer när du stoppar.' });
     live.timer = setInterval(() => pumpLive(live), 1000);
   }).catch((e) => {
@@ -176,17 +178,29 @@ function pumpLive(live) {
   live.chunks = [];
   live.busy = true;
   engine.call('liveFeed', { samples })
-    .then((segs) => { if (segs && segs.length) sendToMeeting('meeting:live', segs); })
+    .then((segs) => { if (segs && segs.length) { live.segs.push(...segs); sendToMeeting('meeting:live', segs); } })
     .catch((e) => console.error('livetext:', e.message))
     .finally(() => { live.busy = false; });
 }
 
-function stopLive() {
+// Stoppar livetexten och transkriberar det som ligger kvar. Svarar med alla stycken, eller null om
+// livetexten inte var igång hela mötet (då görs en vanlig körning i stället).
+async function stopLive() {
   const live = rec.live;
   rec.live = null;
-  if (!live) return;
+  if (!live) return null;
   clearInterval(live.timer);
-  engine.call('liveStop').catch(() => {});
+  if (!live.ok) { engine.call('liveStop').catch(() => {}); return null; }
+  try {
+    while (live.busy) await new Promise((r) => setTimeout(r, 50));
+    if (live.chunks.length) live.segs.push(...(await engine.call('liveFeed', { samples: concatFloat32(live.chunks) })));
+    live.chunks = [];
+    live.segs.push(...(await engine.call('liveStop')));
+    return live.segs;
+  } catch (e) {
+    console.error('livetext vid stopp:', e.message);
+    return null;
+  }
 }
 
 // Mikrofon och datorns ljud sparas även var för sig (mote-x.mic.wav, mote-x.sys.wav) när båda spelas in.
@@ -216,7 +230,7 @@ function rmRecording(p) {
 function stopMeetingRecording() {
   if (rec.mode !== 'meeting') return null;
   captureSend({ cmd: 'stop' });
-  stopLive();
+  const liveSegs = stopLive();
   setIconState('idle');
   rec.mode = null;
   const p = rec.wav.finalize();
@@ -225,7 +239,24 @@ function stopMeetingRecording() {
   if (rec.wavMic) { rec.wavMic.finalize(); rec.wavSys.finalize(); }
   rec.wavMic = null;
   rec.wavSys = null;
-  return { wavPath: p, seconds };
+  return { wavPath: p, seconds, liveSegs };
+}
+
+// Mötet blev redan transkriberat av livetexten: lägg på talare, städa texten och sammanfatta.
+async function meetingFromLive(wavPath, segments, opts = {}) {
+  const s = settings.get();
+  const c = channelPaths(wavPath);
+  const channels = fs.existsSync(c.mic) && fs.existsSync(c.sys) ? c : null;
+  setIconState('type');
+  try {
+    const r = await engine.call('meetingFromLive', { wavPath, segments, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount: opts.speakerCount || 0, useLlm: s.useLlm },
+      (p) => sendToMeeting('meeting:progress', p));
+    sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
+    const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));
+    return { ...r, summary, wavPath, model: `livetext (${s.liveModel})${r.cleanedBy === 'llm' ? ` + ${s.ollamaModel}` : ''}` };
+  } finally {
+    setIconState('idle');
+  }
 }
 
 async function transcribeMeeting(wavPath, opts = {}) {
@@ -240,7 +271,7 @@ async function transcribeMeeting(wavPath, opts = {}) {
   try {
     const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
     sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
-    const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm });
+    const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));
     return { ...r, summary, wavPath, model: `whisper-${whisper}` };
   } finally {
     setIconState('idle');
@@ -342,6 +373,9 @@ function registerIpc() {
     const r = stopMeetingRecording();
     if (!r) throw new Error('Ingen inspelning pågår');
     if (r.seconds < 1) throw new Error('Inspelningen blev för kort');
+    // Livetexten används som den är om det är valt och den hann med hela mötet. Annars en ny körning.
+    const segs = await r.liveSegs;
+    if (settings.get('meetingSource') !== 'full' && segs && segs.length) return meetingFromLive(r.wavPath, segs, opts || {});
     return transcribeMeeting(r.wavPath, opts || {});
   });
   ipcMain.handle('meeting:cancel', () => {
