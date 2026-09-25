@@ -155,7 +155,7 @@ class Worker {
     this.dir = dir;
     this.command = command || l.python;
     this.args = args || [workerScript()];
-    this.env = { HF_HOME: l.hfHome, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', PYTHONUNBUFFERED: '1', SPEAK_THREADS: String(threads || Math.max(2, Math.min(8, os.cpus().length - 2))) };
+    this.env = { HF_HOME: l.hfHome, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', PYTHONUNBUFFERED: '1', PYTORCH_ENABLE_MPS_FALLBACK: '1', SPEAK_THREADS: String(threads || Math.max(2, Math.min(8, os.cpus().length - 2))) };
     this.proc = null;
     this.readyPromise = null;
     this.nextId = 1;

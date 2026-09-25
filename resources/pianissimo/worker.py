@@ -51,11 +51,37 @@ def num(x):
         return None
 
 
+def pick_device(torch):
+    # Macens grafikkrets (MPS) när den finns, annars processorn. SPEAK_DEVICE=cpu tvingar processorn.
+    want = os.environ.get("SPEAK_DEVICE", "auto")
+    if want != "cpu" and torch.cuda.is_available():
+        return torch.device("cuda")
+    if want != "cpu" and getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
 class Models:
     def __init__(self, torch):
         self.torch = torch
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = pick_device(torch)
         self.loaded = {}
+
+    def to_cpu(self, what, err):
+        # Något i modellen fungerade inte på grafikkretsen: kör den på processorn från och med nu.
+        print(f"[arbetare] {MODELS[what]} på {self.device} misslyckades ({err}), byter till cpu", file=sys.stderr)
+        self.loaded[what] = self.loaded[what].to("cpu")
+        self.device = self.torch.device("cpu")
+
+    def run(self, what, fn):
+        m = self.get(what)
+        try:
+            return fn(m)
+        except Exception as e:  # noqa: BLE001
+            if self.device.type == "cpu":
+                raise
+            self.to_cpu(what, e)
+            return fn(self.loaded[what])
 
     def get(self, what):
         if what not in self.loaded:
@@ -74,10 +100,12 @@ class Models:
 
 
 def transcribe(models, req):
-    model = models.get("asr")
     want_ts = bool(req.get("timestamps"))
-    with models.torch.inference_mode():
-        hypotheses = model.transcribe(audio=[req["path"]], batch_size=1, return_hypotheses=True, timestamps=want_ts)
+
+    def run(model):
+        with models.torch.inference_mode():
+            return model.transcribe(audio=[req["path"]], batch_size=1, return_hypotheses=True, timestamps=want_ts)
+    hypotheses = models.run("asr", run)
     h = hypotheses[0]
     if isinstance(h, list):  # vissa NeMo-versioner ger en lista per fil
         h = h[0]
@@ -90,9 +118,10 @@ def transcribe(models, req):
 
 
 def diarize(models, req):
-    model = models.get("diar")
-    with models.torch.inference_mode():
-        result = model.diarize(audio=[req["path"]], batch_size=1, verbose=False)
+    def run(model):
+        with models.torch.inference_mode():
+            return model.diarize(audio=[req["path"]], batch_size=1, verbose=False)
+    result = models.run("diar", run)
     if isinstance(result, tuple):  # (rader, tensorer) om include_tensor_outputs
         result = result[0]
     lines = result[0] if result and isinstance(result[0], (list, tuple)) else result
