@@ -249,7 +249,7 @@ async function meetingFromLive(wavPath, segments, opts = {}) {
   const channels = fs.existsSync(c.mic) && fs.existsSync(c.sys) ? c : null;
   setIconState('type');
   try {
-    const r = await engine.call('meetingFromLive', { wavPath, segments, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount: opts.speakerCount || 0, useLlm: s.useLlm },
+    const r = await engine.call('meetingFromLive', { wavPath, segments, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount: opts.speakerCount || 0, useLlm: s.useLlm, vocabulary: s.vocabulary, title: opts.title || '' },
       (p) => sendToMeeting('meeting:progress', p));
     sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
     const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));

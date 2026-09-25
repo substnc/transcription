@@ -126,19 +126,29 @@ const methods = {
 
   // Möte där livetexten används som den är: talare läggs på, och texten städas av den lokala
   // språkmodellen stycke för stycke (skiljetecken, tvekljud, uppenbara hörfel).
-  async meetingFromLive({ wavPath, segments, diarize, diarizer, channels, speakerCount, useLlm }, id) {
+  async meetingFromLive({ wavPath, segments, diarize, diarizer, channels, speakerCount, useLlm, vocabulary, title }, id) {
     const onProgress = (p) => send({ id, progress: p });
     const r = await pipeline.meetingFromLive(wavPath, { segments, diarize, diarizer, channels, speakerCount, onProgress });
     r.cleanedBy = 'rules';
     if (useLlm && settings.ollamaModel && r.segments.length) {
+      // Korrläsning: tio rader i taget, med de tre raderna före som sammanhang, så att modellen kan
+      // förstå vad som menades där taligenkänningen hört fel.
+      const BATCH = 10;
+      const segs = r.segments;
+      const vocab = String(vocabulary || '').split(/[\n,;]+/).map((t) => t.trim()).filter(Boolean).join(', ');
       let ok = 0;
-      for (let i = 0; i < r.segments.length; i++) {
-        onProgress({ phase: 'cleanup', done: i, total: r.segments.length });
+      for (let i = 0; i < segs.length; i += BATCH) {
+        onProgress({ phase: 'cleanup', done: i, total: segs.length });
+        const batch = segs.slice(i, i + BATCH);
         try {
-          const t = await llm.cleanupText(r.segments[i].text, { host: settings.ollamaHost, model: settings.ollamaModel, timeoutMs: 60000 });
-          if (t) { r.segments[i].text = t; ok++; }
+          const fixed = await llm.correctLines(batch.map((s) => ({ speaker: s.speaker, text: s.text })), {
+            context: segs.slice(Math.max(0, i - 3), i).map((s) => ({ speaker: s.speaker, text: s.text })),
+            vocabulary: vocab, topic: title, host: settings.ollamaHost, model: settings.ollamaModel,
+          });
+          if (fixed) { fixed.forEach((t, k) => (batch[k].text = t)); ok++; }
+          else console.error(`[motor] korrläsning rad ${i + 1}–${i + batch.length}: svaret gick inte att lita på, texten behålls`);
         } catch (e) {
-          console.error(`[motor] städning av stycke ${i + 1} misslyckades: ${e.message}`);
+          console.error(`[motor] korrläsning rad ${i + 1}–${i + batch.length} misslyckades: ${e.message}`);
           if (i === 0) break; // Ollama svarar inte: behåll texten som den är
         }
       }

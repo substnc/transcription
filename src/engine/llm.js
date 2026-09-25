@@ -1,7 +1,7 @@
 'use strict';
 // Klient mot en lokal Ollama-server (http://127.0.0.1:11434). Inget lämnar datorn.
 
-const { CLEANUP_SYSTEM, SUMMARY_SYSTEM, SUMMARY_SCHEMA, normalizeSummary } = require('./summarize');
+const { CLEANUP_SYSTEM, SUMMARY_SYSTEM, SUMMARY_SCHEMA, CORRECT_SYSTEM, CORRECT_SCHEMA, normalizeSummary } = require('./summarize');
 
 const DEFAULT_HOST = 'http://127.0.0.1:11434';
 
@@ -92,6 +92,28 @@ function splitText(text, max) {
 
 // Korta möten sammanfattas i ett anrop. Långa möten sammanfattas del för del, och delarna sammanfattas
 // sedan till en helhet. Beslut och att göra samlas från alla delar.
+// Korrläser rader ur ett mötestranskript i sitt sammanhang. lines: [{ speaker, text }] att rätta,
+// context: raderna strax före (rättas inte). Svarar med lika många rader, eller null om svaret inte går
+// att lita på (fel antal rader, eller en rad som ändrats för mycket).
+async function correctLines(lines, { context = [], vocabulary = '', topic = '', host, model, timeoutMs } = {}) {
+  const parts = [];
+  if (topic) parts.push(`Mötets ämne: ${topic}`);
+  if (vocabulary) parts.push(`Ordlista (namn och facktermer som kan förekomma): ${vocabulary}`);
+  if (context.length) parts.push('Sammanhang, rättas inte:\n' + context.map((l) => `${l.speaker}: ${l.text}`).join('\n'));
+  parts.push('Rader att rätta:\n' + lines.map((l, i) => `${i + 1}. ${l.speaker}: ${l.text}`).join('\n'));
+  const out = await chat({ host, model, system: CORRECT_SYSTEM, user: parts.join('\n\n'), format: CORRECT_SCHEMA, timeoutMs: timeoutMs || 120000, temperature: 0.1, numCtx: 8192 });
+  let parsed;
+  try { parsed = JSON.parse(out); } catch { return null; }
+  const got = parsed && Array.isArray(parsed.lines) ? parsed.lines.map((s) => String(s || '').trim()) : null;
+  if (!got || got.length !== lines.length) return null;
+  return got.map((t, i) => {
+    // Ta bort ett eventuellt "3. Talare 1:" som modellen upprepat, och skydda mot helt omskrivna rader.
+    const clean = t.replace(/^\d+\.\s*/, '').replace(new RegExp(`^${lines[i].speaker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:\s*`), '').trim();
+    const orig = lines[i].text;
+    return clean && clean.length > orig.length * 0.5 && clean.length < orig.length * 1.6 ? clean : orig;
+  });
+}
+
 async function summarize(transcriptText, { host, model, timeoutMs, onProgress } = {}) {
   const parts = splitText(transcriptText, SUMMARY_CHUNK_CHARS);
   if (parts.length <= 1) return summarizeOnce(transcriptText, { host, model, timeoutMs });
@@ -112,4 +134,4 @@ async function summarize(transcriptText, { host, model, timeoutMs, onProgress } 
   };
 }
 
-module.exports = { DEFAULT_HOST, available, chat, cleanupText, summarize, splitText, assertLocal };
+module.exports = { DEFAULT_HOST, available, chat, cleanupText, correctLines, summarize, splitText, assertLocal };

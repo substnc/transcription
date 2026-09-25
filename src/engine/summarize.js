@@ -63,4 +63,22 @@ function heuristicSummary(segments) {
   return { summary, decisions: decisions.slice(0, 15), todos: todos.slice(0, 20) };
 }
 
-module.exports = { SUMMARY_SCHEMA, SUMMARY_SYSTEM, CLEANUP_SYSTEM, normalizeSummary, heuristicSummary };
+// Korrläsning av ett mötestranskript från taligenkänningen: modellen läser raderna i sitt sammanhang och
+// rättar ord som blivit fel, till det personen rimligen sa. Samma antal rader tillbaka, i samma ordning.
+const CORRECT_SCHEMA = {
+  type: 'object',
+  properties: { lines: { type: 'array', items: { type: 'string' } } },
+  required: ['lines'],
+};
+
+const CORRECT_SYSTEM = `Du korrläser ett mötestranskript som en taligenkänning har skrivit. Den hör ibland fel:
+ord som låter lika blir fel ord, namn och facktermer stavas fel, ord saknas eller blir till nonsens.
+Du får numrerade rader att rätta, och ibland några rader före som sammanhang (de ska inte rättas).
+Regler:
+- Rätta ord som uppenbart blivit fel till det personen rimligen sa, utifrån sammanhanget och ordlistan.
+- Ta bort tvekljud (eh, öh, hmm) och fixa skiljetecken och versaler.
+- Behåll allt annat. Skriv inte om meningar, korta inte, lägg inte till innehåll och översätt inte.
+- Är du osäker på vad som sades: låt raden vara som den är.
+- Svara ENBART med JSON: {"lines": [...]}, en sträng per numrerad rad, lika många som du fick, i samma ordning.`;
+
+module.exports = { CORRECT_SCHEMA, CORRECT_SYSTEM, SUMMARY_SCHEMA, SUMMARY_SYSTEM, CLEANUP_SYSTEM, normalizeSummary, heuristicSummary };
