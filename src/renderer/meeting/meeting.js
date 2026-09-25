@@ -185,6 +185,17 @@ function renderSpeakers() {
     input.value = state.speakerNames[s];
     input.placeholder = s;
     input.oninput = () => { state.speakerNames[s] = input.value.trim() || s; renderSegments(); };
+    // Samma namn som en annan talare: det är samma person. Slå ihop dem (till exempel Talare 7 → Anna).
+    input.onchange = () => {
+      const name = input.value.trim().toLowerCase();
+      const other = state.result.speakers.find((o) => o !== s && (state.speakerNames[o] || o).toLowerCase() === name);
+      if (!name || !other) return;
+      state.result.segments.forEach((seg) => { if (seg.speaker === s) seg.speaker = other; });
+      state.result.speakers = state.result.speakers.filter((o) => o !== s);
+      delete state.speakerNames[s];
+      renderSpeakers();
+      renderSegments();
+    };
     wrap.append(dot, input);
     el.appendChild(wrap);
   }

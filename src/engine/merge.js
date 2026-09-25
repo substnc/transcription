@@ -143,4 +143,47 @@ function coalesce(segments, { maxGap = 1.0, maxLen = 40 } = {}) {
   return out;
 }
 
-module.exports = { turnsFromDiarization, assignSpeakers, relabelSpeakers, coalesce, overlap, channelActivity, combineChannelDiarization, segmentsFromWords, ME, ME_LABEL };
+// Talare som bytt nummer mitt i mötet: jämför röstavtrycken (ett medelvärde per talare) och slår ihop
+// talare som låter som samma person. voices: { [talare]: { emb: Float32Array (normerad), sec } }.
+// Slår ihop paret med högst likhet så länge likheten är över `threshold`, eller så länge det finns fler
+// talare än `maxSpeakers`. Den som pratat minst går upp i den andra. Mikrofonen ("me") rörs aldrig.
+// Svarar med en tabell { gammal talare: ny talare }.
+function cosine(a, b) {
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d += a[i] * b[i];
+  return d;
+}
+function normalize(v) {
+  let n = 0;
+  for (let i = 0; i < v.length; i++) n += v[i] * v[i];
+  n = Math.sqrt(n) || 1;
+  return Float32Array.from(v, (x) => x / n);
+}
+function mergeSimilarSpeakers(voices, { threshold = 0.6, maxSpeakers = 0 } = {}) {
+  const map = {};
+  const live = new Map(Object.entries(voices).filter(([k]) => k !== ME).map(([k, v]) => [k, { emb: normalize(v.emb), sec: v.sec }]));
+  for (const k of live.keys()) map[k] = k;
+  for (;;) {
+    let best = null;
+    const keys = [...live.keys()];
+    for (let i = 0; i < keys.length; i++) {
+      for (let j = i + 1; j < keys.length; j++) {
+        const sim = cosine(live.get(keys[i]).emb, live.get(keys[j]).emb);
+        if (!best || sim > best.sim) best = { a: keys[i], b: keys[j], sim };
+      }
+    }
+    if (!best) break;
+    const tooMany = maxSpeakers > 0 && live.size > maxSpeakers;
+    if (best.sim < threshold && !tooMany) break;
+    const A = live.get(best.a), B = live.get(best.b);
+    const [keep, drop] = A.sec >= B.sec ? [best.a, best.b] : [best.b, best.a];
+    const K = live.get(keep), D = live.get(drop);
+    const w = K.sec + D.sec || 1;
+    live.set(keep, { emb: normalize(K.emb.map((x, i) => (x * K.sec + D.emb[i] * D.sec) / w)), sec: K.sec + D.sec });
+    live.delete(drop);
+    for (const k of Object.keys(map)) if (map[k] === drop) map[k] = keep;
+  }
+  return map;
+}
+
+module.exports = { mergeSimilarSpeakers, turnsFromDiarization, assignSpeakers, relabelSpeakers, coalesce, overlap, channelActivity, combineChannelDiarization, segmentsFromWords, ME, ME_LABEL };

@@ -5,7 +5,7 @@
 const path = require('path');
 const os = require('os');
 const models = require('./models');
-const { assignSpeakers, relabelSpeakers, coalesce, channelActivity, combineChannelDiarization, segmentsFromWords } = require('./merge');
+const { assignSpeakers, relabelSpeakers, coalesce, channelActivity, combineChannelDiarization, segmentsFromWords, mergeSimilarSpeakers } = require('./merge');
 const { isHallucination, tidy } = require('./cleanup');
 const audio = require('./audio');
 const whispercpp = require('./whispercpp');
@@ -371,9 +371,50 @@ class Pipeline {
       const d = await this.diarizeAudio(target, count, diarizer);
       result = runs ? { diar: combineChannelDiarization(runs, d.diar), via: `${d.via} + kanaler` } : d;
     }
+    // Samma person kan få ett nytt nummer mitt i ett långt möte. Jämför rösterna och slå ihop.
+    try {
+      result.diar = this.fixSpeakerDrift(result.diar, target.samples || audio.readWav(target.wavPath).samples, count);
+    } catch (e) {
+      console.error('[motor] röstjämförelsen hoppades över:', e.message);
+    }
     if (onProgress) onProgress({ phase: 'diarize', done: 1, total: 1 });
     console.error(`[motor] talare: ${result.via}, ${result.diar.length} stycken`);
     return result;
+  }
+
+  // Röstavtryck per talare (3D-Speaker via sherpa), från talarens längsta stycken, högst 60 sekunder.
+  // Talare som låter som samma person slås ihop. count: antal talare om användaren angett det.
+  fixSpeakerDrift(diar, samples, count = 0) {
+    const ids = [...new Set(diar.map((d) => d.speaker).filter((s) => s !== 'me'))];
+    if (ids.length < 2 || !samples) return diar;
+    const modelPath = models.auxPath(this.modelsDir, 'embedding');
+    if (!require('fs').existsSync(modelPath)) return diar;
+    if (!this.embedder) this.embedder = new this.s.SpeakerEmbeddingExtractor({ model: modelPath, numThreads: this.numThreads, debug: 0, provider: 'cpu' });
+    const voices = {};
+    for (const id of ids) {
+      const turns = diar.filter((d) => d.speaker === id && d.end - d.start >= 1.5).sort((a, b) => (b.end - b.start) - (a.end - a.start));
+      let used = 0;
+      let sum = null;
+      for (const t of turns) {
+        if (used >= 60) break;
+        const clip = samples.subarray(Math.floor(t.start * SAMPLE_RATE), Math.floor(Math.min(t.end, t.start + 20) * SAMPLE_RATE));
+        if (clip.length < SAMPLE_RATE * 1.5) continue;
+        const st = this.embedder.createStream();
+        st.acceptWaveform({ sampleRate: SAMPLE_RATE, samples: clip });
+        st.inputFinished();
+        if (!this.embedder.isReady(st)) continue;
+        const e = this.embedder.compute(st);
+        sum = sum ? sum.map((x, i) => x + e[i]) : Float32Array.from(e);
+        used += clip.length / SAMPLE_RATE;
+      }
+      if (sum && used >= 2) voices[id] = { emb: sum, sec: used };
+    }
+    const maxSpeakers = count > 0 ? count : 0;
+    const map = mergeSimilarSpeakers(voices, { maxSpeakers });
+    const merged = Object.entries(map).filter(([a, b]) => a !== b);
+    if (!merged.length) return diar;
+    console.error(`[motor] röstjämförelse: slog ihop ${merged.map(([a, b]) => `${a}→${b}`).join(', ')}`);
+    return diar.map((d) => (map[d.speaker] !== undefined ? { ...d, speaker: typeof d.speaker === 'number' ? Number(map[d.speaker]) : map[d.speaker] } : d));
   }
 
   async diarizeAudio({ wavPath, samples }, count, diarizer) {

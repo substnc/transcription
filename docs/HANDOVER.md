@@ -47,20 +47,18 @@ Electron-menyradsapp med ikon i Dock (valbart).
   iCloud Drive/01_CLAUDE_CODE/speak/inspelningar. Raderas efter sparad anteckning om inte "Behåll ljudfilerna".
   Rester äldre än ett dygn städas vid start.
 
-## PÅGÅENDE: talare som byter nummer mitt i mötet
-Problem (Anthon): samma person blir plötsligt "Talare 7" i stället för "Talare 1" i långa möten. Att fylla i
-antal talare går smidigt, men hjälper inte mot detta.
-Påbörjad lösning, INTE incheckad, sparad som docs/wip-talardrift.patch (git apply docs/wip-talardrift.patch):
+## Talare som byter nummer mitt i mötet (incheckat 25 sep 2026, väntar på Anthons test)
+Problem (Anthon): samma person blir plötsligt "Talare 7" i stället för "Talare 1" i långa möten.
 - merge.js mergeSimilarSpeakers: röstavtryck per talare, slår ihop talare som låter lika (cosinus > 0,6),
   eller tills antalet stämmer med angivet antal talare. Mikrofonen ("me") rörs aldrig.
-- pipeline.js fixSpeakerDrift: tar röstavtryck (3D-Speaker via sherpa SpeakerEmbeddingExtractor, samma modell
-  som talarmodellerna) från varje talares längsta stycken, högst 60 s, och kör sammanslagningen. Anropas sist i
-  speakerTimeline, på datorns ljud när kanaler finns.
-- meeting.js: skriver man samma namn på två talare i resultatet slås de ihop. Hjälptext under talarna.
-- test/speaker-drift.test.js: tre tester (alla 46 tester gick igenom med patchen).
-Att göra: lägg på patchen, kontrollera SpeakerEmbeddingExtractor-anropet mot riktigt ljud (Mac-testet), fundera på
-tröskeln, bygg och låt Anthon testa på ett långt möte. Idé för senare: röstprofiler (spela in återkommande personer
-en gång, känn igen dem med namn).
+- pipeline.js fixSpeakerDrift: röstavtryck (3D-Speaker via sherpa SpeakerEmbeddingExtractor) från varje talares
+  längsta stycken, högst 60 s. Anropas sist i speakerTimeline. Loggrad i engine.log: "röstjämförelse: slog ihop …".
+- meeting.js: samma namn på två talare i resultatet slår ihop dem. Hjälptext under talarna.
+- test/speaker-drift.test.js: tre tester.
+- Provat på riktigt ljud (sherpas 0-four-speakers-zh.wav, 4 talare): klustringen delade upp i 6–8 talare,
+  röstjämförelsen slog ihop till rätt 4, även utan angivet antal.
+Att göra: Anthon testar på ett långt möte. Slås olika personer ihop, höj tröskeln (0,6). Idé för senare:
+röstprofiler (spela in återkommande personer en gång, känn igen dem med namn).
 
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
@@ -96,7 +94,7 @@ en gång, känn igen dem med namn).
 ## Senaste testresultat (Mac i CI, enkel M1, före MPS)
 - Pianissimo: 59 s ljud på 2,9 s (20× realtid, på processorn). Klangs "en timme på en sekund" gäller stark GPU.
 - Två kanaler och två tydligt olika röster: rätt. Lika röster: slås ihop.
-- Riktiga möten: talare byter nummer i långa möten (se PÅGÅENDE).
+- Riktiga möten: talare byter nummer i långa möten (åtgärdat, väntar på test).
 
 ## Klangs egna siffror (ordfel, CV / FLEURS / dialekter)
 Pianissimo 4,46 / 6,51 / 4,85 %. KB-Whisper large 3,91 / 5,08 / 2,30 %. Pianissimo förstår bara svenska.
@@ -107,7 +105,7 @@ Pianissimo 4,46 / 6,51 / 4,85 %. KB-Whisper large 3,91 / 5,08 / 2,30 %. Pianissi
 - Wispr Flow bearbetar ljud i molnet i USA (kontrollerat), Speak. gör allt lokalt.
 
 ## Nästa steg
-1. Lägg på docs/wip-talardrift.patch, testa, bygg (se PÅGÅENDE).
+1. Anthon testar talar-ihopslagningen på ett långt möte (se "Talare som byter nummer").
 2. Anthon testar MPS: är Pianissimo snabbare, står "mps" i loggen?
 3. Anthon testar korrläsningen på ett riktigt möte. Överväg större Ollama-modell (t.ex. qwen2.5:14b) om svenskan brister.
 4. Eventuellt: röstprofiler för återkommande personer, talare i livetexten, ordlista för Pianissimo.
