@@ -407,8 +407,22 @@ class Pipeline {
     const t0 = Date.now();
     const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
     const t1 = Date.now();
-    if (onProgress) onProgress({ phase: 'transcribe', text: 'Transkriberar med Pianissimo…' });
-    const r = await w.transcribe(wavPath, { timestamps: true });
+    // På Macen körs Pianissimo på processorn (inte grafikkretsen), så ett långt möte i ett enda anrop
+    // blir tungt och säger inget om hur långt det kommit. Långa möten körs därför i stycken om cirka
+    // tio minuter, klippta i en tyst stund, med förlopp i procent.
+    const parts = splitLong(samples);
+    const r = { segments: [], words: [], text: '' };
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (onProgress) onProgress({ phase: 'transcribe', unit: 'percent', done: (i / parts.length) * 100, total: 100 });
+      const one = parts.length === 1 ? await w.transcribe(wavPath, { timestamps: true }) : await w.transcribeSamples(part.samples, { timestamps: true });
+      const shift = (x) => ({ ...x, start: x.start != null ? x.start + part.start : x.start, end: x.end != null ? x.end + part.start : x.end });
+      r.segments.push(...(one.segments || []).map(shift));
+      r.words.push(...(one.words || []).map(shift));
+      r.text += (r.text ? ' ' : '') + (one.text || '');
+      console.error(`[motor] Pianissimo stycke ${i + 1}/${parts.length} klart`);
+    }
+    if (onProgress) onProgress({ phase: 'transcribe', unit: 'percent', done: 100, total: 100 });
     const t2 = Date.now();
     let segs = (r.segments || []).filter((x) => x.start != null && x.end != null)
       .map((x) => ({ start: x.start, end: x.end, text: tidy(x.text), lang: 'sv', speaker: 0 }))
