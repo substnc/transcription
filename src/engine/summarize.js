@@ -81,4 +81,24 @@ Regler:
 - Är du osäker på vad som sades: låt raden vara som den är.
 - Svara ENBART med JSON: {"lines": [...]}, en sträng per numrerad rad, lika många som du fick, i samma ordning.`;
 
-module.exports = { CORRECT_SCHEMA, CORRECT_SYSTEM, SUMMARY_SCHEMA, SUMMARY_SYSTEM, CLEANUP_SYSTEM, normalizeSummary, heuristicSummary };
+// Video och andra klipp som spelas upp under mötet: modellen pekar ut raderna som hör till klippet, så att
+// användaren kan ta bort dem. Radnummer, första och sista raden i varje klipp.
+const ASIDE_SCHEMA = {
+  type: 'object',
+  properties: {
+    clips: { type: 'array', items: { type: 'object', properties: { from: { type: 'integer' }, to: { type: 'integer' } }, required: ['from', 'to'] } },
+  },
+  required: ['clips'],
+};
+
+const ASIDE_SYSTEM = `Du läser ett mötestranskript med numrerade rader. Ibland spelar någon upp en video, ett klipp, en
+reklamfilm eller annat inspelat ljud under mötet, och det ljudet har också blivit text.
+Hitta sådana klipp. Tecken på ett klipp:
+- Någon säger att de ska visa eller spela något ("nu tittar vi på klippet", "jag drar igång videon").
+- Raderna efteråt låter som en film eller reklam (speakerröst, slogans, dialog som inte hör till mötet).
+- Mötet tar vid igen efteråt ("okej, vad tyckte ni?").
+Svara ENBART med JSON enligt schemat. "from" och "to" är radnumret för första och sista raden som hör till
+själva klippet. Raden där någon presenterar klippet, och raden där mötet tar vid, hör inte till klippet.
+Hitta inte på. Finns inga klipp: tom lista.`;
+
+module.exports = { ASIDE_SCHEMA, ASIDE_SYSTEM, CORRECT_SCHEMA, CORRECT_SYSTEM, SUMMARY_SCHEMA, SUMMARY_SYSTEM, CLEANUP_SYSTEM, normalizeSummary, heuristicSummary };

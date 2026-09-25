@@ -1,7 +1,7 @@
 'use strict';
 // Klient mot en lokal Ollama-server (http://127.0.0.1:11434). Inget lämnar datorn.
 
-const { CLEANUP_SYSTEM, SUMMARY_SYSTEM, SUMMARY_SCHEMA, CORRECT_SYSTEM, CORRECT_SCHEMA, normalizeSummary } = require('./summarize');
+const { CLEANUP_SYSTEM, SUMMARY_SYSTEM, SUMMARY_SCHEMA, CORRECT_SYSTEM, CORRECT_SCHEMA, ASIDE_SYSTEM, ASIDE_SCHEMA, normalizeSummary } = require('./summarize');
 
 const DEFAULT_HOST = 'http://127.0.0.1:11434';
 
@@ -114,6 +114,50 @@ async function correctLines(lines, { context = [], vocabulary = '', topic = '', 
   });
 }
 
+// Tolkar modellens svar om klipp: radnummer (1-baserade inom fönstret) blir index i hela mötet.
+// Orimliga svar (utanför fönstret, baklänges) hoppas över.
+function parseClips(parsed, offset, count) {
+  const clips = parsed && Array.isArray(parsed.clips) ? parsed.clips : [];
+  const out = [];
+  for (const c of clips) {
+    const from = Number(c && c.from), to = Number(c && c.to);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from || to > count) continue;
+    out.push([offset + from - 1, offset + to - 1]);
+  }
+  return out;
+}
+
+// Slår ihop klipp som överlappar eller ligger kant i kant. [[från, till], ...] med index, sorterat.
+function mergeRanges(ranges) {
+  const sorted = ranges.slice().sort((a, b) => a[0] - b[0]);
+  const out = [];
+  for (const r of sorted) {
+    const last = out[out.length - 1];
+    if (last && r[0] <= last[1] + 1) last[1] = Math.max(last[1], r[1]);
+    else out.push([r[0], r[1]]);
+  }
+  return out;
+}
+
+// Letar efter video och andra klipp som spelats upp under mötet. lines: [{ speaker, text }]. Läser 120 rader
+// i taget med 20 raders överlapp, så att ett klipp på gränsen ändå syns helt i något fönster.
+// Svarar med [[från, till], ...] (index i lines).
+async function findClips(lines, { topic = '', host, model, timeoutMs, onProgress } = {}) {
+  const WIN = 120, STEP = 100;
+  const found = [];
+  for (let i = 0; i < lines.length; i += STEP) {
+    if (onProgress) onProgress({ done: i, total: lines.length });
+    const win = lines.slice(i, i + WIN);
+    const user = (topic ? `Mötets ämne: ${topic}\n\n` : '') + win.map((l, k) => `${k + 1}. ${l.speaker}: ${l.text}`).join('\n');
+    const out = await chat({ host, model, system: ASIDE_SYSTEM, user, format: ASIDE_SCHEMA, timeoutMs: timeoutMs || 180000, temperature: 0, numCtx: 16384 });
+    let parsed = null;
+    try { parsed = JSON.parse(out); } catch { /* svaret gick inte att läsa: inga klipp i det här fönstret */ }
+    found.push(...parseClips(parsed, i, win.length));
+    if (i + WIN >= lines.length) break;
+  }
+  return mergeRanges(found);
+}
+
 async function summarize(transcriptText, { host, model, timeoutMs, onProgress } = {}) {
   const parts = splitText(transcriptText, SUMMARY_CHUNK_CHARS);
   if (parts.length <= 1) return summarizeOnce(transcriptText, { host, model, timeoutMs });
@@ -134,4 +178,4 @@ async function summarize(transcriptText, { host, model, timeoutMs, onProgress } 
   };
 }
 
-module.exports = { DEFAULT_HOST, available, chat, cleanupText, correctLines, summarize, splitText, assertLocal };
+module.exports = { DEFAULT_HOST, available, chat, cleanupText, correctLines, findClips, parseClips, mergeRanges, summarize, splitText, assertLocal };

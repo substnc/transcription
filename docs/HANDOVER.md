@@ -60,6 +60,17 @@ Problem (Anthon): samma person blir plötsligt "Talare 7" i stället för "Talar
 Att göra: Anthon testar på ett långt möte. Slås olika personer ihop, höj tröskeln (0,6). Idé för senare:
 röstprofiler (spela in återkommande personer en gång, känn igen dem med namn).
 
+## Video under mötet (incheckat 25 sep 2026, väntar på Anthons test)
+Problem (Anthon): videoklipp som spelas upp under mötet kommer med i transkriptet.
+- Språkmodellen letar efter klipp efter korrläsningen (llm.js findClips, summarize.js ASIDE_SYSTEM): 120 rader
+  i taget med 20 raders överlapp, svar som radnummer. Raderna får aside = klippets nummer (server.js findClips).
+  Körs i main.js clipsAndSummary för både livetext och full körning. Loggrad: "troligen video: rad …".
+- Sammanfattningen tar inte med aside-rader. Inget tas bort utan att Anthon trycker.
+- Resultatet (meeting.js renderSegments): vit ruta "Troligen video" med Ta bort / Behåll, och egen markering
+  med rundeln framför varje rad (shift-klick = allt däremellan), "Ta bort N rader" / Avbryt. Borttagning gör
+  om sammanfattningen. Skisser: designfilen, "Resultat: modellen hittar video" och "Resultat: markera och ta bort".
+- Svaghet: sägs inget högt om klippet kan modellen missa det. Idé för senare: knapp "Video spelas" under inspelning.
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.
@@ -106,6 +117,7 @@ Pianissimo 4,46 / 6,51 / 4,85 %. KB-Whisper large 3,91 / 5,08 / 2,30 %. Pianissi
 
 ## Nästa steg
 1. Anthon testar talar-ihopslagningen på ett långt möte (se "Talare som byter nummer").
+1b. Anthon testar videorutan på mötet med två videoklipp (se "Video under mötet").
 2. Anthon testar MPS: är Pianissimo snabbare, står "mps" i loggen?
 3. Anthon testar korrläsningen på ett riktigt möte. Överväg större Ollama-modell (t.ex. qwen2.5:14b) om svenskan brister.
 4. Eventuellt: röstprofiler för återkommande personer, talare i livetexten, ordlista för Pianissimo.

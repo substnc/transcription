@@ -242,6 +242,13 @@ function stopMeetingRecording() {
   return { wavPath: p, seconds, liveSegs };
 }
 
+// Letar efter video som spelats upp under mötet (raderna får aside) och sammanfattar resten.
+async function clipsAndSummary(r, s, title) {
+  r.segments = await engine.call('findClips', { segments: r.segments, useLlm: s.useLlm, title: title || '' }, (p) => sendToMeeting('meeting:progress', p));
+  sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
+  return engine.call('summarize', { segments: r.segments.filter((x) => !x.aside), useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));
+}
+
 // Mötet blev redan transkriberat av livetexten: lägg på talare, städa texten och sammanfatta.
 async function meetingFromLive(wavPath, segments, opts = {}) {
   const s = settings.get();
@@ -251,8 +258,7 @@ async function meetingFromLive(wavPath, segments, opts = {}) {
   try {
     const r = await engine.call('meetingFromLive', { wavPath, segments, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount: opts.speakerCount || 0, useLlm: s.useLlm, vocabulary: s.vocabulary, title: opts.title || '' },
       (p) => sendToMeeting('meeting:progress', p));
-    sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
-    const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));
+    const summary = await clipsAndSummary(r, s, opts.title);
     return { ...r, summary, wavPath, model: `livetext (${s.liveModel})${r.cleanedBy === 'llm' ? ` + ${s.ollamaModel}` : ''}` };
   } finally {
     setIconState('idle');
@@ -270,8 +276,7 @@ async function transcribeMeeting(wavPath, opts = {}) {
   setIconState('type');
   try {
     const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
-    sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
-    const summary = await engine.call('summarize', { segments: r.segments, useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));
+    const summary = await clipsAndSummary(r, s, opts.title);
     return { ...r, summary, wavPath, model: `whisper-${whisper}` };
   } finally {
     setIconState('idle');

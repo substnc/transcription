@@ -157,6 +157,23 @@ const methods = {
     return r;
   },
 
+  // Video och andra klipp under mötet: rader som språkmodellen tror hör till ett klipp får aside = klippets
+  // nummer. Inget tas bort här, användaren bestämmer i resultatet.
+  async findClips({ segments, useLlm, title }, id) {
+    if (!useLlm || !settings.ollamaModel || !segments.length) return segments;
+    try {
+      const ranges = await llm.findClips(segments.map((s) => ({ speaker: s.speaker, text: s.text })), {
+        topic: title, host: settings.ollamaHost, model: settings.ollamaModel,
+        onProgress: (p) => send({ id, progress: { phase: 'cleanup', ...p, text: 'Letar efter video i mötet…' } }),
+      });
+      ranges.forEach(([a, b], n) => { for (let k = a; k <= b; k++) segments[k].aside = n + 1; });
+      if (ranges.length) console.error(`[motor] troligen video: ${ranges.map(([a, b]) => `rad ${a + 1}–${b + 1}`).join(', ')}`);
+    } catch (e) {
+      console.error(`[motor] videosökningen misslyckades: ${e.message}`);
+    }
+    return segments;
+  },
+
   async summarize({ segments, useLlm }, id) {
     if (useLlm && settings.ollamaModel) {
       try {
