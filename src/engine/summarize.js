@@ -99,6 +99,8 @@ Hitta sådana klipp. Tecken på ett klipp:
 - Mötet tar vid igen efteråt ("okej, vad tyckte ni?").
 Svara ENBART med JSON enligt schemat. "from" och "to" är radnumret för första och sista raden som hör till
 själva klippet. Raden där någon presenterar klippet, och raden där mötet tar vid, hör inte till klippet.
+Ta hellre med för lite än för mycket. Klippet slutar på sista raden som låter som filmen. Så fort någon i mötet
+pratar igen (kommenterar, frågar, ger instruktioner, säger hej då) är klippet slut, även om det är samma talare.
 Hitta inte på. Finns inga klipp: tom lista.`;
 
 module.exports = { ASIDE_SCHEMA, ASIDE_SYSTEM, CORRECT_SCHEMA, CORRECT_SYSTEM, SUMMARY_SCHEMA, SUMMARY_SYSTEM, CLEANUP_SYSTEM, normalizeSummary, heuristicSummary };

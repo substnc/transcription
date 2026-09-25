@@ -174,7 +174,9 @@ function showResult(r) {
   renderInboxes();
   $('saveStatus').textContent = '';
   show('result');
+  $('segments').querySelectorAll('textarea').forEach(fitText);
 }
+window.addEventListener('resize', () => $('segments').querySelectorAll('textarea').forEach(fitText));
 
 function renderSpeakers() {
   const el = $('speakers');
@@ -235,11 +237,17 @@ function segRow(seg, i) {
   const name = document.createElement('span'); name.textContent = state.speakerNames[seg.speaker] || seg.speaker;
   sp.append(name);
   if (seg.lang) { const l = document.createElement('span'); l.className = 'lang'; l.textContent = `· ${seg.lang}`; sp.appendChild(l); }
-  const ta = document.createElement('textarea'); ta.value = seg.text; ta.rows = Math.max(1, Math.ceil(seg.text.length / 80));
-  ta.oninput = () => (state.result.segments[i].text = ta.value);
+  const ta = document.createElement('textarea'); ta.value = seg.text; ta.rows = 1;
+  ta.oninput = () => { state.result.segments[i].text = ta.value; fitText(ta); };
   body.append(sp, ta);
   row.append(pick, t, lane, body);
   return row;
+}
+
+// Textrutan blir precis så hög som texten, utan rullningslist.
+function fitText(ta) {
+  ta.style.height = 'auto';
+  ta.style.height = `${ta.scrollHeight}px`;
 }
 
 function togglePick(i, shift) {
@@ -298,9 +306,9 @@ function renderSegments() {
   let i = 0;
   while (i < segs.length) {
     // Markerade rader i följd: en vit ruta med Ta bort och Avbryt.
-    if (state.picked.has(i)) {
+    if (state.picked.has(i) && !segs[i].aside) {
       let j = i;
-      while (j + 1 < segs.length && state.picked.has(j + 1)) j++;
+      while (j + 1 < segs.length && state.picked.has(j + 1) && !segs[j + 1].aside) j++;
       const n = j - i + 1;
       const g = groupBox('picked', `<span><b>${n} ${n === 1 ? 'rad' : 'rader'} markerade</b> · ${fmt(segs[i].start)} – ${fmt(segs[j].end)}</span>`);
       for (let k = i; k <= j; k++) g.appendChild(segRow(segs[k], k));
@@ -313,14 +321,18 @@ function renderSegments() {
       i = j + 1;
       continue;
     }
-    // Troligen video: en vit ruta med de första raderna, resten dolda, Ta bort och Behåll.
+    // Troligen video: en vit ruta med de första raderna, resten dolda, Ta bort och Behåll. Rader du markerar
+    // här stannar i rutan, och knapparna gäller då bara de markerade.
     if (segs[i].aside) {
       const id = segs[i].aside;
       let j = i;
-      while (j + 1 < segs.length && segs[j + 1].aside === id && !state.picked.has(j + 1)) j++;
+      while (j + 1 < segs.length && segs[j + 1].aside === id) j++;
       const n = j - i + 1;
-      const g = groupBox('clip', `${CLIP_SVG}<b>Troligen video</b><span>· ${fmt(segs[i].start)} – ${fmt(segs[j].end)} · ${n} ${n === 1 ? 'rad' : 'rader'}</span>`);
-      const open = state.openClips.has(id) || n <= 3;
+      const rows = Array.from({ length: n }, (_, k) => i + k);
+      const mine = rows.filter((k) => state.picked.has(k));
+      const m = mine.length;
+      const g = groupBox('clip', `${CLIP_SVG}<b>Troligen video</b><span>· ${fmt(segs[i].start)} – ${fmt(segs[j].end)} · ${n} ${n === 1 ? 'rad' : 'rader'}${m ? ` · ${m} markerade` : ''}</span>`);
+      const open = state.openClips.has(id) || n <= 3 || m > 0;
       const shown = open ? n : 2;
       for (let k = i; k < i + shown; k++) g.appendChild(segRow(segs[k], k));
       if (!open) {
@@ -330,8 +342,12 @@ function renderSegments() {
         more.onclick = () => { state.openClips.add(id); renderSegments(); };
         g.appendChild(more);
       }
-      const rows = Array.from({ length: n }, (_, k) => i + k);
-      g.appendChild(pillButtons([
+      const clearPick = () => { state.picked.clear(); state.anchor = null; };
+      g.appendChild(pillButtons(m ? [
+        [`Behåll ${m} markerade`, true, () => { mine.forEach((k) => delete segs[k].aside); clearPick(); renderSegments(); resummarize(); }],
+        [`Ta bort ${m} markerade`, false, () => removeRows(mine)],
+        ['Avbryt', false, () => { clearPick(); renderSegments(); }],
+      ] : [
         ['Ta bort', true, () => removeRows(rows)],
         ['Behåll', false, () => { rows.forEach((k) => delete segs[k].aside); renderSegments(); resummarize(); }],
       ]));
@@ -342,6 +358,7 @@ function renderSegments() {
     el.appendChild(segRow(segs[i], i));
     i++;
   }
+  el.querySelectorAll('textarea').forEach(fitText);
 }
 
 function fillSummary(s) {
