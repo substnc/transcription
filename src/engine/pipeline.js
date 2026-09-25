@@ -43,6 +43,30 @@ function loadSherpa() {
   return require('sherpa-onnx-node');
 }
 
+// Delar långt ljud i stycken om cirka `chunkSec` sekunder. Varje gräns läggs i den tystaste halvsekunden
+// under de sista 30 sekunderna före gränsen, så att inget ord klipps mitt av. Kortare ljud än `minSec` delas inte.
+function splitLong(samples, { chunkSec = 600, minSec = 900, searchSec = 30 } = {}) {
+  const total = samples.length;
+  if (total <= minSec * SAMPLE_RATE) return [{ start: 0, samples }];
+  const win = Math.round(0.5 * SAMPLE_RATE);
+  const parts = [];
+  let from = 0;
+  while (total - from > (chunkSec + 120) * SAMPLE_RATE) {
+    const target = from + chunkSec * SAMPLE_RATE;
+    let best = target, bestE = Infinity;
+    for (let s = target - searchSec * SAMPLE_RATE; s + win <= target; s += Math.round(win / 2)) {
+      let e = 0;
+      for (let k = s; k < s + win; k += 4) e += samples[k] * samples[k];
+      if (e < bestE) { bestE = e; best = s + Math.round(win / 2); }
+    }
+    parts.push({ start: from / SAMPLE_RATE, samples: samples.subarray(from, best) });
+    from = best;
+  }
+  parts.push({ start: from / SAMPLE_RATE, samples: samples.subarray(from) });
+  return parts;
+}
+const fmtTime = (sec) => { const m = Math.floor(sec / 60); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}:${String(Math.floor(sec % 60)).padStart(2, '0')}`; };
+
 class Pipeline {
   constructor(opts = {}) {
     this.modelsDir = opts.modelsDir;
@@ -234,9 +258,29 @@ class Pipeline {
     const t0 = Date.now();
     const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
     const t1 = Date.now();
-    const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt,
-      onProgress: onProgress ? (f) => onProgress({ phase: 'transcribe', done: f * 100, total: 100 }) : null };
-    const raw = wavPath ? await whispercpp.transcribeWav(wavPath, opts) : await whispercpp.transcribeSamples(samples, opts);
+    const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt };
+    // Långa möten delas i stycken om cirka tio minuter, klippta i en tyst stund. Då kan ett stycke som
+    // fastnar inte stoppa hela mötet: det avbryts, körs om enklare, och resten fortsätter.
+    const parts = splitLong(samples);
+    const raw = [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const report = onProgress ? (f) => onProgress({ phase: 'transcribe', unit: 'percent', done: ((i + f) / parts.length) * 100, total: 100 }) : null;
+      let segs = null;
+      for (const greedy of [false, true]) {
+        try {
+          segs = parts.length === 1 && wavPath && !greedy
+            ? await whispercpp.transcribeWav(wavPath, { ...opts, onProgress: report })
+            : await whispercpp.transcribeSamples(part.samples, { ...opts, greedy, onProgress: report });
+          break;
+        } catch (e) {
+          console.error(`[motor] stycke ${i + 1}/${parts.length} (${fmtTime(part.start)}) misslyckades${greedy ? ' igen' : ''}: ${e.message}`);
+        }
+      }
+      if (!segs) segs = [{ start: 0, end: part.samples.length / SAMPLE_RATE, text: `[Det här stycket kunde inte transkriberas, ${fmtTime(part.start)}–${fmtTime(part.start + part.samples.length / SAMPLE_RATE)}]` }];
+      for (const s of segs) raw.push({ ...s, start: s.start + part.start, end: s.end + part.start });
+      if (report) report(1);
+    }
     const t2 = Date.now();
     // Tidtagning för hastighetsmätning: syns i loggen och i mötesfönstret.
     const timing = { diarizeSec: (t1 - t0) / 1000, transcribeSec: (t2 - t1) / 1000, totalSec: (t2 - t0) / 1000, speed: durationSec / Math.max(0.001, (t2 - t0) / 1000) };
@@ -467,4 +511,4 @@ function isJunk(text, lang, dur, policy) {
   return false;
 }
 
-module.exports = { Pipeline, SAMPLE_RATE, audio, modelsDir: (base) => path.join(base, 'models') };
+module.exports = { Pipeline, SAMPLE_RATE, splitLong, audio, modelsDir: (base) => path.join(base, 'models') };

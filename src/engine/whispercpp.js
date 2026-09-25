@@ -40,31 +40,48 @@ function parseResult(json) {
 }
 
 // Kör whisper-cli på en 16 kHz mono WAV. Returnerar [{ start, end, text }].
-function transcribeWav(wavPath, { binary, model, language = 'auto', threads, onProgress, prompt } = {}) {
+// greedy: enklare avkodning (utan beam search), används som andra försök om ett stycke fastnar.
+// stallMs: om whisper-cli inte rör sig på så här länge avbryts den i stället för att hänga för alltid.
+function transcribeWav(wavPath, { binary, model, language = 'auto', threads, onProgress, prompt, greedy = false, stallMs = 5 * 60 * 1000 } = {}) {
   return new Promise((resolve, reject) => {
     const bin = findBinary(binary);
     if (!bin) return reject(new Error('whisper-cli saknas (Metal-motorn). Installera om appen.'));
     if (!model || !fs.existsSync(model)) return reject(new Error('ggml-modellen saknas.'));
     const out = path.join(os.tmpdir(), `speak-${process.pid}-${Date.now()}`);
     const args = ['-m', model, '-f', wavPath, '-l', language === 'auto' ? 'auto' : language, '-oj', '-of', out, '-np', '-pp',
-      '-t', String(threads || Math.max(2, Math.min(8, os.cpus().length))), '-bo', '5', '-bs', '5'];
+      '-t', String(threads || Math.max(2, Math.min(8, os.cpus().length))), '-bo', greedy ? '1' : '5', '-bs', greedy ? '1' : '5'];
     if (prompt) args.push('--prompt', prompt);
     const p = spawn(bin, args);
     let err = '';
+    let settled = false;
+    let watchdog = null;
+    const finish = (fn, v) => { if (settled) return; settled = true; clearTimeout(watchdog); fn(v); };
+    const arm = () => {
+      clearTimeout(watchdog);
+      // Svara direkt i stället för att vänta på att processen stängs: den kan hänga kvar.
+      watchdog = setTimeout(() => {
+        p.kill('SIGKILL');
+        fs.rmSync(out + '.json', { force: true });
+        finish(reject, new Error(`whisper-cli stod still i ${Math.max(1, Math.round(stallMs / 60000))} minuter och avbröts`));
+      }, stallMs);
+    };
+    arm();
     p.stderr.on('data', (d) => {
+      arm();
       const s = d.toString();
-      err += s;
+      err = (err + s).slice(-4000);
       if (onProgress) for (const m of s.matchAll(/progress\s*=\s*(\d+)%/g)) onProgress(Number(m[1]) / 100);
     });
-    p.on('error', reject);
+    p.on('error', (e) => finish(reject, e));
     p.on('close', (code) => {
+      if (settled) return;
       const file = out + '.json';
       try {
         if (code !== 0) throw new Error(`whisper-cli avslutades med kod ${code}: ${err.trim().split('\n').slice(-3).join(' | ')}`);
         const json = JSON.parse(fs.readFileSync(file, 'utf8'));
-        resolve(parseResult(json));
+        finish(resolve, parseResult(json));
       } catch (e) {
-        reject(e);
+        finish(reject, e);
       } finally {
         fs.rmSync(file, { force: true });
       }

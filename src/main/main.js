@@ -357,6 +357,13 @@ function registerIpc() {
     });
     if (r.canceled || !r.filePaths.length) return null;
     const input = r.filePaths[0];
+    // En egen mötesinspelning (mote-….wav med .mic/.sys bredvid) körs som den är, så att "Jag" och de
+    // andra fortfarande skiljs åt via kanalerna. Används för att köra om ett möte som inte blev klart.
+    const c = channelPaths(input);
+    if (/\/mote-[^/]+\.wav$/.test(input) && !/\.(mic|sys)\.wav$/.test(input) && fs.existsSync(c.mic) && fs.existsSync(c.sys)) {
+      const result = await transcribeMeeting(input, opts || {});
+      return { ...result, sourceFile: input };
+    }
     sendToMeeting('meeting:progress', { phase: 'convert', text: 'Konverterar ljudet…' });
     fs.mkdirSync(recordingsDir(), { recursive: true });
     const out = path.join(recordingsDir(), `upload-${Date.now()}.wav`);

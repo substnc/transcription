@@ -138,7 +138,10 @@ function setProgress(p) {
   const texts = { load: 'Laddar modeller…', convert: 'Konverterar ljudet…', diarize: 'Hittar talare…', transcribe: 'Transkriberar', summarize: 'Sammanfattar med lokal språkmodell…' };
   let text = p.text || texts[p.phase] || '';
   let frac = 0;
-  if (p.phase === 'transcribe' && p.total) {
+  if (p.phase === 'transcribe' && p.unit === 'percent') {
+    frac = Math.min(1, p.done / 100);
+    text = `Transkriberar, ${Math.floor(p.done)} %`;
+  } else if (p.phase === 'transcribe' && p.total) {
     frac = Math.min(1, p.done / p.total);
     text = `Transkriberar talartur ${Math.min(p.total, Math.floor(p.done) + 1)} av ${p.total}`;
   } else if (p.phase === 'diarize') frac = p.done ? 1 : 0;

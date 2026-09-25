@@ -58,3 +58,16 @@ echo '{"transcription":[{"offsets":{"from":0,"to":1000},"text":" hej"}]}' > "\${
   assert.strictEqual(args[args.indexOf('-l') + 1], 'sv');
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('whisper-cli som står still avbryts i stället för att hänga', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'speak-stall-'));
+  const fake = path.join(dir, 'whisper-cli');
+  fs.writeFileSync(fake, '#!/bin/sh\nsleep 30\n');
+  fs.chmodSync(fake, 0o755);
+  const model = path.join(dir, 'ggml-model.bin');
+  fs.writeFileSync(model, 'x');
+  const t0 = Date.now();
+  await assert.rejects(transcribeWav(model, { binary: fake, model, stallMs: 300 }), /stod still/);
+  assert.ok(Date.now() - t0 < 5000, 'avbröts snabbt');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
