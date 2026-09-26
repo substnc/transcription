@@ -85,6 +85,21 @@ Kvar att göra (större, motorn vid krasch):
 - engine-client.js: timeout vid start dödar inte processen, init skickas inte efter omstart, exit-hanteraren
   registreras efter firstRunCheck.
 
+## Diktering: snabbhet och urklipp (26 sep 2026)
+- whisper-server (whispercpp.js WhisperServer, pipeline.js dictationServer/warmDictation) håller
+  dikteringsmodellen laddad. Startas vid init, bara 127.0.0.1, reserv whisper-cli. engine.log:
+  "whisper-server redo på …" och "diktering (whisper-server): X s ljud på Y s". Byggs i CI.
+- Urklipp (paste.js): sparar text, html, rtf, bild och kopierad fil, lägger tillbaka efter 700 ms.
+  Anthon: kopierad TEXT försvann efter diktering, trots att text redan skulle läggas tillbaka. Orsak okänd.
+  logs/main.log har nu en rad "[urklipp] före: … efter ⌘V: …" per diktering. Misstanke: macOS 27:s skydd
+  för urklipp (läsning ger tomt) eller en urklippshanterare. Kolla loggen efter Anthons test.
+- Idé om det inte räcker: skriva texten direkt med tangenthändelser (CGEvent) utan urklipp.
+
+## Ett fönster (skisser klara, inte byggt)
+Designfilen, "Ett fönster: …": mötet som sida i huvudfönstret med ← Tillbaka, huvudsidan visar möte pågår /
+transkriberar. Stäng fönstret = göm, inspelning fortsätter. Plan: BaseWindow + WebContentsView (home och
+meeting som två vyer som byts, så mötessidans tillstånd ligger kvar).
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.
