@@ -22,9 +22,9 @@ jobs:
         run: |
           git clone -q --depth 1 --branch v1.8.2 https://github.com/ggml-org/whisper.cpp.git /tmp/wcpp
           cmake -S /tmp/wcpp -B /tmp/wcpp/build -DGGML_METAL=ON -DGGML_METAL_EMBED_LIBRARY=ON -DBUILD_SHARED_LIBS=OFF \
-            -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=OFF -DCMAKE_BUILD_TYPE=Release
-          cmake --build /tmp/wcpp/build --config Release -j 4 --target whisper-cli
-          mkdir -p resources/bin && cp /tmp/wcpp/build/bin/whisper-cli resources/bin/ && ls -la resources/bin
+            -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_SERVER=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/wcpp/build --config Release -j 4 --target whisper-cli whisper-server
+          mkdir -p resources/bin && cp /tmp/wcpp/build/bin/whisper-cli /tmp/wcpp/build/bin/whisper-server resources/bin/ && ls -la resources/bin
           ./resources/bin/whisper-cli --help | head -3
       - name: Testa Metal-motorn på riktigt (tiny-modell + svenskt TTS-tal)
         run: |
@@ -42,6 +42,16 @@ jobs:
           w.transcribeWav('tts.wav', { binary: 'resources/bin/whisper-cli', model: 'ggml-tiny.bin', language: 'sv' }).then((segs) => {
             console.log('Metal-motorn:', JSON.stringify(segs), 'ms', Date.now() - t0);
             if (!segs.length) { console.error('inget resultat'); process.exit(1); }
+          }).then(async () => {
+            // Dikteringens whisper-server: modellen laddad en gång, två dikteringar i rad.
+            const srv = new w.WhisperServer({ binary: 'resources/bin/whisper-server', model: 'ggml-tiny.bin', threads: 4 });
+            for (let k = 0; k < 2; k++) {
+              const t = Date.now();
+              const segs = await srv.transcribe(x, { language: 'sv', prompt: 'Speak.' });
+              console.log(`whisper-server diktering ${k + 1}:`, JSON.stringify(segs), 'ms', Date.now() - t);
+              if (!segs.length) throw new Error('whisper-server gav inget resultat');
+            }
+            srv.stop();
           }).catch((e) => { console.error(e); process.exit(1); });
           EOF
       - name: Bygg dmg

@@ -25,6 +25,7 @@ const methods = {
     settings = { ...settings, ...p };
     pipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: settings.whisper, numThreads: settings.numThreads, whisperCli: settings.whisperCli });
     livePipeline = null;
+    pipeline.warmDictation();
     return models.status(settings.modelsDir);
   },
   async configure(p) {
@@ -188,6 +189,9 @@ const methods = {
     return { ...heuristicSummary(segments), by: 'rules' };
   },
 };
+
+// whisper-server ska inte leva kvar när motorn avslutas.
+process.on('exit', () => { if (pipeline && pipeline.server) pipeline.server.stop(); });
 
 process.on('uncaughtException', (e) => console.error('uncaughtException', e && e.stack ? e.stack : e));
 process.on('unhandledRejection', (e) => console.error('unhandledRejection', e && e.stack ? e.stack : e));

@@ -100,4 +100,104 @@ async function transcribeSamples(samples, opts) {
   }
 }
 
-module.exports = { findBinary, parseResult, vocabularyPrompt, transcribeWav, transcribeSamples };
+// ---- Diktering via whisper-server: modellen laddas en gång och ligger kvar ----
+// whisper-cli laddar hela modellen vid varje diktering. whisper-server håller den laddad, så en diktering
+// blir bara själva transkriberingen. Servern lyssnar bara på 127.0.0.1 (den här datorn), inget går ut.
+
+function findServer(cliPath) {
+  const candidates = [
+    process.env.SPEAK_WHISPER_SERVER,
+    cliPath ? path.join(path.dirname(cliPath), 'whisper-server') : null,
+    process.resourcesPath ? path.join(process.resourcesPath, 'bin', 'whisper-server') : null,
+    path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-server'),
+  ].filter(Boolean);
+  return candidates.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } }) || null;
+}
+
+// 16 kHz mono 16-bit WAV i minnet.
+function wavBuffer(samples, sampleRate = audio.SAMPLE_RATE) {
+  const data = Buffer.alloc(samples.length * 2);
+  for (let i = 0; i < samples.length; i++) {
+    const x = Math.max(-1, Math.min(1, samples[i]));
+    data.writeInt16LE(Math.round(x < 0 ? x * 32768 : x * 32767), i * 2);
+  }
+  const h = Buffer.alloc(44);
+  h.write('RIFF', 0); h.writeUInt32LE(36 + data.length, 4); h.write('WAVE', 8); h.write('fmt ', 12);
+  h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(sampleRate, 24);
+  h.writeUInt32LE(sampleRate * 2, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(data.length, 40);
+  return Buffer.concat([h, data]);
+}
+
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const srv = require('net').createServer();
+    srv.unref();
+    srv.on('error', reject);
+    srv.listen(0, '127.0.0.1', () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
+  });
+}
+
+class WhisperServer {
+  constructor({ binary, model, threads }) {
+    this.binary = binary;
+    this.model = model;
+    this.threads = threads;
+    this.proc = null;
+    this.ready = null;
+  }
+
+  start() {
+    if (this.ready) return this.ready;
+    this.ready = (async () => {
+      this.port = await freePort();
+      const t0 = Date.now();
+      const args = ['-m', this.model, '--host', '127.0.0.1', '--port', String(this.port), '-t', String(this.threads || 4), '-bs', '5', '-bo', '5'];
+      const p = spawn(this.binary, args);
+      this.proc = p;
+      let err = '';
+      p.stderr.on('data', (d) => { err = (err + d.toString()).slice(-4000); });
+      p.stdout.on('data', () => {});
+      p.on('exit', (code) => {
+        if (this.proc === p) { this.proc = null; this.ready = null; }
+        if (code) console.error(`[motor] whisper-server avslutades (${code}): ${err.trim().split('\n').slice(-2).join(' | ')}`);
+      });
+      // Vänta tills servern svarar (modellen är då laddad).
+      for (let i = 0; i < 600; i++) {
+        if (!this.proc) throw new Error(`whisper-server startade inte: ${err.trim().split('\n').slice(-2).join(' | ')}`);
+        try {
+          const r = await fetch(`http://127.0.0.1:${this.port}/`, { signal: AbortSignal.timeout(1000) });
+          if (r.ok) break;
+        } catch { /* inte uppe än */ }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      console.error(`[motor] whisper-server redo på ${((Date.now() - t0) / 1000).toFixed(1)} s (${path.basename(this.model)})`);
+    })().catch((e) => { this.stop(); throw e; });
+    return this.ready;
+  }
+
+  async transcribe(samples, { language = 'auto', prompt } = {}) {
+    await this.start();
+    const form = new FormData();
+    form.append('file', new Blob([wavBuffer(samples)], { type: 'audio/wav' }), 'diktering.wav');
+    form.append('response_format', 'verbose_json');
+    form.append('language', language === 'auto' ? 'auto' : language);
+    form.append('temperature', '0');
+    if (prompt) form.append('prompt', prompt);
+    const r = await fetch(`http://127.0.0.1:${this.port}/inference`, { method: 'POST', body: form, signal: AbortSignal.timeout(120000) });
+    if (!r.ok) throw new Error(`whisper-server svarade ${r.status}`);
+    const json = await r.json();
+    if (json.error) throw new Error(`whisper-server: ${json.error}`);
+    return (json.segments || [])
+      .map((x) => ({ start: Number(x.start) || 0, end: Number(x.end) || 0, text: String(x.text || '').trim() }))
+      .filter((x) => x.text);
+  }
+
+  stop() {
+    const p = this.proc;
+    this.proc = null;
+    this.ready = null;
+    if (p) try { p.kill(); } catch {}
+  }
+}
+
+module.exports = { findBinary, findServer, WhisperServer, wavBuffer, parseResult, vocabularyPrompt, transcribeWav, transcribeSamples };

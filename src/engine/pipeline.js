@@ -239,12 +239,44 @@ class Pipeline {
     return segs;
   }
 
+  // Dikteringens whisper-server för den här ggml-modellen. Byts modellen startas en ny. null om servern saknas.
+  dictationServer(model) {
+    if (!model) return null;
+    if (this.server && this.server.model === model) return this.server;
+    if (this.server) this.server.stop();
+    const bin = whispercpp.findServer(whispercpp.findBinary(this.whisperCli));
+    this.server = bin ? new whispercpp.WhisperServer({ binary: bin, model, threads: this.numThreads }) : null;
+    return this.server;
+  }
+
+  // Laddar dikteringsmodellen i förväg, så att första dikteringen också går snabbt.
+  warmDictation() {
+    const s = this.dictationServer(this.ggmlModel());
+    if (s) s.start().catch((e) => console.error(`[motor] whisper-server: ${e.message}`));
+  }
+
   // ---- whisper.cpp-vägen (Metal) ----
   async dictateCpp(samples, { policy, prompt } = {}) {
     const { language = 'auto', primary = 'sv' } = policy || {};
     const t0 = Date.now();
-    const segs = await whispercpp.transcribeSamples(samples, { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt });
-    console.error(`[motor] diktering (whisper.cpp): ${(samples.length / SAMPLE_RATE).toFixed(1)} s ljud på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+    const model = this.ggmlModel();
+    const lang = language === 'auto' ? 'auto' : language;
+    let segs = null;
+    let via = 'whisper-server';
+    const server = this.dictationServer(model);
+    if (server) {
+      try {
+        segs = await server.transcribe(samples, { language: lang, prompt });
+      } catch (e) {
+        console.error(`[motor] whisper-server misslyckades, kör whisper-cli i stället: ${e.message}`);
+        server.stop();
+      }
+    }
+    if (!segs) {
+      via = 'whisper-cli';
+      segs = await whispercpp.transcribeSamples(samples, { binary: this.whisperCli, model, language: lang, threads: this.numThreads, prompt });
+    }
+    console.error(`[motor] diktering (${via}): ${(samples.length / SAMPLE_RATE).toFixed(1)} s ljud på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     const kept = segs.map((s) => ({ ...s, text: tidy(s.text), lang: language === 'auto' ? primary : language })).filter((s) => !isHallucination(s.text));
     return { text: kept.map((s) => s.text).join(' ').trim(), languages: [...new Set(kept.map((s) => s.lang))], segments: kept };
   }

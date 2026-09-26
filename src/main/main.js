@@ -33,6 +33,17 @@ const modelsDir = process.env.DIKTERA_MODELS_DIR || path.join(userData, 'models'
 const recordingsDir = () => settings.get('recordingsDir') || path.join(userData, 'recordings');
 const logsDir = path.join(userData, 'logs');
 const engine = new EngineClient(path.join(logsDir, 'engine.log'));
+// Huvudprocessens meddelanden sparas i logs/main.log (urklipp, fönster, fel), så att de går att felsöka.
+{
+  fs.mkdirSync(logsDir, { recursive: true });
+  const mainLog = path.join(logsDir, 'main.log');
+  try { if (fs.statSync(mainLog).size > 2e6) fs.rmSync(mainLog, { force: true }); } catch {}
+  const orig = console.error.bind(console);
+  console.error = (...a) => {
+    orig(...a);
+    try { fs.appendFileSync(mainLog, `${new Date().toISOString()} ${a.map((x) => (x && x.stack) || String(x)).join(' ')}\n`); } catch {}
+  };
+}
 const hotkey = new Hotkey();
 
 let tray = null;
