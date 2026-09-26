@@ -174,7 +174,7 @@ function showResult(r) {
   renderInboxes();
   $('saveStatus').textContent = '';
   show('result');
-  $('segments').querySelectorAll('textarea').forEach(fitText);
+  fitAll();
 }
 window.addEventListener('resize', () => $('segments').querySelectorAll('textarea').forEach(fitText));
 
@@ -249,6 +249,13 @@ function fitText(ta) {
   ta.style.height = 'auto';
   ta.style.height = `${ta.scrollHeight}px`;
 }
+// Alla textrutor på en gång: först nollställ, sedan läs, sedan sätt, så att sidan bara räknas om en gång.
+function fitAll() {
+  const tas = [...$('segments').querySelectorAll('textarea')];
+  tas.forEach((ta) => (ta.style.height = 'auto'));
+  const h = tas.map((ta) => ta.scrollHeight);
+  tas.forEach((ta, k) => (ta.style.height = `${h[k]}px`));
+}
 
 function togglePick(i, shift) {
   if (shift && state.anchor !== null) {
@@ -285,13 +292,27 @@ function pillButtons(items) {
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+// Avmarkerar bara de här raderna. Markeringar i andra rutor ligger kvar.
+function unpick(indices) {
+  indices.forEach((k) => state.picked.delete(k));
+  state.anchor = null;
+}
+
 // Tar bort rader (index) och gör om sammanfattningen. Talare som inte har någon rad kvar försvinner.
+// Andra markerade rader förblir markerade (deras index flyttas med).
 function removeRows(indices) {
   const drop = new Set(indices);
-  state.result.segments = state.result.segments.filter((_, k) => !drop.has(k));
-  const left = new Set(state.result.segments.map((s) => s.speaker));
+  const kept = [];
+  const moved = new Set();
+  state.result.segments.forEach((seg, k) => {
+    if (drop.has(k)) return;
+    if (state.picked.has(k)) moved.add(kept.length);
+    kept.push(seg);
+  });
+  state.result.segments = kept;
+  const left = new Set(kept.map((s) => s.speaker));
   state.result.speakers = state.result.speakers.filter((s) => left.has(s));
-  state.picked.clear();
+  state.picked = moved;
   state.anchor = null;
   renderSpeakers();
   renderSegments();
@@ -315,7 +336,7 @@ function renderSegments() {
       const rows = Array.from({ length: n }, (_, k) => i + k);
       g.appendChild(pillButtons([
         [`Ta bort ${n} ${n === 1 ? 'rad' : 'rader'}`, true, () => removeRows(rows)],
-        ['Avbryt', false, () => { state.picked.clear(); state.anchor = null; renderSegments(); }],
+        ['Avbryt', false, () => { unpick(rows); renderSegments(); }],
       ]));
       el.appendChild(g);
       i = j + 1;
@@ -342,11 +363,10 @@ function renderSegments() {
         more.onclick = () => { state.openClips.add(id); renderSegments(); };
         g.appendChild(more);
       }
-      const clearPick = () => { state.picked.clear(); state.anchor = null; };
       g.appendChild(pillButtons(m ? [
-        [`Behåll ${m} markerade`, true, () => { mine.forEach((k) => delete segs[k].aside); clearPick(); renderSegments(); resummarize(); }],
+        [`Behåll ${m} markerade`, true, () => { mine.forEach((k) => delete segs[k].aside); unpick(mine); renderSegments(); resummarize(); }],
         [`Ta bort ${m} markerade`, false, () => removeRows(mine)],
-        ['Avbryt', false, () => { clearPick(); renderSegments(); }],
+        ['Avbryt', false, () => { unpick(mine); renderSegments(); }],
       ] : [
         ['Ta bort', true, () => removeRows(rows)],
         ['Behåll', false, () => { rows.forEach((k) => delete segs[k].aside); renderSegments(); resummarize(); }],
@@ -358,7 +378,7 @@ function renderSegments() {
     el.appendChild(segRow(segs[i], i));
     i++;
   }
-  el.querySelectorAll('textarea').forEach(fitText);
+  fitAll();
 }
 
 function fillSummary(s) {
