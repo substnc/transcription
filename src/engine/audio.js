@@ -75,8 +75,10 @@ function readWav(filePath) {
   let off = 12;
   while (off < b.length - 8) {
     const id = b.toString('ascii', off, off + 4);
-    const size = b.readUInt32LE(off + 4);
+    let size = b.readUInt32LE(off + 4);
     if (id === 'data') {
+      // En inspelning som avbröts (krasch) har aldrig fått rätt storlek i huvudet: läs allt som finns i filen.
+      if (size === 0 || off + 8 + size > b.length) size = b.length - off - 8;
       const n = Math.floor(size / (bits / 8) / channels);
       const out = new Float32Array(n);
       for (let i = 0; i < n; i++) {
@@ -88,6 +90,26 @@ function readWav(filePath) {
     off += 8 + size + (size % 2);
   }
   throw new Error('Ingen data-chunk i WAV-filen');
+}
+
+// Lagar huvudet på en WAV som aldrig blev avslutad (krasch mitt i en inspelning): storlekarna sätts efter
+// hur mycket ljud som faktiskt finns, så att whisper-cli, ffmpeg och Python kan läsa hela filen.
+function repairWav(filePath) {
+  const fd = fs.openSync(filePath, 'r+');
+  try {
+    const size = fs.fstatSync(fd).size;
+    const head = Buffer.alloc(44);
+    fs.readSync(fd, head, 0, 44, 0);
+    if (size < 44 || head.toString('ascii', 0, 4) !== 'RIFF' || head.toString('ascii', 36, 40) !== 'data') return false;
+    const data = size - 44;
+    if (head.readUInt32LE(40) === data) return false;
+    const b = Buffer.alloc(4);
+    b.writeUInt32LE(36 + data); fs.writeSync(fd, b, 0, 4, 4);
+    b.writeUInt32LE(data); fs.writeSync(fd, b, 0, 4, 40);
+    return true;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 // Konverterar valfri ljud-/videofil till 16 kHz mono WAV med ffmpeg (körs lokalt).
@@ -115,4 +137,4 @@ function concatFloat32(chunks) {
   return out;
 }
 
-module.exports = { SAMPLE_RATE, WavWriter, writeWav, readWav, convertToWav, concatFloat32, ffmpegPath };
+module.exports = { SAMPLE_RATE, WavWriter, writeWav, readWav, repairWav, convertToWav, concatFloat32, ffmpegPath };

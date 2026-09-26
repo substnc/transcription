@@ -255,10 +255,13 @@ class Pipeline {
     const durationSec = samples.length / SAMPLE_RATE;
     const { language = 'auto', primary = 'sv' } = policy || {};
     console.error(`[motor] möte (whisper.cpp): ${durationSec.toFixed(1)} s, språk=${language}, antal talare=${speakerCount || 'auto'}`);
+    // Modellen bestäms nu: dikterar du medan talarna letas fram byter dikteringen modell, och mötet ska
+    // ändå köras med mötets modell.
+    const model = this.ggmlModel();
     const t0 = Date.now();
     const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
     const t1 = Date.now();
-    const opts = { binary: this.whisperCli, model: this.ggmlModel(), language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt };
+    const opts = { binary: this.whisperCli, model, language: language === 'auto' ? 'auto' : language, threads: this.numThreads, prompt };
     // Långa möten delas i stycken om cirka tio minuter, klippta i en tyst stund. Då kan ett stycke som
     // fastnar inte stoppa hela mötet: det avbryts, körs om enklare, och resten fortsätter.
     const parts = splitLong(samples);
@@ -318,11 +321,13 @@ class Pipeline {
     const samples = wavPath ? audio.readWav(wavPath).samples : input;
     const durationSec = samples.length / SAMPLE_RATE;
     console.error(`[motor] möte: ${durationSec.toFixed(1)} s ljud, talarseparering=${diarize}, antal talare=${speakerCount || 'auto'}`);
+    const name = this.whisperName; // dikterar du under tiden får mötet ändå sin egen modell
     const t0 = Date.now();
 
     const { diar, via } = await this.speakerTimeline({ wavPath, samples, diarize, diarizer, channels, speakerCount, onProgress });
 
     const t1 = Date.now();
+    this.setWhisper(name);
     this.ensureRecognizer();
     const pieces = this.splitSpeech(samples);
     let segs = [];

@@ -14,9 +14,14 @@ const HALLUCINATIONS = [
 function isHallucination(text) {
   const t = (text || '').trim();
   if (!t) return true;
-  if (HALLUCINATIONS.some((re) => re.test(t))) return true;
-  // Samma korta tecken- eller ordsekvens upprepad många gånger.
-  if (/(.{1,12}?)\1{4,}/.test(t)) return true;
+  // Fraserna gäller bara korta stycken. I en lång talartur är "www." eller "textning" riktigt tal, och hela
+  // turen får inte försvinna för att någon nämner en webbadress.
+  const words = t.split(/\s+/).length;
+  if (words <= 7 && HALLUCINATIONS.some((re) => re.test(t))) return true;
+  // Samma korta tecken- eller ordsekvens upprepad många gånger, och den upprepningen är det mesta av texten
+  // (inte "1000000 kronor" mitt i en mening).
+  const rep = t.match(/(.{1,12}?)\1{4,}/);
+  if (rep && rep[0].length >= t.length * 0.6) return true;
   return false;
 }
 

@@ -11,7 +11,7 @@ const { Hotkey, KEY_LABELS, TOGGLE_SHORTCUT } = require('./hotkey');
 const { pasteText, accessibilityGranted } = require('./paste');
 const windows = require('./windows');
 const art = require('./icon-art');
-const { WavWriter, convertToWav, concatFloat32 } = require('../engine/audio');
+const { WavWriter, convertToWav, concatFloat32, repairWav } = require('../engine/audio');
 const { buildMeetingNote } = require('../engine/markdown');
 
 // Appen hette "sub.stnc® - Speak" innan den blev "Speak". Modeller (flera GB) och inställningar ligger kvar
@@ -221,8 +221,14 @@ function writeChannels(mic, sys) {
   rec.wavMic.write(mic);
   rec.wavSys.write(sys);
 }
+// Ligger filen i inspelningsmappen? Filer du själv laddat upp från en annan mapp får aldrig raderas.
+function inRecordings(p) {
+  const rel = path.relative(path.resolve(recordingsDir()), path.resolve(p));
+  return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
 function rmRecording(p) {
-  if (!p) return;
+  if (!p || !inRecordings(p)) return;
   const c = channelPaths(p);
   for (const f of [p, c.mic, c.sys]) fs.rmSync(f, { force: true });
 }
@@ -380,7 +386,11 @@ function registerIpc() {
     if (r.seconds < 1) throw new Error('Inspelningen blev för kort');
     // Livetexten används som den är om det är valt och den hann med hela mötet. Annars en ny körning.
     const segs = await r.liveSegs;
-    if (settings.get('meetingSource') !== 'full' && segs && segs.length) return meetingFromLive(r.wavPath, segs, opts || {});
+    // Livetexten är bara svenska. Har du valt engelska, eller svenska och engelska, för just det här mötet
+    // körs hela mötet om med mötesmodellen.
+    const lang = opts && opts.language;
+    const liveOk = lang !== 'en' && lang !== 'auto';
+    if (settings.get('meetingSource') !== 'full' && liveOk && segs && segs.length) return meetingFromLive(r.wavPath, segs, opts || {});
     return transcribeMeeting(r.wavPath, opts || {});
   });
   ipcMain.handle('meeting:cancel', () => {
@@ -400,6 +410,8 @@ function registerIpc() {
     // andra fortfarande skiljs åt via kanalerna. Används för att köra om ett möte som inte blev klart.
     const c = channelPaths(input);
     if (/\/mote-[^/]+\.wav$/.test(input) && !/\.(mic|sys)\.wav$/.test(input) && fs.existsSync(c.mic) && fs.existsSync(c.sys)) {
+      // Blev inspelningen avbruten av en krasch saknar filerna rätt storlek i huvudet. Laga dem först.
+      for (const f of [input, c.mic, c.sys]) { try { repairWav(f); } catch (e) { console.error('[speak] kunde inte laga', f, e.message); } }
       const result = await transcribeMeeting(input, opts || {});
       return { ...result, sourceFile: input };
     }
@@ -434,7 +446,7 @@ function registerIpc() {
     return target;
   });
   ipcMain.handle('meeting:discard-audio', (_e, p) => {
-    if (p && p.startsWith(recordingsDir())) rmRecording(p);
+    if (p) rmRecording(p);
     return true;
   });
 }
@@ -442,7 +454,8 @@ function registerIpc() {
 // ---------- Fönster och meny ----------
 function openMeeting(opts = {}) {
   if (meetingWin && !meetingWin.isDestroyed()) {
-    if (opts.upload) meetingWin.webContents.executeJavaScript('upload()').catch(() => {});
+    // Pågår en inspelning får uppladdningen inte ta över fönstret: visa bara fönstret.
+    if (opts.upload && rec.mode !== 'meeting') meetingWin.webContents.executeJavaScript('upload()').catch(() => {});
     return meetingWin.focus();
   }
   meetingWin = windows.createMeeting(opts);
@@ -561,7 +574,7 @@ function cleanRecordings() {
   const old = Date.now() - 24 * 3600 * 1000;
   for (const f of fs.readdirSync(dir)) {
     const p = path.join(dir, f);
-    try { if (f.endsWith('.wav') && fs.statSync(p).mtimeMs < old) fs.rmSync(p, { force: true }); } catch {}
+    try { if (/^(mote-|upload-).*\.wav$/.test(f) && fs.statSync(p).mtimeMs < old) fs.rmSync(p, { force: true }); } catch {}
   }
 }
 

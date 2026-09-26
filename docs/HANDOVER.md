@@ -71,6 +71,20 @@ Problem (Anthon): videoklipp som spelas upp under mötet kommer med i transkript
   om sammanfattningen. Skisser: designfilen, "Resultat: modellen hittar video" och "Resultat: markera och ta bort".
 - Svaghet: sägs inget högt om klippet kan modellen missa det. Idé för senare: knapp "Video spelas" under inspelning.
 
+## Genomgång av hela appen (26 sep 2026)
+Fixat: hallucinationsfiltret tog bort långa talartur med "www."/"textning"/stora tal (gäller nu bara korta
+stycken), kraschad inspelning gav tomt möte (readWav läser allt, repairWav lagar huvudet vid uppladdning),
+diktering under mötesbearbetning bytte mötets modell, språkval engelska/båda ignorerades med livetext (kör nu
+om hela mötet), sparad anteckning kunde radera uppladdade originalfiler (raderar bara i inspelningsmappen),
+städningen vid start raderade alla .wav i mappen (nu bara mote-/upload-), "Ladda upp fil" under inspelning tog
+över fönstret.
+Kvar att göra (större, motorn vid krasch):
+- Livetexten tappar resten av mötet om motorn startar om mitt i (main.js pumpLive, server.js liveFeed):
+  markera live.failed och kör transcribeMeeting i stället.
+- Kraschar det dolda inspelningsfönstret fortsätter tiduret men inget spelas in (main.js ~606).
+- engine-client.js: timeout vid start dödar inte processen, init skickas inte efter omstart, exit-hanteraren
+  registreras efter firstRunCheck.
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.
