@@ -90,9 +90,9 @@ Kvar att göra (större, motorn vid krasch):
   dikteringsmodellen laddad. Startas vid init, bara 127.0.0.1, reserv whisper-cli. engine.log:
   "whisper-server redo på …" och "diktering (whisper-server): X s ljud på Y s". Byggs i CI.
 - Urklipp (paste.js): sparar text, html, rtf, bild och kopierad fil, lägger tillbaka efter 700 ms.
-  Anthon: kopierad TEXT försvann efter diktering, trots att text redan skulle läggas tillbaka. Orsak okänd.
-  logs/main.log har nu en rad "[urklipp] före: … efter ⌘V: …" per diktering. Misstanke: macOS 27:s skydd
-  för urklipp (läsning ger tomt) eller en urklippshanterare. Kolla loggen efter Anthons test.
+  ORSAK HITTAD 27 sep: Electron 44:s clipboard är asynkront (readText/read/write/writeText ger löften).
+  Gamla koden jämförde ett löfte med texten, så urklippet lades aldrig tillbaka. Nu await överallt, read() +
+  ClipboardItem sparar alla typer. Provat i Electron (Linux). logs/main.log: "[urklipp] före: … efter ⌘V: …".
 - Idé om det inte räcker: skriva texten direkt med tangenthändelser (CGEvent) utan urklipp.
 
 ## Ett fönster (byggt 27 sep 2026)
