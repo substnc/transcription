@@ -4,9 +4,22 @@ const api = window.diktera;
 const state = { result: null, speakerNames: {}, customFolder: null, settings: null, audioPath: null, consent: false, startedAt: null };
 let timerHandle = null;
 
+// Mötessidans läge rapporteras till huvudsidan och menyn: spelar in, transkriberar, klart eller inget.
+let current = 'idle';
+function report(extra = {}) {
+  const title = $('title').value.trim();
+  const st = current === 'recording' ? 'recording' : current === 'processing' ? 'processing' : current === 'result' && !state.saved ? 'done' : 'idle';
+  api.meeting.report({ state: st, title, startedAt: state.startedAt, ...extra });
+}
+
 function show(section) {
   for (const id of ['idle', 'recording', 'processing', 'result']) $(id).classList.toggle('hidden', id !== section);
+  current = section;
+  report();
 }
+
+// Tillbaka till huvudsidan. Mötet ligger kvar här, inspelningen fortsätter.
+$('btnBack').onclick = () => api.open.home();
 
 function fmt(sec) {
   const s = Math.floor(sec);
@@ -26,6 +39,7 @@ function meetingOpts() {
 
 function fail(msg) {
   clearInterval(timerHandle);
+  if (current === 'recording' || current === 'processing') show('idle');
   $('errorText').textContent = msg;
   $('errorBox').classList.remove('hidden');
   show(state.result ? 'result' : 'idle');
@@ -154,6 +168,7 @@ function setProgress(p) {
   } else if (p.phase === 'summarize') frac = 1;
   $('progressBar').style.width = `${Math.round(frac * 100)}%`;
   $('progressText').textContent = text;
+  if (current === 'processing') report({ frac, text });
 }
 api.meeting.onProgress(setProgress);
 
@@ -469,6 +484,7 @@ $('btnSave').onclick = async () => {
     const a = document.createElement('button'); a.className = 'small'; a.textContent = 'Visa i Finder'; a.onclick = () => api.open.folder(p);
     const b = document.createElement('button'); b.className = 'small'; b.textContent = 'Öppna i Obsidian'; b.onclick = () => api.open.path(p);
     state.saved = true;
+    report();
     $('saveStatus').append(`Sparad: ${p.split('/').pop()} `, a, ' ', b);
   } catch (e) {
     $('saveStatus').textContent = 'Kunde inte spara: ' + e.message;

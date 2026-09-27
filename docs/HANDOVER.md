@@ -95,10 +95,14 @@ Kvar att göra (större, motorn vid krasch):
   för urklipp (läsning ger tomt) eller en urklippshanterare. Kolla loggen efter Anthons test.
 - Idé om det inte räcker: skriva texten direkt med tangenthändelser (CGEvent) utan urklipp.
 
-## Ett fönster (skisser klara, inte byggt)
-Designfilen, "Ett fönster: …": mötet som sida i huvudfönstret med ← Tillbaka, huvudsidan visar möte pågår /
-transkriberar. Stäng fönstret = göm, inspelning fortsätter. Plan: BaseWindow + WebContentsView (home och
-meeting som två vyer som byts, så mötessidans tillstånd ligger kvar).
+## Ett fönster (byggt 27 sep 2026)
+windows.createMain: BaseWindow med två WebContentsView (home, meeting), en syns åt gången, båda lever kvar.
+Inställningar laddas i home-vyn (?from=home). Mötessidan har ← Tillbaka och rapporterar sitt läge
+(meeting:status: idle/recording/processing/done) till main, som skickar det till huvudsidan (meeting:state)
+och bygger om menyn (● Möte spelas in, Visa mötet, Stoppa och transkribera). Stoppa från huvudsidan klickar
+btnStop i mötesvyn. Röda knappen gömmer fönstret. Avsluta mitt i ett möte eller med osparat resultat frågar
+först. Om Speak är fortfarande ett eget litet fönster. Provat i Electron under Linux (skärmbilder), inte på Mac:
+kolla att fönstret går att dra i överkanten (-webkit-app-region i WebContentsView).
 
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,

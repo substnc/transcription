@@ -33,6 +33,7 @@
   .steps .chip.active { color: var(--ink); }
   .steps .chip.active::before { background: var(--ink); box-shadow: none; }
   #processing .bar { max-width: 640px; }
+  .back { position: fixed; top: 10px; left: 84px; z-index: 5; -webkit-app-region: no-drag; }
   .working { display: flex; align-items: center; gap: 20px; }
 
   .two { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 46px; align-items: start; flex-grow: 1; }
@@ -92,6 +93,7 @@
 </style></head>
 <body>
 <div class="drag"></div>
+<button class="small back" id="btnBack">← Tillbaka</button>
 <div id="errorBox" class="card hidden"><span id="errorText"></span><button id="errorClose" class="small">Stäng</button></div>
 
 <section id="idle">

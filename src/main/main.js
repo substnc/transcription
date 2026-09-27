@@ -49,9 +49,11 @@ const hotkey = new Hotkey();
 let tray = null;
 let captureWin = null;
 let overlayWin = null;
-let meetingWin = null;
-let settingsWin = null;
-let homeWin = null;
+// Ett enda fönster med två vyer: huvudsidan (där Inställningar också visas) och mötet. Se windows.createMain.
+let ui = null;
+let quitting = false;
+// Mötessidans läge, som sidan själv rapporterar: idle, recording eller processing. Visas på huvudsidan och i menyn.
+let meetingState = { state: 'idle' };
 let aboutWin = null;
 
 // Tillstånd för ljudinspelning. mode: null | 'dictation' | 'meeting'
@@ -92,12 +94,21 @@ function overlay(state, text) {
   }
 }
 
-function sendToMeeting(channel, payload) {
-  if (meetingWin && !meetingWin.isDestroyed()) meetingWin.webContents.send(channel, payload);
+function viewContents(name) {
+  const v = ui && !ui.win.isDestroyed() ? ui.view(name) : null;
+  return v && !v.webContents.isDestroyed() ? v.webContents : null;
 }
-// Inställningar kan också visas i huvudfönstret, så nedladdningsförlopp skickas dit med.
+function mainWindow() {
+  return ui && !ui.win.isDestroyed() ? ui.win : null;
+}
+function sendToMeeting(channel, payload) {
+  const wc = viewContents('meeting');
+  if (wc) wc.send(channel, payload);
+}
+// Inställningar visas i huvudsidans vy, så nedladdningsförlopp skickas dit.
 function sendToSettings(channel, payload) {
-  for (const w of [settingsWin, homeWin]) if (w && !w.isDestroyed()) w.webContents.send(channel, payload);
+  const wc = viewContents('home');
+  if (wc) wc.send(channel, payload);
 }
 
 function captureSend(msg) {
@@ -354,7 +365,7 @@ function registerIpc() {
   });
   ipcMain.handle('models:remove', (_e, { name }) => engine.call(name === 'nemotron' ? 'removeNemotron' : 'removeWhisper', { name }));
   ipcMain.handle('models:import', async () => {
-    const r = await dialog.showOpenDialog(settingsWin, { title: 'Välj modellmapp eller .tar.bz2', properties: ['openFile', 'openDirectory'], filters: [{ name: 'Modell', extensions: ['bz2', 'tar'] }] });
+    const r = await dialog.showOpenDialog(mainWindow(), { title: 'Välj modellmapp eller .tar.bz2', properties: ['openFile', 'openDirectory'], filters: [{ name: 'Modell', extensions: ['bz2', 'tar'] }] });
     if (r.canceled || !r.filePaths.length) return null;
     const res = await engine.call('importWhisper', { sourcePath: r.filePaths[0] });
     if (!settings.get('whisperMeeting')) settings.set({ whisperMeeting: res.name });
@@ -385,6 +396,11 @@ function registerIpc() {
   ipcMain.handle('open:meeting', (_e, opts) => openMeeting(opts || {}));
   ipcMain.handle('open:settings', () => openSettings());
   ipcMain.handle('open:about', () => openAbout());
+  ipcMain.handle('open:home', () => openHome());
+  ipcMain.on('meeting:status', (_e, st) => setMeetingState(st));
+  ipcMain.handle('meeting:state', () => meetingState);
+  // Stoppa från huvudsidan eller menyn: mötessidan gör det, så att resultatet hamnar där.
+  ipcMain.handle('meeting:stop-from-home', () => stopFromOutside());
   ipcMain.handle('app:info', () => ({ version: app.getVersion() }));
   ipcMain.handle('test:dictate', async () => { await startDictation(); });
   ipcMain.handle('test:stop', async () => { await stopDictation(); });
@@ -410,7 +426,7 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('meeting:upload', async (_e, opts) => {
-    const r = await dialog.showOpenDialog(meetingWin, {
+    const r = await dialog.showOpenDialog(mainWindow(), {
       title: 'Välj ljud- eller videofil',
       properties: ['openFile'],
       filters: [{ name: 'Ljud och video', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'webm', 'mp4', 'mov', 'aiff', 'caf'] }],
@@ -435,13 +451,13 @@ function registerIpc() {
   });
   ipcMain.handle('meeting:summarize', (_e, { segments }) => engine.call('summarize', { segments, useLlm: settings.get('useLlm') }));
   ipcMain.handle('settings:choose-recordings', async () => {
-    const r = await dialog.showOpenDialog(settingsWin, { title: 'Mapp för inspelningar', properties: ['openDirectory', 'createDirectory'] });
+    const r = await dialog.showOpenDialog(mainWindow(), { title: 'Mapp för inspelningar', properties: ['openDirectory', 'createDirectory'] });
     if (r.canceled) return null;
     settings.set({ recordingsDir: r.filePaths[0] });
     return r.filePaths[0];
   });
   ipcMain.handle('meeting:choose-folder', async () => {
-    const r = await dialog.showOpenDialog(meetingWin, { title: 'Välj mapp att spara i', properties: ['openDirectory', 'createDirectory'] });
+    const r = await dialog.showOpenDialog(mainWindow(), { title: 'Välj mapp att spara i', properties: ['openDirectory', 'createDirectory'] });
     return r.canceled ? null : r.filePaths[0];
   });
   ipcMain.handle('meeting:save', async (_e, { note, folder }) => {
@@ -463,29 +479,45 @@ function registerIpc() {
 }
 
 // ---------- Fönster och meny ----------
-function openMeeting(opts = {}) {
-  if (meetingWin && !meetingWin.isDestroyed()) {
-    // Pågår en inspelning får uppladdningen inte ta över fönstret: visa bara fönstret.
-    if (opts.upload && rec.mode !== 'meeting') meetingWin.webContents.executeJavaScript('upload()').catch(() => {});
-    return meetingWin.focus();
+function mainShell() {
+  if (!ui || ui.win.isDestroyed()) {
+    ui = windows.createMain();
+    // Röda knappen gömmer bara fönstret. Inspelning, transkribering och resultat ligger kvar.
+    ui.win.on('close', (e) => { if (!quitting) { e.preventDefault(); ui.win.hide(); } });
+    ui.win.on('closed', () => { ui = null; });
   }
-  meetingWin = windows.createMeeting(opts);
-  meetingWin.on('closed', () => {
-    meetingWin = null;
-    if (rec.mode === 'meeting') stopMeetingRecording();
-  });
+  return ui;
 }
 
+function openMeeting(opts = {}) {
+  const sh = mainShell();
+  const existed = !!sh.view('meeting');
+  sh.meeting(opts);
+  // Pågår en inspelning får uppladdningen inte ta över mötet: visa bara mötet.
+  if (existed && opts.upload && rec.mode !== 'meeting') sh.view('meeting').webContents.executeJavaScript('upload()').catch(() => {});
+  sh.show('meeting');
+}
+
+// Inställningar visas i huvudsidans vy, med ← Tillbaka.
 function openSettings() {
-  if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
-  settingsWin = windows.createSettings();
-  settingsWin.on('closed', () => (settingsWin = null));
+  const sh = mainShell();
+  sh.home().webContents.loadFile(path.join(__dirname, '..', 'renderer', 'settings', 'settings.html'), { query: { from: 'home' } });
+  sh.show('home');
 }
 
 function openHome() {
-  if (homeWin && !homeWin.isDestroyed()) return homeWin.focus();
-  homeWin = windows.createHome();
-  homeWin.on('closed', () => (homeWin = null));
+  const sh = mainShell();
+  sh.home();
+  sh.show('home');
+}
+
+// Mötessidan rapporterar sitt läge. Huvudsidan och menyn visar det.
+function setMeetingState(st) {
+  const before = meetingState.state;
+  meetingState = st || { state: 'idle' };
+  const wc = viewContents('home');
+  if (wc) wc.send('meeting:state', meetingState);
+  if (before !== meetingState.state) buildTray();
 }
 
 function openAbout() {
@@ -550,6 +582,12 @@ function setIconState(state) {
   }, 100);
 }
 
+function stopFromOutside() {
+  openMeeting();
+  const wc = viewContents('meeting');
+  if (wc) wc.executeJavaScript("document.getElementById('btnStop').click()").catch(() => {});
+}
+
 function buildTray() {
   if (!tray) {
     try {
@@ -565,10 +603,19 @@ function buildTray() {
   const key = (keyLabel.match(/[⌃⌥⌘⇧]/) || [keyLabel])[0];
   // Modeller och Ollama visas i huvudfönstret. Genvägen ⌥⇧D fungerar fortfarande, men syns inte här.
   const menu = Menu.buildFromTemplate([
-    { label: 'Öppna Speak', click: openHome },
+    { label: 'Öppna Speak', click: showCurrent },
     { type: 'separator' },
     { label: s.hotkeyMode === 'hold' ? `Diktera: håll in ${key}` : `Diktera: tryck ${key}`, enabled: false },
-    { label: 'Nytt möte…', click: () => openMeeting() },
+    ...(meetingState.state === 'recording' ? [
+      { label: '● Möte spelas in', enabled: false },
+      { label: 'Visa mötet', click: () => openMeeting() },
+      { label: 'Stoppa och transkribera', click: stopFromOutside },
+    ] : meetingState.state === 'processing' ? [
+      { label: 'Möte transkriberas…', enabled: false },
+      { label: 'Visa mötet', click: () => openMeeting() },
+    ] : [
+      { label: 'Nytt möte…', click: () => openMeeting() },
+    ]),
     { type: 'separator' },
     { label: 'Inställningar…', accelerator: 'Command+,', click: openSettings },
     { label: 'Om Speak', click: openAbout },
@@ -638,7 +685,10 @@ app.whenReady().then(async () => {
 
   buildTray();
   if (process.platform === 'darwin') systemPreferences.askForMediaAccess('microphone').catch(() => {});
-  if (process.env.DIKTERA_SMOKE) return require('./smoke')({ engine, openMeeting, openSettings, transcribeMeeting, startDictation, stopDictation, wins: () => ({ meetingWin, settingsWin, captureWin, overlayWin }) });
+  if (process.env.DIKTERA_SMOKE) return require('./smoke')({ engine, openMeeting, openSettings, transcribeMeeting, startDictation, stopDictation, wins: () => {
+    const v = (n) => { const wc = viewContents(n); return wc ? { webContents: wc, isDestroyed: () => wc.isDestroyed() } : null; };
+    return { meetingWin: v('meeting'), settingsWin: v('home'), captureWin, overlayWin };
+  } });
   cleanRecordings();
   warmDockFrames();
   await firstRunCheck();
@@ -650,15 +700,23 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => { /* menyradsapp: fortsätt köra */ });
-// Klick på Dock-ikonen visar det som pågår: mötesfönstret om det är öppet eller ett möte spelas in,
-// annars Inställningar om det är öppet, annars huvudfönstret.
+// Klick på Dock-ikonen eller "Öppna Speak": fönstret visas där du var senast. Spelas ett möte in visas mötet.
 function showCurrent() {
-  if ((meetingWin && !meetingWin.isDestroyed()) || rec.mode === 'meeting') return openMeeting();
-  if (settingsWin && !settingsWin.isDestroyed()) return settingsWin.focus();
-  openHome();
+  if (rec.mode === 'meeting') return openMeeting();
+  const sh = mainShell();
+  sh.home();
+  sh.show(sh.current && sh.view(sh.current) ? sh.current : 'home');
 }
 app.on('activate', () => { if (app.isReady()) showCurrent(); });
-app.on('before-quit', () => {
+app.on('before-quit', (e) => {
+  // Avsluta mitt i ett möte: fråga först, så att inspelningen inte försvinner av misstag.
+  if (!quitting && meetingState.state !== 'idle') {
+    const r = dialog.showMessageBoxSync({ type: 'warning', buttons: ['Avbryt', 'Avsluta ändå'], defaultId: 0, cancelId: 0,
+      message: { recording: 'Ett möte spelas in.', processing: 'Ett möte transkriberas.', done: 'Mötet är inte sparat.' }[meetingState.state] || 'Ett möte pågår.',
+      detail: meetingState.state === 'done' ? 'Avslutar du nu försvinner texten.' : 'Avslutar du nu blir mötet inte klart.' });
+    if (r === 0) return e.preventDefault();
+  }
+  quitting = true;
   hotkey.stop();
   engine.stop();
 });

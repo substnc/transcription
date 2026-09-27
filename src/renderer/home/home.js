@@ -67,6 +67,56 @@ $('wPermBtn').onclick = toSettings;
 $('wModelsBtn').onclick = toSettings;
 $('btnStart').onclick = async () => { await api.settings.set({ welcomed: true }); render(); };
 
+// ---- Mötet i den svarta rutan: spelas in, transkriberas eller klart ----
+let meetTimer = null;
+function fmtTime(sec) {
+  const t = Math.max(0, Math.floor(sec));
+  const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), r = t % 60;
+  const p = (n) => String(n).padStart(2, '0');
+  return h ? `${p(h)}:${p(m)}:${p(r)}` : `${p(m)}:${p(r)}`;
+}
+function renderMeeting(st) {
+  const s = (st && st.state) || 'idle';
+  const busy = s !== 'idle';
+  clearInterval(meetTimer);
+  $('meetIdle').classList.toggle('hidden', busy);
+  $('meetBusy').classList.toggle('hidden', !busy);
+  $('btnUpload').classList.toggle('hidden', busy);
+  $('btnMeetStop').classList.toggle('hidden', s !== 'recording');
+  $('meetModel').classList.toggle('hidden', busy);
+  $('btnMeeting').textContent = busy ? 'Visa mötet' : 'Nytt möte';
+  const title = st && st.title ? ` · ${st.title}` : '';
+  $('meetLabel').innerHTML = '';
+  if (s === 'recording') {
+    const dot = document.createElement('span'); dot.className = 'rec';
+    $('meetLabel').append(dot, `Möte pågår${title}`);
+  } else {
+    $('meetLabel').textContent = s === 'processing' ? `Möte${title}` : s === 'done' ? `Möte klart${title}` : 'Möten';
+  }
+  $('meetTimer').classList.toggle('hidden', s !== 'recording');
+  $('meetDoing').classList.toggle('hidden', s === 'recording');
+  $('meetBarWrap').classList.toggle('hidden', s !== 'processing');
+  if (s === 'recording') {
+    const tick = () => ($('meetTimer').textContent = fmtTime((Date.now() - (st.startedAt || Date.now())) / 1000));
+    tick();
+    meetTimer = setInterval(tick, 500);
+    $('meetNote').textContent = 'Inspelningen fortsätter medan du är här. Du kan diktera som vanligt.';
+  } else if (s === 'processing') {
+    const pct = Math.round((st.frac || 0) * 100);
+    $('meetDoing').firstChild.textContent = 'Transkriberar.';
+    $('meetPct').textContent = `${pct} %`;
+    $('meetBar').style.width = `${pct}%`;
+    $('meetNote').textContent = 'Klart om en stund. Du kan göra annat så länge.';
+  } else if (s === 'done') {
+    $('meetDoing').firstChild.textContent = 'Texten är klar.';
+    $('meetPct').textContent = 'Inte sparad än.';
+    $('meetNote').textContent = 'Gå till mötet för att läsa, rätta och spara.';
+  }
+}
+api.meeting.onState(renderMeeting);
+api.meeting.state().then(renderMeeting).catch(() => {});
+$('btnMeetStop').onclick = () => api.meeting.stopFromHome();
+
 render();
 // Håll status aktuell när man kommer tillbaka från Inställningar.
 window.addEventListener('focus', render);
