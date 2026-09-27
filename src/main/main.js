@@ -33,6 +33,9 @@ const modelsDir = process.env.DIKTERA_MODELS_DIR || path.join(userData, 'models'
 const recordingsDir = () => settings.get('recordingsDir') || path.join(userData, 'recordings');
 const logsDir = path.join(userData, 'logs');
 const engine = new EngineClient(path.join(logsDir, 'engine.log'));
+// Dikteringen har en egen motor. Mötesmotorn kan vara låst i flera minuter (talare i ett långt möte),
+// och då ska diktering och huvudsidans status ändå svara direkt.
+const dictEngine = new EngineClient(path.join(logsDir, 'dictation.log'), 'speak-dictation');
 // Huvudprocessens meddelanden sparas i logs/main.log (urklipp, fönster, fel), så att de går att felsöka.
 {
   fs.mkdirSync(logsDir, { recursive: true });
@@ -64,10 +67,11 @@ function notify(title, body) {
   if (Notification.isSupported()) new Notification({ title, body, silent: true }).show();
 }
 
-function engineSettings() {
+// role 'meeting': mötesmotorn (håller ingen dikteringsmodell laddad).
+function engineSettings(role = 'dictation') {
   const s = settings.get();
   const whisperCli = app.isPackaged ? path.join(process.resourcesPath, 'bin', 'whisper-cli') : path.join(__dirname, '..', '..', 'resources', 'bin', 'whisper-cli');
-  return { modelsDir, whisper: s.whisperDictation, liveModel: s.liveModel, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
+  return { role, modelsDir, whisper: s.whisperDictation, liveModel: s.liveModel, ollamaHost: s.ollamaHost, ollamaModel: s.ollamaModel, whisperCli };
 }
 
 async function ensureLlmModel() {
@@ -80,6 +84,7 @@ async function ensureLlmModel() {
       const prefer = st.models.find((m) => /qwen|gemma|llama|mistral/i.test(m)) || st.models[0];
       settings.set({ ollamaModel: prefer });
       await engine.call('configure', { ollamaModel: prefer });
+      await dictEngine.call('configure', { ollamaModel: prefer });
     }
   } catch { /* Ollama saknas, reglerna används */ }
 }
@@ -139,7 +144,7 @@ async function stopDictation() {
   try {
     const s = settings.get();
     const policy = settings.policy();
-    const r = await engine.call('dictate', { samples, policy, whisper: settings.modelFor('dictation'), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
+    const r = await dictEngine.call('dictate', { samples, policy, whisper: settings.modelFor('dictation'), useLlm: s.useLlm && s.llmDictation, voiceCommands: s.voiceCommands, vocabulary: s.vocabulary });
     if (!r.text) return overlay('hidden');
     const how = await pasteText(r.text, { autoPaste: s.autoPaste, restoreClipboard: s.restoreClipboard });
     overlay('done', how === 'pasted' ? 'Inklistrat' : 'Kopierat, tryck ⌘V');
@@ -349,13 +354,17 @@ function registerIpc() {
     if (patch.hotkey !== undefined || patch.hotkeyMode !== undefined) hotkey.restart({ hotkey: after.hotkey, hotkeyMode: after.hotkeyMode });
     if (patch.launchAtLogin !== undefined) app.setLoginItemSettings({ openAtLogin: !!patch.launchAtLogin });
     if (patch.showInDock !== undefined && app.dock) (patch.showInDock ? app.dock.show() : app.dock.hide());
-    if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.liveModel !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) await engine.call('configure', engineSettings());
-    if (before.whisperDictation !== after.whisperDictation) engine.call('warmup').catch(() => {});
+    if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.liveModel !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) {
+      await engine.call('configure', engineSettings('meeting'));
+      await dictEngine.call('configure', engineSettings());
+    }
+    if (before.whisperDictation !== after.whisperDictation) dictEngine.call('warmup').catch(() => {});
     buildTray();
     return after;
   });
-  ipcMain.handle('models:status', () => engine.call('status'));
-  ipcMain.handle('engine:info', (_e, name) => engine.call('engineInfo', { name }));
+  // Status frågas hos dikteringsmotorn, som aldrig är låst av ett möte.
+  ipcMain.handle('models:status', () => dictEngine.call('status'));
+  ipcMain.handle('engine:info', (_e, name) => dictEngine.call('engineInfo', { name }));
   ipcMain.handle('open:logs', () => shell.openPath(logsDir));
   ipcMain.handle('models:install', (_e, { kind, name }) => {
     if (kind === 'nemotron') return engine.call('installNemotron', {}, (p) => sendToSettings('models:progress', { ...p, kind, name }));
@@ -369,11 +378,12 @@ function registerIpc() {
     if (r.canceled || !r.filePaths.length) return null;
     const res = await engine.call('importWhisper', { sourcePath: r.filePaths[0] });
     if (!settings.get('whisperMeeting')) settings.set({ whisperMeeting: res.name });
-    await engine.call('configure', engineSettings());
+    await engine.call('configure', engineSettings('meeting'));
+    await dictEngine.call('configure', engineSettings());
     buildTray();
     return res;
   });
-  ipcMain.handle('llm:status', () => engine.call('llmStatus'));
+  ipcMain.handle('llm:status', () => dictEngine.call('llmStatus'));
   ipcMain.handle('perm:status', () => ({
     accessibility: accessibilityGranted(false),
     microphone: process.platform === 'darwin' ? systemPreferences.getMediaAccessStatus('microphone') : 'granted',
@@ -637,7 +647,7 @@ function cleanRecordings() {
 }
 
 async function firstRunCheck() {
-  const st = await engine.call('status');
+  const st = await dictEngine.call('status');
   const s = settings.get();
   const d = settings.modelFor('dictation');
   const missing = !st.whisper[d] || !st.whisper[d].installed || !st.aux.vad.installed;
@@ -648,7 +658,7 @@ async function firstRunCheck() {
     if (s.welcomed) openSettings();
     notify('Speak behöver modeller', 'Importera KB-Whisper eller ladda ner turbo i Inställningar, och hämta talarmodellerna.');
   } else {
-    engine.call('warmup').catch((e) => console.error('warmup', e.message));
+    dictEngine.call('warmup').catch((e) => console.error('warmup', e.message));
   }
 }
 
@@ -666,7 +676,9 @@ app.whenReady().then(async () => {
   buildTray();
   try {
     await engine.start();
-    await engine.call('init', engineSettings());
+    await engine.call('init', engineSettings('meeting'));
+    await dictEngine.start();
+    await dictEngine.call('init', engineSettings());
     await ensureLlmModel();
   } catch (e) {
     console.error('Motorn kunde inte starta:', e.message);
@@ -695,7 +707,10 @@ app.whenReady().then(async () => {
 
   engine.on('exit', () => {
     notify('Speak', 'Transkriberingsmotorn startade om.');
-    engine.start().then(() => engine.call('init', engineSettings())).catch(console.error);
+    engine.start().then(() => engine.call('init', engineSettings('meeting'))).catch(console.error);
+  });
+  dictEngine.on('exit', () => {
+    dictEngine.start().then(() => dictEngine.call('init', engineSettings())).catch(console.error);
   });
 });
 
@@ -719,4 +734,5 @@ app.on('before-quit', (e) => {
   quitting = true;
   hotkey.stop();
   engine.stop();
+  dictEngine.stop();
 });

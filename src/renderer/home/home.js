@@ -17,15 +17,22 @@ const engineLabel = (name, st) => {
   return `${name.replace(/-metal$/, '')} · ${m.ggml ? 'Metal' : m.py ? 'NeMo' : 'CPU'}`;
 };
 
+// Svarar inte motorn inom kort tid visas sidan ändå, utan just den uppgiften.
+const within = (p, ms = 2000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('tog för lång tid')), ms))]);
+
 async function render() {
   const S = await api.settings.get();
+  // Sidan visas direkt. Status om modeller och Ollama fylls i när svaren kommer.
+  const show = S.welcomed ? 'home' : 'welcome';
+  $('home').classList.toggle('hidden', show !== 'home');
+  $('welcome').classList.toggle('hidden', show !== 'welcome');
   const label = S.keyLabels[S.hotkey] || S.hotkey;
   $('keyCap').textContent = keyCap(label);
   const lower = label.charAt(0).toLowerCase() + label.slice(1);
   $('keyText').textContent = `${S.hotkeyMode === 'hold' ? 'Håll in' : 'Tryck'} ${lower}, var du än skriver`;
   $('wKey').textContent = lower;
   let st = null;
-  try { st = await api.models.status(); } catch { /* motorn startar fortfarande */ }
+  try { st = await within(api.models.status()); } catch { /* motorn startar fortfarande eller är upptagen */ }
   if (st) {
     $('dictModel').textContent = engineLabel(S.whisperDictation || S.whisperMeeting, st);
     $('meetModel').textContent = engineLabel(S.whisperMeeting || S.whisperDictation, st);
@@ -36,7 +43,7 @@ async function render() {
     $('wModelsBtn').classList.toggle('hidden', !!ready);
   }
   try {
-    const llm = await api.llm.status();
+    const llm = await within(api.llm.status());
     $('footStatus').textContent = `Allt körs på den här datorn${llm.ok && S.useLlm && S.ollamaModel ? ` · Ollama: ${S.ollamaModel}` : ''}`;
   } catch { /* Ollama saknas */ }
   const p = await api.perm.status();
@@ -44,9 +51,6 @@ async function render() {
   $('wPerm').textContent = permOk ? 'Klart' : 'Saknas';
   $('wPerm').className = 'chip ' + (permOk ? '' : 'warn');
   $('wPermBtn').classList.toggle('hidden', permOk);
-  const show = S.welcomed ? 'home' : 'welcome';
-  $('home').classList.toggle('hidden', show !== 'home');
-  $('welcome').classList.toggle('hidden', show !== 'welcome');
 }
 
 async function testDictation(statusEl) {

@@ -7,9 +7,10 @@ const EventEmitter = require('events');
 const fs = require('fs');
 
 class EngineClient extends EventEmitter {
-  constructor(logFile) {
+  constructor(logFile, serviceName = 'speak-engine') {
     super();
     this.logFile = logFile;
+    this.serviceName = serviceName;
     this.proc = null;
     this.pending = new Map();
     this.n = 0;
@@ -19,7 +20,7 @@ class EngineClient extends EventEmitter {
   start() {
     if (this.proc) return this.ready;
     const entry = path.join(__dirname, '..', 'engine', 'server.js');
-    this.proc = utilityProcess.fork(entry, [], { serviceName: 'speak-engine', stdio: 'pipe' });
+    this.proc = utilityProcess.fork(entry, [], { serviceName: this.serviceName, stdio: 'pipe' });
     // Allt motorn skriver hamnar i en loggfil så att krascher går att felsöka.
     if (this.logFile) {
       fs.mkdirSync(path.dirname(this.logFile), { recursive: true });

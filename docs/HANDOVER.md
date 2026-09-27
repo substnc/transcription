@@ -104,6 +104,13 @@ btnStop i mötesvyn. Röda knappen gömmer fönstret. Avsluta mitt i ett möte e
 först. Om Speak är fortfarande ett eget litet fönster. Provat i Electron under Linux (skärmbilder), inte på Mac:
 kolla att fönstret går att dra i överkanten (-webkit-app-region i WebContentsView).
 
+## Två motorer (27 sep 2026)
+Mötesmotorn (engine.log) kan vara låst i minuter: sherpas talaruppdelning och röstavtryck körs synkront på långa
+möten. Därför en egen dikteringsmotor (dictation.log, EngineClient 'speak-dictation', init role 'dictation'):
+dictate, status, llmStatus, engineInfo, warmup går dit. Bara den startar whisper-server. Huvudsidan visas
+direkt och väntar högst 2 s på status (home.js within). Tidigare: vit sida och hängande diktering under ett
+2 h-möte. Idé för senare: flytta talaruppdelningen till en worker_thread så att förloppet också rör sig.
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.

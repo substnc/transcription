@@ -25,7 +25,8 @@ const methods = {
     settings = { ...settings, ...p };
     pipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: settings.whisper, numThreads: settings.numThreads, whisperCli: settings.whisperCli });
     livePipeline = null;
-    pipeline.warmDictation();
+    // Bara dikteringsmotorn håller dikteringsmodellen laddad (whisper-server). Mötesmotorn behöver den inte.
+    if (p.role !== 'meeting') pipeline.warmDictation();
     return models.status(settings.modelsDir);
   },
   async configure(p) {
