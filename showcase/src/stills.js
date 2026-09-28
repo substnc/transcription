@@ -37,6 +37,7 @@ const css = `
 .ts{font-size:20px;line-height:33px;color:#5f5f5f;font-variant-numeric:tabular-nums}
 .b{width:33px;height:33px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .who{font-size:20px;line-height:33px}.said{font-size:26px;line-height:36px}
+.foot{position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between}
 .tag{font-size:18px;line-height:22px;color:#5f5f5f;display:flex;align-items:center;gap:10px}
 .tag::before{content:"";width:9px;height:9px;border-radius:999px;background:#000}
 .hair{position:absolute;background:#000}
@@ -52,50 +53,54 @@ const imgs = {};
 
 // 1. Liggande hero: ikonen stor på en grå yta, rubrik till höger.
 imgs['01-hero-16x9'] = [1920, 1080, `
-<div style="position:absolute;inset:0;padding:96px;display:grid;grid-template-columns:900px minmax(0,1fr);gap:96px;align-items:stretch">
+<div class="label" style="position:absolute;left:96px;top:48px">Byggt med Klang Pianissimo</div>
+<div style="position:absolute;inset:0;padding:120px 96px 96px;display:grid;grid-template-columns:900px minmax(0,1fr);gap:96px;align-items:stretch">
  <div class="tile" style="position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden"><div class="grid" style="opacity:.55"></div><div style="position:relative">${icon(620, 'hero', 0.62)}</div></div>
  <div style="display:flex;flex-direction:column;justify-content:space-between">
-  <div class="label">Byggt med Klang Pianissimo</div>
+  <div></div>
   <div style="display:flex;flex-direction:column;gap:40px">
    <div class="m" style="font-size:140px;line-height:140px;letter-spacing:-0.03em">Speak.</div>
    <div class="m dim" style="font-size:56px;line-height:62px;letter-spacing:-0.02em">Röst blir text.<br>Direkt på datorn.</div>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:14px 28px"><span class="tag">Diktering</span><span class="tag">Möten med talare</span><span class="tag">Svenska och engelska</span><span class="tag">Allt stannar på datorn</span></div>
+  <div style="position:absolute;right:96px;top:120px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>
  </div>
 </div>`];
 
 // 2. Fyrkant: ikonen i närbild som teknisk ritning, röst till vänster, text till höger.
 {
-  const S = 720, sp = (S * 0.98) / (art.COLS - 0.5), ox = 1080 / 2 - ((art.COLS - 1) / 2) * sp, oy = 430;
+  const S = 640, sp = (S * 0.98) / (art.COLS - 0.5), ox = 1080 / 2 - ((art.COLS - 1) / 2) * sp, oy = 500;
   const xw = ox + 4 * sp, xr = ox + 10 * sp; // mitt i vågen, mitt i raden
   imgs['02-ikon-ritning-1x1'] = [1080, 1080, `
 <div class="grid" style="opacity:.5"></div>
 <div style="position:absolute;left:${1080 / 2 - S / 2}px;top:${oy - S / 2}px">${icon(S, 'hero', 0.62)}</div>
-<div class="hair" style="left:${xw}px;top:${oy + 7 * sp}px;width:1.5px;height:${880 - (oy + 7 * sp)}px"></div>
-<div class="hair" style="left:${xr}px;top:${oy + 1 * sp}px;width:1.5px;height:${880 - (oy + 1 * sp)}px"></div>
-<div class="hair" style="left:${xw}px;top:880px;width:${xr - xw}px;height:1.5px"></div>
-<div style="position:absolute;left:${xw - 100}px;top:896px;width:200px;text-align:center" class="label">Röst</div>
-<div style="position:absolute;left:${xr - 100}px;top:896px;width:200px;text-align:center" class="label">Text</div>
-<div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:baseline"><span class="m" style="font-size:36px">Speak.</span><span class="label">Byggt med Klang Pianissimo</span></div>`];
+<div class="hair" style="left:${xw}px;top:${oy + 7 * sp}px;width:1.5px;height:${900 - (oy + 7 * sp)}px"></div>
+<div class="hair" style="left:${xr}px;top:${oy + 1 * sp}px;width:1.5px;height:${900 - (oy + 1 * sp)}px"></div>
+<div class="hair" style="left:${xw}px;top:900px;width:${xr - xw}px;height:1.5px"></div>
+<div style="position:absolute;left:${xw - 100}px;top:914px;width:200px;text-align:center" class="label">Röst</div>
+<div style="position:absolute;left:${xr - 100}px;top:914px;width:200px;text-align:center" class="label">Text</div>
+<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;right:84px;bottom:84px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>`];
 }
 
 // 3. Fyrkant: dikteringen i ett appfönster på grå yta.
 imgs['03-diktering-1x1'] = [1080, 1080, `
 <div style="position:absolute;inset:0;background:#ebecef"></div>
-<div style="position:absolute;left:84px;top:84px" class="label">Diktering</div>
+
 <div class="win" style="position:absolute;left:84px;right:84px;top:160px;height:720px;padding:96px 60px 60px;display:flex;flex-direction:column;justify-content:center;gap:44px">
  <div class="lights"><span></span><span></span><span></span></div>
  <div style="display:flex;align-items:center;gap:30px">${icon(120, 'live', 0.3)}<div class="m" style="font-size:52px;line-height:56px;letter-spacing:-0.02em">Håll in. Prata.<br><span class="dim">Släpp.</span></div></div>
  <div class="tile" style="padding:30px 36px;font-size:30px;line-height:42px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div>
  <div style="display:flex;align-items:center;gap:18px">${listen}<span class="label">→</span>${pill}</div>
 </div>
-<div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:baseline"><span class="m" style="font-size:36px">Speak.</span><span class="label">Byggt med Klang Pianissimo</span></div>`];
+<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;right:84px;bottom:84px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>`];
 
 // 4. Liggande: mötet som text, med nivåmätare och sammanfattning.
 imgs['04-mote-16x9'] = [1920, 1080, `
 <div style="position:absolute;inset:0;background:#ebecef"></div>
+<div class="label" style="position:absolute;left:96px;top:36px">Byggt med Klang Pianissimo</div>
 <div class="win" style="position:absolute;left:96px;right:96px;top:96px;bottom:96px;padding:110px 72px 64px;display:grid;grid-template-columns:560px minmax(0,1fr);gap:72px">
  <div class="lights"><span></span><span></span><span></span></div>
+ <div style="position:absolute;right:72px;top:24px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:110px;height:auto;display:block"></div>
  <div style="display:flex;flex-direction:column;gap:36px">
   <div class="label">Mötesläge · Kvartalsgenomgång, Almkvist Logistik</div>
   <div class="m" style="font-size:72px;line-height:76px;letter-spacing:-0.02em">Möte blir text.<br><span class="dim">3 talare.</span></div>
@@ -114,17 +119,18 @@ imgs['04-mote-16x9'] = [1920, 1080, `
 
 // 5. Fyrkant: flödet i tre steg, allt inom datorn.
 imgs['05-flode-1x1'] = [1080, 1080, `
-<div style="position:absolute;inset:0;padding:84px;display:flex;flex-direction:column;gap:42px">
- <div class="m" style="font-size:72px;line-height:78px;letter-spacing:-0.02em">Röst in. Text ut.<br><span class="dim">Inget lämnar datorn.</span></div>
- <div class="tile" style="flex-grow:1;padding:48px;display:flex;flex-direction:column;gap:26px;position:relative;border:0">
+<div style="position:absolute;inset:0;padding:84px;display:flex;flex-direction:column;gap:28px">
+ <div class="label">Byggt med Klang Pianissimo</div>
+ <div class="m" style="font-size:64px;line-height:68px;letter-spacing:-0.02em">Röst in. Text ut.<br><span class="dim">Inget lämnar datorn.</span></div>
+ <div class="tile" style="flex-grow:1;padding:40px 48px;display:flex;flex-direction:column;gap:18px;position:relative;border:0">
   <div class="label" style="position:absolute;right:48px;top:40px">På datorn</div>
   <div style="display:flex;flex-direction:column;gap:14px"><span class="label">1 · Ljud</span>${meter(46, 3, 16, 4.4, 11)}</div>
-  <div style="width:1.5px;height:40px;background:#000;margin-left:4px"></div>
+  <div style="width:1.5px;height:22px;background:#000;margin-left:4px"></div>
   <div style="display:flex;flex-direction:column;gap:14px"><span class="label">2 · Taligenkänning</span><div style="height:64px;border-radius:999px;background:#000;color:#fff;display:flex;align-items:center;gap:18px;padding:0 30px;font-size:24px" class="m">${icon(40, 'type', 0.5, '#fff', 0.42)}Klang Pianissimo</div></div>
-  <div style="width:1.5px;height:40px;background:#000;margin-left:4px"></div>
+  <div style="width:1.5px;height:22px;background:#000;margin-left:4px"></div>
   <div style="display:flex;flex-direction:column;gap:14px"><span class="label">3 · Text</span><div style="background:#fff;border-radius:16px;padding:22px 28px;font-size:26px;line-height:36px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div></div>
  </div>
- <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="m" style="font-size:36px">Speak.</span><span class="label">Gjord av Anthon Bäckström</span></div>
+ <div style="display:flex;justify-content:flex-end"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"></div>
 </div>`];
 
 fs.mkdirSync('stills-src', { recursive: true });

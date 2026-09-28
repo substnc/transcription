@@ -20,7 +20,7 @@ const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><style>
 .who{font-size:20px;line-height:33px}.said{font-size:26px;line-height:36px}
 </style></head><body>
 ${(() => {
-  const foot = `<div class="foot"><span class="m" style="font-size:36px">Speak.</span><span class="label">Byggt med Klang Pianissimo</span></div>`;
+  const foot = `<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;right:84px;bottom:84px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>`;
   const dot = `<span style="width:12px;height:12px;border-radius:999px;background:#fff"></span>`;
   const ring = `<span style="width:12px;height:12px;border-radius:999px;border:2px solid #fff"></span>`;
   const B = { J: 'background:#000;color:#fff', 1: 'background:#5f5f5f;color:#fff', 2: 'border:1.5px solid #000' };
@@ -28,9 +28,8 @@ ${(() => {
   return `
 <div class="stage" id="lyssnar"><div style="position:absolute;inset:0 0 120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="560" width="560" height="560"></svg><div class="pill m">${dot}Lyssnar…</div></div>${foot}</div>
 <div class="stage" id="skriver"><div style="position:absolute;inset:0 0 120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="560" width="560" height="560"></svg><div class="pill m">${ring}Skriver…</div></div>${foot}</div>
-<div class="stage" id="ljud"><div style="position:absolute;left:84px;top:84px" class="label">Ljud in</div><div class="tile" style="position:absolute;left:84px;right:84px;top:250px;height:500px;display:flex;align-items:center;justify-content:center"><svg data-meter="44,6,19,5.6"></svg></div>${foot}</div>
-<div class="stage" id="mote"><div style="position:absolute;inset:84px 84px 180px;display:flex;flex-direction:column;gap:30px">
- <div class="label">Mötesläge · Kvartalsgenomgång, Almkvist Logistik</div>
+<div class="stage" id="ljud"><div class="tile" style="position:absolute;left:84px;right:84px;top:250px;height:500px;display:flex;align-items:center;justify-content:center"><svg data-meter="44,6,19,5.6"></svg></div>${foot}</div>
+<div class="stage" id="mote"><div style="position:absolute;inset:150px 84px 190px;display:flex;flex-direction:column;gap:30px">
  <div style="display:flex;align-items:center;justify-content:space-between"><div class="m" style="font-size:64px;line-height:68px;letter-spacing:-0.02em">Möte blir text.</div><div class="pill m">${ring}Transkriberar…</div></div>
  <svg data-meter="61,3,15,4.2"></svg>
  <div class="tile" style="padding:36px;display:flex;flex-direction:column;gap:24px">
