@@ -1,137 +1,116 @@
-// Stillbilder för Klang i sub.stnc® light. Skriver stills/<namn>.html och tar 4K-bilder med Playwright.
+// Stillbilder för Klang i sub.stnc® light. Ett system för alla bilder:
+// typskala 18 / 22 / 26 / 72 / 144 px, avstånd i steg om 8 px, marginal 80 px (1:1) och 96 px (16:9).
+// Ram: Klang uppe till vänster, Speak. nere till vänster, signatur och Made by nere till höger.
 const fs = require('fs');
 const art = require('./icon-art.js');
 const b64 = (f) => fs.readFileSync(f).toString('base64');
-const reg = b64('texgyreheros-regular.otf'), bold = b64('texgyreheros-bold.otf');
+const reg = b64('texgyreheros-regular.otf');
+const SIG = `data:image/png;base64,${b64('signature.png')}`;
 
 function icon(size, state = 'idle', t = 0, fill = '#000', rf = 0.3) {
   const sp = (size * 0.98) / (art.COLS - 0.5), r = sp * rf, ox = size / 2 - ((art.COLS - 1) / 2) * sp;
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" fill="${fill}">` + art.DOTS.map(d =>
-    `<circle cx="${(ox + d.x * sp).toFixed(1)}" cy="${(size / 2 + d.y * sp).toFixed(1)}" r="${r.toFixed(1)}" opacity="${(state === 'hero' ? (d.row ? art.opacity('type', d, t) : 1) : art.opacity(state, d, t)).toFixed(2)}"/>`).join('') + '</svg>';
+  const op = (d) => state === 'hero' ? (d.row ? art.opacity('type', d, t) : 1) : art.opacity(state, d, t);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" fill="${fill}" style="display:block">` + art.DOTS.map(d =>
+    `<circle cx="${(ox + d.x * sp).toFixed(1)}" cy="${(size / 2 + d.y * sp).toFixed(1)}" r="${r.toFixed(1)}" opacity="${op(d).toFixed(2)}"/>`).join('') + '</svg>';
 }
-// Nivåmätare av prickar som i mötesläget: kolumner, höjd efter en påhittad ljudnivå.
-function meter(cols, half, sp, r, seed = 3, fill = '#000') {
+function meter(cols, half, sp, r, seed = 3) {
   let x = seed; const rnd = () => ((x = (x * 9301 + 49297) % 233280) / 233280);
   const w = (cols - 1) * sp + 2 * r, h = half * 2 * sp + 2 * r; let s = '';
   for (let i = 0; i < cols; i++) {
-    const env = Math.sin(Math.PI * i / (cols - 1)) ** 0.7;
-    const lvl = Math.round(env * (0.35 + 0.65 * rnd()) * half);
-    for (let j = -half; j <= half; j++)
-      s += `<circle cx="${(r + i * sp).toFixed(1)}" cy="${(r + (j + half) * sp).toFixed(1)}" r="${r}" opacity="${Math.abs(j) <= lvl ? 1 : 0.14}"/>`;
+    const env = Math.sin(Math.PI * i / (cols - 1)) ** 0.7, lvl = Math.round(env * (0.3 + 0.6 * rnd()) * half);
+    for (let j = -half; j <= half; j++) s += `<circle cx="${(r + i * sp).toFixed(1)}" cy="${(r + (j + half) * sp).toFixed(1)}" r="${r}" opacity="${Math.abs(j) <= lvl ? 1 : 0.14}"/>`;
   }
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" fill="${fill}">${s}</svg>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block">${s}</svg>`;
 }
 const css = `
 @font-face{font-family:Heros;font-weight:400;src:url(data:font/otf;base64,${reg})}
-@font-face{font-family:Heros;font-weight:700;src:url(data:font/otf;base64,${bold})}
 *{box-sizing:border-box}html,body{margin:0;background:#fff}
 #stage{position:relative;overflow:hidden;background:#fff;color:#000;font-family:'Helvetica Neue',Heros,Helvetica,Arial,sans-serif}
 .m{-webkit-text-stroke:.45px currentColor}
-.label{font-size:22px;line-height:30px;color:#5f5f5f}
+.meta{font-size:18px;line-height:24px;color:#5f5f5f}
+.label{font-size:22px;line-height:32px;color:#5f5f5f}
+.body{font-size:26px;line-height:36px}
+.h1{font-size:72px;line-height:80px;letter-spacing:-0.02em}
 .dim{color:#818181}
 .tile{border-radius:24px;background:#ebecef}
-.win{background:#fff;border-radius:24px;position:relative}
-.lights{position:absolute;left:24px;top:24px;display:flex;gap:12px}.lights span{width:18px;height:18px;border-radius:999px;background:#ebecef}
-.pill{height:54px;padding:0 27px 0 21px;border-radius:999px;background:#000;color:#fff;font-size:20px;display:inline-flex;align-items:center;gap:15px;white-space:nowrap}
-.row{display:grid;grid-template-columns:66px 33px minmax(0,1fr);gap:18px;align-items:start}
-.ts{font-size:20px;line-height:33px;color:#5f5f5f;font-variant-numeric:tabular-nums}
-.b{width:33px;height:33px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:16px}
-.who{font-size:20px;line-height:33px}.said{font-size:26px;line-height:36px}
-.foot{position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between}
-.tag{font-size:18px;line-height:22px;color:#5f5f5f;display:flex;align-items:center;gap:10px}
-.tag::before{content:"";width:9px;height:9px;border-radius:999px;background:#000}
-.hair{position:absolute;background:#000}
-.grid{position:absolute;inset:0;background-image:radial-gradient(circle,#c9ccd3 1.6px,transparent 1.8px);background-size:36px 36px}
+.pill{height:56px;padding:0 28px 0 24px;border-radius:999px;background:#000;color:#fff;font-size:22px;display:inline-flex;align-items:center;gap:16px;white-space:nowrap}
+.row{display:grid;grid-template-columns:64px 32px minmax(0,1fr);gap:16px;align-items:start}
+.ts{font-size:18px;line-height:32px;color:#5f5f5f;font-variant-numeric:tabular-nums}
+.b{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.who{font-size:18px;line-height:32px}
 `;
-const page = (w, h, body) => `<!doctype html><html lang="sv"><head><meta charset="utf-8"><style>${css}</style></head><body><div id="stage" style="width:${w}px;height:${h}px">${body}</div></body></html>`;
-const pill = `<div class="pill m"><svg width="15" height="15" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.2l2.2 2.2 4.8-4.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Inklistrat</div>`;
-const listen = `<div class="pill m"><span style="width:12px;height:12px;border-radius:999px;background:#fff"></span>Lyssnar…</div>`;
 const B = { J: 'background:#000;color:#fff', 1: 'background:#5f5f5f;color:#fff', 2: 'border:1.5px solid #000' };
-const line = (ts, k, who, said) => `<div class="row"><span class="ts">${ts}</span><span class="b" style="${B[k]}">${k}</span><div><div class="who m">${who}</div><div class="said">${said}</div></div></div>`;
+const line = (ts, k, who, said) => `<div class="row"><span class="ts">${ts}</span><span class="b" style="${B[k]}">${k}</span><div><div class="who m">${who}</div><div class="body">${said}</div></div></div>`;
+const pillOk = `<div class="pill m"><svg width="16" height="16" viewBox="0 0 10 10" fill="none"><path d="M1.5 5.2l2.2 2.2 4.8-4.8" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Inklistrat</div>`;
+const pillListen = `<div class="pill m"><span style="width:12px;height:12px;border-radius:999px;background:#fff"></span>Lyssnar…</div>`;
+const made = `<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><img src="${SIG}" alt="Anthon Bäckströms signatur" style="width:144px;height:auto;display:block"><span class="meta">Made by Anthon Bäckström</span></div>`;
+// Ramen och en innehållsyta mellan rubrikraden och sidfoten.
+function frame(w, h, M, body, { speak = true } = {}) {
+  return `<div class="label" style="position:absolute;left:${M}px;top:${M}px">Byggt med Klang Pianissimo</div>
+<div style="position:absolute;left:${M}px;right:${M}px;top:${M + 96}px;bottom:${M + 136}px">${body}</div>
+<div style="position:absolute;left:${M}px;right:${M}px;bottom:${M}px;display:flex;justify-content:space-between;align-items:flex-end">${speak ? '<span class="m" style="font-size:36px;line-height:36px">Speak.</span>' : '<span></span>'}${made}</div>`;
+}
+const page = (w, h, inner) => `<!doctype html><html lang="sv"><head><meta charset="utf-8"><style>${css}</style></head><body><div id="stage" style="width:${w}px;height:${h}px">${inner}</div></body></html>`;
 
 const imgs = {};
 
-// 1. Liggande hero: ikonen stor på en grå yta, rubrik till höger.
-imgs['01-hero-16x9'] = [1920, 1080, `
-<div class="label" style="position:absolute;left:96px;top:48px">Byggt med Klang Pianissimo</div>
-<div style="position:absolute;inset:0;padding:120px 96px 96px;display:grid;grid-template-columns:900px minmax(0,1fr);gap:96px;align-items:stretch">
- <div class="tile" style="position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden"><div class="grid" style="opacity:.55"></div><div style="position:relative">${icon(620, 'hero', 0.62)}</div></div>
- <div style="display:flex;flex-direction:column;justify-content:space-between">
-  <div></div>
-  <div style="display:flex;flex-direction:column;gap:40px">
-   <div class="m" style="font-size:140px;line-height:140px;letter-spacing:-0.03em">Speak.</div>
-   <div class="m dim" style="font-size:56px;line-height:62px;letter-spacing:-0.02em">Röst blir text.<br>Direkt på datorn.</div>
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:14px 28px"><span class="tag">Diktering</span><span class="tag">Möten med talare</span><span class="tag">Svenska och engelska</span><span class="tag">Allt stannar på datorn</span></div>
-  <div style="position:absolute;right:96px;top:120px"><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>
+// 1. Huvudbild: ikonen på en grå yta, namnet och en rad om vad appen gör.
+imgs['01-hero-16x9'] = [1920, 1080, frame(1920, 1080, 96, `
+<div style="height:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:96px">
+ <div class="tile" style="display:flex;align-items:center;justify-content:center">${icon(480, 'hero', 0.62)}</div>
+ <div style="display:flex;flex-direction:column;justify-content:center;gap:32px">
+  <div class="m" style="font-size:144px;line-height:144px;letter-spacing:-0.03em">Speak.</div>
+  <div class="h1 m dim">Diktering och möten.<br>Allt på datorn.</div>
  </div>
-</div>`];
+</div>`, { speak: false })];
 
-// 2. Fyrkant: ikonen i närbild som teknisk ritning, röst till vänster, text till höger.
+// 2. Ikonen som ritning: var rösten är och var texten börjar.
 {
-  const S = 640, sp = (S * 0.98) / (art.COLS - 0.5), ox = 1080 / 2 - ((art.COLS - 1) / 2) * sp, oy = 500;
-  const xw = ox + 4 * sp, xr = ox + 10 * sp; // mitt i vågen, mitt i raden
-  imgs['02-ikon-ritning-1x1'] = [1080, 1080, `
-<div class="grid" style="opacity:.5"></div>
-<div style="position:absolute;left:${1080 / 2 - S / 2}px;top:${oy - S / 2}px">${icon(S, 'hero', 0.62)}</div>
-<div class="hair" style="left:${xw}px;top:${oy + 7 * sp}px;width:1.5px;height:${900 - (oy + 7 * sp)}px"></div>
-<div class="hair" style="left:${xr}px;top:${oy + 1 * sp}px;width:1.5px;height:${900 - (oy + 1 * sp)}px"></div>
-<div class="hair" style="left:${xw}px;top:900px;width:${xr - xw}px;height:1.5px"></div>
-<div style="position:absolute;left:${xw - 100}px;top:914px;width:200px;text-align:center" class="label">Röst</div>
-<div style="position:absolute;left:${xr - 100}px;top:914px;width:200px;text-align:center" class="label">Text</div>
-<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>`];
+  const S = 544, sp = (S * 0.98) / (art.COLS - 0.5), cx = 1080 / 2 - 80, oy = 336; // koordinater inne i innehållsytan
+  const ox = cx - ((art.COLS - 1) / 2) * sp, xw = ox + 4 * sp, xr = ox + 10 * sp, base = 640;
+  imgs['02-ikon-ritning-1x1'] = [1080, 1080, frame(1080, 1080, 80, `
+<div style="position:absolute;left:${cx - S / 2}px;top:${oy - S / 2}px">${icon(S, 'hero', 0.62)}</div>
+<div style="position:absolute;background:#000;left:${xw}px;top:${oy + 7 * sp}px;width:1.5px;height:${base - (oy + 7 * sp)}px"></div>
+<div style="position:absolute;background:#000;left:${xr}px;top:${oy + sp}px;width:1.5px;height:${base - (oy + sp)}px"></div>
+<div style="position:absolute;background:#000;left:${xw}px;top:${base}px;width:${xr - xw + 1.5}px;height:1.5px"></div>
+<div class="label" style="position:absolute;left:${xw}px;top:${base + 16}px">Röst</div>
+<div class="label" style="position:absolute;left:${xr}px;top:${base + 16}px;transform:translateX(-100%)">Text</div>`)];
 }
 
-// 3. Fyrkant: dikteringen i ett appfönster på grå yta.
-imgs['03-diktering-1x1'] = [1080, 1080, `
-<div style="position:absolute;inset:0;background:#ebecef"></div>
+// 3. Diktering: rubrik, texten som klistras in, statuspillren.
+imgs['03-diktering-1x1'] = [1080, 1080, frame(1080, 1080, 80, `
+<div style="height:100%;display:flex;flex-direction:column;gap:48px">
+ <div style="display:flex;flex-direction:column;gap:8px"><span class="label">Diktering</span><div class="h1 m">Tänk högt.</div></div>
+ <div style="flex-grow:1;display:flex;align-items:center;justify-content:center">${icon(240, 'live', 0.3)}</div>
+ <div class="tile body" style="padding:32px 40px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div>
+ <div style="display:flex;align-items:center;gap:16px">${pillListen}<span class="label">→</span>${pillOk}</div>
+</div>`)];
 
-<div class="win" style="position:absolute;left:84px;right:84px;top:160px;height:720px;padding:96px 60px 60px;display:flex;flex-direction:column;justify-content:center;gap:44px">
- <div class="lights"><span></span><span></span><span></span></div>
- <div style="display:flex;align-items:center;gap:30px">${icon(120, 'live', 0.3)}<div style="display:flex;flex-direction:column;gap:6px"><span class="label">Diktering</span><div class="m" style="font-size:64px;line-height:68px;letter-spacing:-0.02em">Tänk högt.</div></div></div>
- <div class="tile" style="padding:30px 36px;font-size:30px;line-height:42px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div>
- <div style="display:flex;align-items:center;gap:18px">${listen}<span class="label">→</span>${pill}</div>
-</div>
-<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>`];
-
-// 4. Liggande: mötet som text, med nivåmätare och sammanfattning.
-imgs['04-mote-16x9'] = [1920, 1080, `
-<div style="position:absolute;inset:0;background:#ebecef"></div>
-<div class="label" style="position:absolute;left:96px;top:36px">Byggt med Klang Pianissimo</div>
-<div class="win" style="position:absolute;left:96px;right:96px;top:96px;bottom:96px;padding:110px 72px 64px;display:grid;grid-template-columns:590px minmax(0,1fr);gap:56px">
- <div class="lights"><span></span><span></span><span></span></div>
- <div style="position:absolute;right:72px;top:24px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:110px;height:auto;display:block"></div>
- <div style="display:flex;flex-direction:column;gap:36px">
-  <div class="label">Mötesläge · Kvartalsgenomgång, Almkvist Logistik</div>
-  <div class="m" style="font-size:58px;line-height:62px;letter-spacing:-0.02em;white-space:nowrap">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div>
-  <div style="display:flex;flex-direction:column;gap:9px"><span class="label">Sammanfattning</span><div class="said">Budgeten ses över. Omar tar fram ett nytt förslag till nästa vecka.</div></div>
-  <div style="margin-top:auto">${meter(44, 3, 12, 3.4, 7)}</div>
+// 4. Möte: rubrik och sammanfattning till vänster, samtalet till höger.
+imgs['04-mote-16x9'] = [1920, 1080, frame(1920, 1080, 96, `
+<div style="height:100%;display:grid;grid-template-columns:640px minmax(0,1fr);gap:96px;align-items:center">
+ <div style="display:flex;flex-direction:column;gap:48px">
+  <div style="display:flex;flex-direction:column;gap:8px"><span class="label">Mötesläge</span><div class="h1 m">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div></div>
+  <div style="display:flex;flex-direction:column;gap:8px"><span class="label">Sammanfattning</span><div class="body">Budgeten ses över. Omar tar fram<br>ett nytt förslag till nästa vecka.</div></div>
  </div>
- <div class="tile" style="padding:40px;display:flex;flex-direction:column;gap:28px">
+ <div class="tile" style="padding:40px;display:flex;flex-direction:column;gap:24px">
   ${line('00:00', 1, 'Karin', 'Ska vi börja med tredje kvartalet?')}
-  ${line('00:12', 'J', 'Jag', 'Ja. Leveranserna ligger i fas, men budgeten behöver ses över.')}
+  ${line('00:12', 'J', 'Jag', 'Leveranserna ligger i fas, men budgeten behöver ses över.')}
   ${line('00:27', 2, 'Omar', 'Då tar jag fram ett nytt förslag till nästa vecka.')}
   ${line('00:41', 1, 'Karin', 'Bra. Vi stämmer av på måndag.')}
-  ${line('00:48', 'J', 'Jag', 'Jag skickar underlaget till er båda i dag.')}
-  ${line('00:56', 2, 'Omar', 'Perfekt, då har jag det inför förslaget.')}
  </div>
-</div>`];
+</div>`)];
 
-// 5. Fyrkant: flödet i tre steg, allt inom datorn.
-imgs['05-flode-1x1'] = [1080, 1080, `
-<div style="position:absolute;inset:0;padding:84px;display:flex;flex-direction:column;gap:28px">
- <div class="label">Byggt med Klang Pianissimo</div>
- <div class="m" style="font-size:64px;line-height:68px;letter-spacing:-0.02em">Röst in. Text ut.<br><span class="dim">Inget lämnar datorn.</span></div>
- <div class="tile" style="flex-grow:1;padding:40px 48px;display:flex;flex-direction:column;gap:18px;position:relative;border:0">
-  <div class="label" style="position:absolute;right:48px;top:40px">På datorn</div>
-  <div style="display:flex;flex-direction:column;gap:14px"><span class="label">1 · Ljud</span>${meter(46, 3, 16, 4.4, 11)}</div>
-  <div style="width:1.5px;height:22px;background:#000;margin-left:4px"></div>
-  <div style="display:flex;flex-direction:column;gap:14px"><span class="label">2 · Taligenkänning</span><div style="height:64px;border-radius:999px;background:#000;color:#fff;display:flex;align-items:center;gap:18px;padding:0 30px;font-size:24px" class="m">${icon(40, 'type', 0.5, '#fff', 0.42)}Klang Pianissimo</div></div>
-  <div style="width:1.5px;height:22px;background:#000;margin-left:4px"></div>
-  <div style="display:flex;flex-direction:column;gap:14px"><span class="label">3 · Text</span><div style="background:#fff;border-radius:16px;padding:22px 28px;font-size:26px;line-height:36px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div></div>
+// 5. Flödet: ljud, Pianissimo, text. Tre steg, samma avstånd.
+imgs['05-flode-1x1'] = [1080, 1080, frame(1080, 1080, 80, `
+<div style="height:100%;display:flex;flex-direction:column;gap:48px">
+ <div class="h1 m">Från röst till text.<br><span class="dim">Allt på datorn.</span></div>
+ <div style="display:flex;flex-direction:column;gap:32px">
+  <div style="display:flex;flex-direction:column;gap:16px"><span class="label">1 · Ljud</span>${meter(58, 3, 16, 4.4, 11)}</div>
+  <div style="display:flex;flex-direction:column;gap:16px"><span class="label">2 · Taligenkänning</span><div class="pill m" style="align-self:flex-start">${icon(40, 'type', 0.5, '#fff', 0.42)}Klang Pianissimo</div></div>
+  <div style="display:flex;flex-direction:column;gap:16px"><span class="label">3 · Text</span><div class="tile body" style="padding:24px 32px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div></div>
  </div>
- <div style="display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>
-</div>`];
+</div>`)];
 
 fs.mkdirSync('stills-src', { recursive: true });
 for (const [n, [w, h, body]] of Object.entries(imgs)) fs.writeFileSync(`stills-src/${n}.html`, page(w, h, body));

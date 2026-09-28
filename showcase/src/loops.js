@@ -10,35 +10,33 @@ const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><style>
 *{box-sizing:border-box}html,body{margin:0;background:#fff}
 .stage{width:1080px;height:1080px;position:relative;overflow:hidden;background:#fff;color:#000;font-family:'Helvetica Neue',Heros,Helvetica,Arial,sans-serif;display:none}
 .m{-webkit-text-stroke:.45px currentColor}
-.label{font-size:22px;line-height:30px;color:#5f5f5f}.dim{color:#818181}
+.label{font-size:22px;line-height:32px;color:#5f5f5f}.dim{color:#818181}
 .tile{border-radius:24px;background:#ebecef}
-.pill{height:54px;padding:0 27px 0 21px;border-radius:999px;background:#000;color:#fff;font-size:20px;display:inline-flex;align-items:center;gap:15px;white-space:nowrap}
-.foot{position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:baseline}
-.row{display:grid;grid-template-columns:66px 33px minmax(0,1fr);gap:18px;align-items:start}
-.ts{font-size:20px;line-height:33px;color:#5f5f5f;font-variant-numeric:tabular-nums}
-.b{width:33px;height:33px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:16px}
-.who{font-size:20px;line-height:33px}.said{font-size:26px;line-height:36px}
+.pill{height:56px;padding:0 28px 0 24px;border-radius:999px;background:#000;color:#fff;font-size:22px;display:inline-flex;align-items:center;gap:16px;white-space:nowrap}
+.foot{position:absolute;left:80px;right:80px;bottom:80px;display:flex;justify-content:space-between;align-items:baseline}
+.row{display:grid;grid-template-columns:64px 32px minmax(0,1fr);gap:16px;align-items:start}
+.ts{font-size:18px;line-height:32px;color:#5f5f5f;font-variant-numeric:tabular-nums}
+.b{width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:16px}
+.who{font-size:18px;line-height:32px}.said{font-size:26px;line-height:36px}
 </style></head><body>
 ${(() => {
-  const foot = `<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>`;
+  const foot = `<div class="label" style="position:absolute;left:80px;top:80px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:80px;right:80px;bottom:80px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:144px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:24px">Made by Anthon Bäckström</span></div></div>`;
   const dot = `<span style="width:12px;height:12px;border-radius:999px;background:#fff"></span>`;
   const ring = `<span style="width:12px;height:12px;border-radius:999px;border:2px solid #fff"></span>`;
   const B = { J: 'background:#000;color:#fff', 1: 'background:#5f5f5f;color:#fff', 2: 'border:1.5px solid #000' };
   const line = (id, ts, k, who, said) => `<div class="row" id="${id}"><span class="ts">${ts}</span><span class="b" style="${B[k]}">${k}</span><div><div class="who m">${who}</div><div class="said">${said}</div></div></div>`;
   return `
-<div class="stage" id="lyssnar"><div style="position:absolute;inset:0 0 120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="560" width="560" height="560"></svg><div class="pill m">${dot}Lyssnar…</div></div>${foot}</div>
-<div class="stage" id="skriver"><div style="position:absolute;inset:0 0 120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="560" width="560" height="560"></svg><div class="pill m">${ring}Skriver…</div></div>${foot}</div>
-<div class="stage" id="ljud"><div class="tile" style="position:absolute;left:84px;right:84px;top:250px;height:500px;display:flex;align-items:center;justify-content:center"><svg data-meter="44,6,19,5.6"></svg></div>${foot}</div>
-<div class="stage" id="mote"><div style="position:absolute;inset:150px 84px 230px;display:flex;flex-direction:column;gap:22px">
- <div style="display:flex;align-items:flex-start;justify-content:space-between"><div class="m" style="font-size:56px;line-height:60px;letter-spacing:-0.02em">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div><div class="pill m">${ring}Transkriberar…</div></div>
- <svg data-meter="61,3,15,4.2"></svg>
- <div class="tile" style="padding:28px 36px;display:flex;flex-direction:column;gap:16px">
+<div class="stage" id="lyssnar"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="480" width="480" height="480"></svg><div class="pill m">${dot}Lyssnar…</div></div>${foot}</div>
+<div class="stage" id="skriver"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="480" width="480" height="480"></svg><div class="pill m">${ring}Skriver…</div></div>${foot}</div>
+<div class="stage" id="ljud"><div class="tile" style="position:absolute;left:80px;right:80px;top:272px;height:488px;display:flex;align-items:center;justify-content:center"><svg data-meter="44,6,19,5.6"></svg></div>${foot}</div>
+<div class="stage" id="mote"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;gap:48px">
+ <div style="display:flex;align-items:flex-start;justify-content:space-between"><div class="m" style="font-size:72px;line-height:80px;letter-spacing:-0.02em">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div><div class="pill m">${ring}Transkriberar…</div></div>
+ <div class="tile" style="padding:40px;display:flex;flex-direction:column;gap:24px">
   ${line('m1', '00:00', 1, 'Karin', 'Ska vi börja med tredje kvartalet?')}
-  ${line('m2', '00:12', 'J', 'Jag', 'Ja. Leveranserna ligger i fas, men budgeten behöver ses över.')}
+  ${line('m2', '00:12', 'J', 'Jag', 'Leveranserna ligger i fas, men budgeten behöver ses över.')}
   ${line('m3', '00:27', 2, 'Omar', 'Då tar jag fram ett nytt förslag till nästa vecka.')}
-  ${line('m4', '00:41', 1, 'Karin', 'Bra. Vi stämmer av på måndag.')}
  </div>
- <div id="m5" style="display:flex;flex-direction:column;gap:9px"><span class="label">Sammanfattning</span><div class="said">Budgeten ses över. Omar tar fram ett nytt förslag till nästa vecka.</div></div>
+ <div id="m5" style="display:flex;flex-direction:column;gap:8px"><span class="label">Sammanfattning</span><div class="said">Budgeten ses över. Omar tar fram<br>ett nytt förslag till nästa vecka.</div></div>
 </div>${foot}</div>`;
 })()}
 <script>
@@ -67,9 +65,9 @@ function render(name,t){document.querySelectorAll('.stage').forEach(s=>s.style.d
  if(name==='lyssnar')icon(st,'live',t);
  if(name==='skriver')icon(st,'type',t);
  if(name==='ljud')meter(st.querySelector('svg[data-meter]'),t,LOOPS.ljud,5);
- if(name==='mote'){t=(t+5.0)%LOOPS.mote;meter(st.querySelector('svg[data-meter]'),t,LOOPS.mote,9);
+ if(name==='mote'){t=(t+5.0)%LOOPS.mote;
   const out=1-ease((t-5.6)/0.6);
-  ['m1','m2','m3','m4','m5'].forEach((id,i)=>show($(id),Math.min(ease((t-0.3-i*1.05)/0.4),out)));}
+  ['m1','m2','m3','m5'].forEach((id,i)=>show($(id),Math.min(ease((t-0.3-i*1.05)/0.4),out)));}
 }
 window.render=render;window.LOOPS=LOOPS;window.FPS=FPS;
 </script></body></html>`;

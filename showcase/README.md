@@ -24,3 +24,10 @@ Fem stillbilder i `bilder/`, 4K: tre fyrkantiga (2160×2160) och två liggande (
 
 Fyra sömlösa loopar i `loopar/`, var och en som MP4 (2160×2160, 25 fps, utan ljud) och GIF (1080×1080, 64 gråtoner):
 `lyssnar` (2,4 s), `skriver` (3,2 s), `ljud` (4 s) och `mote` (6,4 s). Bygg med `SCALE=2 node src/loops.js lframes`, sedan ffmpeg per mapp.
+
+## Designsystem
+
+Samma regler i video, bilder och loopar:
+- Typskala 18 / 22 / 26 / 72 / 144 px. Grått #5f5f5f för små etiketter, #818181 för andrarader i rubriker.
+- Avstånd i steg om 8 px. Marginal 80 px (1:1) och 96 px (16:9).
+- Ram: "Byggt med Klang Pianissimo" uppe till vänster, "Speak." nere till vänster, signatur och "Made by Anthon Bäckström" nere till höger.
