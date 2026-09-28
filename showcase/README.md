@@ -15,3 +15,7 @@ och TeX Gyre Heros (`texgyreheros-regular.otf`, `texgyreheros-bold.otf`) i samma
 2. `node shoot.js all` tar 300 bilder med Playwright till `frames/`.
 3. `python3 music.py` skriver `music.wav` (kräver numpy).
 4. ffmpeg: `ffmpeg -framerate 30 -i frames/f%04d.png -i music.wav -c:v libx264 -crf 16 -pix_fmt yuv420p -c:a aac -t 10 speak-showcase-1x1.mp4`
+
+## Bilder
+
+Fem stillbilder i `bilder/`, 4K: tre fyrkantiga (2160×2160) och två liggande (3840×2160). Bygg med `node src/stills.js bilder` (samma filer bredvid som ovan).
