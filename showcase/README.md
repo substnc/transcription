@@ -19,3 +19,8 @@ och TeX Gyre Heros (`texgyreheros-regular.otf`, `texgyreheros-bold.otf`) i samma
 ## Bilder
 
 Fem stillbilder i `bilder/`, 4K: tre fyrkantiga (2160×2160) och två liggande (3840×2160). Bygg med `node src/stills.js bilder` (samma filer bredvid som ovan).
+
+## Loopar
+
+Fyra sömlösa loopar i `loopar/`, var och en som MP4 (2160×2160, 25 fps, utan ljud) och GIF (800×800):
+`lyssnar` (2,4 s), `skriver` (3,2 s), `ljud` (4 s) och `mote` (6,4 s). Bygg med `SCALE=2 node src/loops.js lframes`, sedan ffmpeg per mapp.
