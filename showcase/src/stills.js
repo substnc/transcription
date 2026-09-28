@@ -63,7 +63,7 @@ imgs['01-hero-16x9'] = [1920, 1080, `
    <div class="m dim" style="font-size:56px;line-height:62px;letter-spacing:-0.02em">Röst blir text.<br>Direkt på datorn.</div>
   </div>
   <div style="display:flex;flex-wrap:wrap;gap:14px 28px"><span class="tag">Diktering</span><span class="tag">Möten med talare</span><span class="tag">Svenska och engelska</span><span class="tag">Allt stannar på datorn</span></div>
-  <div style="position:absolute;right:96px;top:120px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>
+  <div style="position:absolute;right:96px;top:120px"><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>
  </div>
 </div>`];
 
@@ -79,7 +79,7 @@ imgs['01-hero-16x9'] = [1920, 1080, `
 <div class="hair" style="left:${xw}px;top:900px;width:${xr - xw}px;height:1.5px"></div>
 <div style="position:absolute;left:${xw - 100}px;top:914px;width:200px;text-align:center" class="label">Röst</div>
 <div style="position:absolute;left:${xr - 100}px;top:914px;width:200px;text-align:center" class="label">Text</div>
-<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;right:84px;bottom:84px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>`];
+<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>`];
 }
 
 // 3. Fyrkant: dikteringen i ett appfönster på grå yta.
@@ -92,7 +92,7 @@ imgs['03-diktering-1x1'] = [1080, 1080, `
  <div class="tile" style="padding:30px 36px;font-size:30px;line-height:42px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div>
  <div style="display:flex;align-items:center;gap:18px">${listen}<span class="label">→</span>${pill}</div>
 </div>
-<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;right:84px;bottom:84px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:170px;height:auto;display:block"></div>`];
+<div class="label" style="position:absolute;left:84px;top:84px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:84px;right:84px;bottom:84px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>`];
 
 // 4. Liggande: mötet som text, med nivåmätare och sammanfattning.
 imgs['04-mote-16x9'] = [1920, 1080, `
@@ -130,7 +130,7 @@ imgs['05-flode-1x1'] = [1080, 1080, `
   <div style="width:1.5px;height:22px;background:#000;margin-left:4px"></div>
   <div style="display:flex;flex-direction:column;gap:14px"><span class="label">3 · Text</span><div style="background:#fff;border-radius:16px;padding:22px 28px;font-size:26px;line-height:36px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div></div>
  </div>
- <div style="display:flex;justify-content:flex-end"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"></div>
+ <div style="display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:150px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:22px">Made by Anthon Bäckström</span></div></div>
 </div>`];
 
 fs.mkdirSync('stills-src', { recursive: true });
