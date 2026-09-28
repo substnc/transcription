@@ -30,7 +30,7 @@ ${(() => {
 <div class="stage" id="skriver"><div style="position:absolute;inset:0 0 120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="560" width="560" height="560"></svg><div class="pill m">${ring}Skriver…</div></div>${foot}</div>
 <div class="stage" id="ljud"><div class="tile" style="position:absolute;left:84px;right:84px;top:250px;height:500px;display:flex;align-items:center;justify-content:center"><svg data-meter="44,6,19,5.6"></svg></div>${foot}</div>
 <div class="stage" id="mote"><div style="position:absolute;inset:150px 84px 230px;display:flex;flex-direction:column;gap:22px">
- <div style="display:flex;align-items:center;justify-content:space-between"><div class="m" style="font-size:64px;line-height:68px;letter-spacing:-0.02em">Möte blir text.</div><div class="pill m">${ring}Transkriberar…</div></div>
+ <div style="display:flex;align-items:flex-start;justify-content:space-between"><div class="m" style="font-size:56px;line-height:60px;letter-spacing:-0.02em">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div><div class="pill m">${ring}Transkriberar…</div></div>
  <svg data-meter="61,3,15,4.2"></svg>
  <div class="tile" style="padding:28px 36px;display:flex;flex-direction:column;gap:16px">
   ${line('m1', '00:00', 1, 'Karin', 'Ska vi börja med tredje kvartalet?')}

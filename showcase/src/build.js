@@ -31,7 +31,7 @@ html,body{margin:0;background:#fff}
 <div class="scene" id="s1">
  <div style="display:flex;flex-direction:column;gap:12px">
   <div class="label">Diktering</div>
-  <div class="hero m"><div id="h1a">Håll in. Prata.</div><div class="dim" id="h1b">Släpp.</div></div>
+  <div class="hero m"><div id="h1a">Tänk högt.</div><div id="h1b"></div></div>
  </div>
  <div style="flex-grow:1;display:flex;align-items:center;justify-content:center"><svg id="ic1" width="300" height="300" viewBox="0 0 300 300" fill="#000"></svg></div>
  <div style="display:flex;flex-direction:column;gap:21px">
@@ -47,7 +47,7 @@ html,body{margin:0;background:#fff}
 <div class="scene" id="s2">
  <div style="display:flex;flex-direction:column;gap:12px">
   <div class="label">Mötesläge · Kvartalsgenomgång, Almkvist Logistik</div>
-  <div class="hero m"><div>Möte blir text.</div><div class="dim">3 talare.</div></div>
+  <div class="hero m"><div>Var närvarande.</div><div class="dim">Lokal transkribering.</div></div>
  </div>
  <div class="tile" style="padding:36px;display:flex;flex-direction:column;gap:24px">
   <div class="row" id="r1"><span class="ts">00:00</span><span class="b" style="background:#5f5f5f;color:#fff">1</span><div><div class="who m">Karin</div><div class="said">Ska vi börja med tredje kvartalet?</div></div></div>

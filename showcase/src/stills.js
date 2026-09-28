@@ -88,7 +88,7 @@ imgs['03-diktering-1x1'] = [1080, 1080, `
 
 <div class="win" style="position:absolute;left:84px;right:84px;top:160px;height:720px;padding:96px 60px 60px;display:flex;flex-direction:column;justify-content:center;gap:44px">
  <div class="lights"><span></span><span></span><span></span></div>
- <div style="display:flex;align-items:center;gap:30px">${icon(120, 'live', 0.3)}<div class="m" style="font-size:52px;line-height:56px;letter-spacing:-0.02em">Håll in. Prata.<br><span class="dim">Släpp.</span></div></div>
+ <div style="display:flex;align-items:center;gap:30px">${icon(120, 'live', 0.3)}<div style="display:flex;flex-direction:column;gap:6px"><span class="label">Diktering</span><div class="m" style="font-size:64px;line-height:68px;letter-spacing:-0.02em">Tänk högt.</div></div></div>
  <div class="tile" style="padding:30px 36px;font-size:30px;line-height:42px">Hej Karin, jag skickar budgetunderlaget innan fredag.</div>
  <div style="display:flex;align-items:center;gap:18px">${listen}<span class="label">→</span>${pill}</div>
 </div>
@@ -98,12 +98,12 @@ imgs['03-diktering-1x1'] = [1080, 1080, `
 imgs['04-mote-16x9'] = [1920, 1080, `
 <div style="position:absolute;inset:0;background:#ebecef"></div>
 <div class="label" style="position:absolute;left:96px;top:36px">Byggt med Klang Pianissimo</div>
-<div class="win" style="position:absolute;left:96px;right:96px;top:96px;bottom:96px;padding:110px 72px 64px;display:grid;grid-template-columns:560px minmax(0,1fr);gap:72px">
+<div class="win" style="position:absolute;left:96px;right:96px;top:96px;bottom:96px;padding:110px 72px 64px;display:grid;grid-template-columns:590px minmax(0,1fr);gap:56px">
  <div class="lights"><span></span><span></span><span></span></div>
  <div style="position:absolute;right:72px;top:24px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:110px;height:auto;display:block"></div>
  <div style="display:flex;flex-direction:column;gap:36px">
   <div class="label">Mötesläge · Kvartalsgenomgång, Almkvist Logistik</div>
-  <div class="m" style="font-size:72px;line-height:76px;letter-spacing:-0.02em">Möte blir text.<br><span class="dim">3 talare.</span></div>
+  <div class="m" style="font-size:58px;line-height:62px;letter-spacing:-0.02em;white-space:nowrap">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div>
   <div style="display:flex;flex-direction:column;gap:9px"><span class="label">Sammanfattning</span><div class="said">Budgeten ses över. Omar tar fram ett nytt förslag till nästa vecka.</div></div>
   <div style="margin-top:auto">${meter(44, 3, 12, 3.4, 7)}</div>
  </div>
