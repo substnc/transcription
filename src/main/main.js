@@ -13,6 +13,7 @@ const windows = require('./windows');
 const art = require('./icon-art');
 const { WavWriter, convertToWav, concatFloat32, repairWav } = require('../engine/audio');
 const { buildMeetingNote } = require('../engine/markdown');
+const { buildQuestions } = require('../engine/questions');
 
 // Appen hette "sub.stnc® - Speak" innan den blev "Speak". Modeller (flera GB) och inställningar ligger kvar
 // i den gamla mappen, så den används fortfarande. Ingen flytt: Pianissimos Python-miljö ligger där.
@@ -275,9 +276,22 @@ function stopMeetingRecording() {
   return { wavPath: p, seconds, liveSegs };
 }
 
+// Frågor efter mötet (namn, samma person, ord) och namn som Speak är säker på. Körs lokalt, utan språkmodell.
+function addQuestions(r, opts = {}) {
+  try {
+    const q = buildQuestions({ segments: r.segments, speakers: r.speakers, similar: r.similar || [], corrections: r.corrections || [], about: opts.about || '' });
+    r.autoNames = q.autoNames;
+    r.questions = q.questions;
+  } catch (e) {
+    console.error('Frågorna kunde inte tas fram:', e.message);
+    r.autoNames = {};
+    r.questions = [];
+  }
+}
+
 // Letar efter video som spelats upp under mötet (raderna får aside) och sammanfattar resten.
-async function clipsAndSummary(r, s, title) {
-  r.segments = await engine.call('findClips', { segments: r.segments, useLlm: s.useLlm, title: title || '' }, (p) => sendToMeeting('meeting:progress', p));
+async function clipsAndSummary(r, s, title, about = '') {
+  r.segments = await engine.call('findClips', { segments: r.segments, useLlm: s.useLlm, title: title || '', about }, (p) => sendToMeeting('meeting:progress', p));
   sendToMeeting('meeting:progress', { phase: 'summarize', text: 'Sammanfattar…' });
   return engine.call('summarize', { segments: r.segments.filter((x) => !x.aside), useLlm: s.useLlm }, (p) => sendToMeeting('meeting:progress', p));
 }
@@ -289,9 +303,10 @@ async function meetingFromLive(wavPath, segments, opts = {}) {
   const channels = fs.existsSync(c.mic) && fs.existsSync(c.sys) ? c : null;
   setIconState('type');
   try {
-    const r = await engine.call('meetingFromLive', { wavPath, segments, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount: opts.speakerCount || 0, useLlm: s.useLlm, vocabulary: s.vocabulary, title: opts.title || '' },
+    const r = await engine.call('meetingFromLive', { wavPath, segments, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount: opts.speakerCount || 0, useLlm: s.useLlm, vocabulary: s.vocabulary, title: opts.title || '', about: opts.about || '' },
       (p) => sendToMeeting('meeting:progress', p));
-    const summary = await clipsAndSummary(r, s, opts.title);
+    const summary = await clipsAndSummary(r, s, opts.title, opts.about);
+    addQuestions(r, opts);
     return { ...r, summary, wavPath, model: `livetext (${s.liveModel})${r.cleanedBy === 'llm' ? ` + ${s.ollamaModel}` : ''}` };
   } finally {
     setIconState('idle');
@@ -309,7 +324,8 @@ async function transcribeMeeting(wavPath, opts = {}) {
   setIconState('type');
   try {
     const r = await engine.call('meeting', { wavPath, policy, whisper, diarize: s.diarize, diarizer: s.diarizer, channels, speakerCount, vocabulary: s.vocabulary }, (p) => sendToMeeting('meeting:progress', p));
-    const summary = await clipsAndSummary(r, s, opts.title);
+    const summary = await clipsAndSummary(r, s, opts.title, opts.about);
+    addQuestions(r, opts);
     return { ...r, summary, wavPath, model: `whisper-${whisper}` };
   } finally {
     setIconState('idle');

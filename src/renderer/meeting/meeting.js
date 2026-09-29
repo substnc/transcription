@@ -8,12 +8,12 @@ let timerHandle = null;
 let current = 'idle';
 function report(extra = {}) {
   const title = $('title').value.trim();
-  const st = current === 'recording' ? 'recording' : current === 'processing' ? 'processing' : current === 'result' && !state.saved ? 'done' : 'idle';
+  const st = current === 'recording' ? 'recording' : current === 'processing' ? 'processing' : (current === 'result' || current === 'questions') && !state.saved ? 'done' : 'idle';
   api.meeting.report({ state: st, title, startedAt: state.startedAt, ...extra });
 }
 
 function show(section) {
-  for (const id of ['idle', 'recording', 'processing', 'result']) $(id).classList.toggle('hidden', id !== section);
+  for (const id of ['idle', 'recording', 'processing', 'questions', 'result']) $(id).classList.toggle('hidden', id !== section);
   current = section;
   report();
 }
@@ -34,7 +34,7 @@ function speakerCount() {
 }
 
 function meetingOpts() {
-  return { speakerCount: speakerCount(), language: $('language').value || undefined, title: $('title').value.trim() };
+  return { speakerCount: speakerCount(), language: $('language').value || undefined, title: $('title').value.trim(), about: $('about').value.trim() };
 }
 
 function fail(msg) {
@@ -176,7 +176,12 @@ api.meeting.onProgress(setProgress);
 function showResult(r) {
   state.saved = false;
   state.result = r;
-  state.speakerNames = Object.fromEntries(r.speakers.map((s) => [s, s]));
+  // Namn som Speak är säker på (tilltal och svar i samtalet) sätts direkt.
+  state.speakerNames = Object.fromEntries(r.speakers.map((s) => [s, (r.autoNames && r.autoNames[s]) || s]));
+  // Frågorna visas som kort innan texten, bara när fler än två talare är med.
+  state.questions = r.speakers.length > 2 ? (r.questions || []).slice() : [];
+  state.qIndex = 0;
+  state.qChanged = false;
   state.picked.clear();
   state.anchor = null;
   state.openClips.clear();
@@ -188,10 +193,19 @@ function showResult(r) {
   fillSummary(r.summary);
   renderInboxes();
   $('saveStatus').textContent = '';
+  if (state.questions.length) return showQuestions();
   show('result');
   fitAll();
+  updateQuestionsLeft();
 }
 window.addEventListener('resize', () => $('segments').querySelectorAll('textarea').forEach(fitText));
+
+// Två talare är samma person: allt som from sa blir to:s.
+function mergeSpeaker(from, to) {
+  state.result.segments.forEach((seg) => { if (seg.speaker === from) seg.speaker = to; });
+  state.result.speakers = state.result.speakers.filter((o) => o !== from);
+  delete state.speakerNames[from];
+}
 
 function renderSpeakers() {
   const el = $('speakers');
@@ -210,9 +224,7 @@ function renderSpeakers() {
       const name = input.value.trim().toLowerCase();
       const other = state.result.speakers.find((o) => o !== s && (state.speakerNames[o] || o).toLowerCase() === name);
       if (!name || !other) return;
-      state.result.segments.forEach((seg) => { if (seg.speaker === s) seg.speaker = other; });
-      state.result.speakers = state.result.speakers.filter((o) => o !== s);
-      delete state.speakerNames[s];
+      mergeSpeaker(s, other);
       renderSpeakers();
       renderSegments();
     };
@@ -438,6 +450,213 @@ $('btnCopy').onclick = async () => {
   setTimeout(() => ($('btnCopy').textContent = 'Kopiera som text'), 1500);
 };
 
+// ---- Innan du läser: frågekort ----
+const PLAY_SVG = '<svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.2v7.6L8.6 5z" fill="currentColor"></path></svg>';
+const TICK_SVG = '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.2l2.3 2.3 4.7-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+let clip = null;
+
+// Spelar upp en bit av mötets ljudfil (den ligger kvar på datorn tills anteckningen sparas).
+function playClip(start, end, btn) {
+  if (clip) { clip.audio.pause(); if (clip.btn) clip.btn.classList.remove('on'); }
+  const p = (state.result && state.result.wavPath) || state.audioPath;
+  if (!p || (clip && clip.btn === btn)) { clip = null; return; }
+  const audio = new Audio('file://' + encodeURI(p).replace(/#/g, '%23').replace(/\?/g, '%3F'));
+  clip = { audio, btn };
+  btn.classList.add('on');
+  audio.addEventListener('loadedmetadata', () => { audio.currentTime = Math.max(0, start - 0.2); audio.play().catch(() => {}); });
+  audio.addEventListener('timeupdate', () => { if (audio.currentTime >= end + 0.3) { audio.pause(); btn.classList.remove('on'); clip = null; } });
+  audio.addEventListener('error', () => { btn.classList.remove('on'); btn.title = 'Ljudfilen finns inte kvar'; clip = null; });
+}
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+// En replik med uppspelningsknapp.
+function quoteRow(seg, { clip: oneLine = true, mark } = {}) {
+  const row = el('div', 'quote');
+  const b = el('button', 'play');
+  b.type = 'button';
+  b.setAttribute('aria-label', `Spela upp ${fmt(seg.start)}`);
+  b.innerHTML = PLAY_SVG;
+  b.onclick = () => playClip(seg.start, seg.end, b);
+  const x = el('span', 'x' + (oneLine ? ' clip' : ''));
+  if (mark && seg.text.includes(mark)) {
+    const [pre, ...rest] = seg.text.split(mark);
+    x.append(pre, el('span', 'mark', mark), rest.join(mark));
+  } else x.textContent = seg.text;
+  row.append(b, el('span', 't', fmt(seg.start)), x);
+  return row;
+}
+
+// Några repliker från en talare, utspridda över hela mötet, de längre först.
+function examples(speaker, n = 5) {
+  const all = state.result.segments.filter((s) => s.speaker === speaker && s.text.length > 12);
+  if (all.length <= n) return all;
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const part = all.slice(Math.floor((k * all.length) / n), Math.floor(((k + 1) * all.length) / n));
+    out.push(part.sort((a, b) => b.text.length - a.text.length)[0]);
+  }
+  return out;
+}
+
+function quoteBox(title, segs, count, oneLine = true) {
+  const box = el('div', 'quotes');
+  const h = el('div', 'qh');
+  h.append(el('span', '', title));
+  if (count) h.append(el('span', '', `${count} repliker`));
+  box.appendChild(h);
+  segs.forEach((s) => box.appendChild(quoteRow(s, { clip: oneLine })));
+  return box;
+}
+
+function answerButton(text, primary, fn) {
+  const b = el('button', primary ? 'primary' : '', text);
+  b.type = 'button';
+  b.onclick = fn;
+  return b;
+}
+
+function nameOf(sp) { return state.speakerNames[sp] || sp; }
+function countOf(sp) { return state.result.segments.filter((s) => s.speaker === sp).length; }
+
+function showQuestions() {
+  const qs = state.questions;
+  // Frågor som inte längre gäller (talaren finns inte kvar) hoppas över.
+  while (state.qIndex < qs.length && !questionValid(qs[state.qIndex])) state.qIndex++;
+  if (state.qIndex >= qs.length) return finishQuestions();
+  const q = qs[state.qIndex];
+  $('qMeta').textContent = `${$('title').value.trim() || 'Möte'} · ${fmt(state.result.durationSec)} · ${state.result.speakers.length} talare`;
+  const left = qs.length - state.qIndex;
+  $('qCount').textContent = left === 1 ? 'En sak Speak vill ha hjälp med.' : `${['', 'En', 'Två', 'Tre', 'Fyra', 'Fem', 'Sex', 'Sju'][left] || left} saker Speak vill ha hjälp med.`;
+  const done = $('qDone');
+  done.innerHTML = '';
+  const known = Object.entries(state.speakerNames).filter(([sp, n]) => n !== sp);
+  if (known.length) {
+    done.appendChild(el('span', 'status', 'Redan klart'));
+    for (const [sp, n] of known) { const c = el('span', 'chip2'); c.innerHTML = TICK_SVG; c.append(`${n}, ${sp}`); done.appendChild(c); }
+  }
+  const dots = $('qDots');
+  dots.innerHTML = '';
+  qs.forEach((_, k) => dots.appendChild(el('i', k < state.qIndex ? 'done' : k === state.qIndex ? 'now' : '')));
+  $('qStep').textContent = `Fråga ${state.qIndex + 1} av ${qs.length}`;
+  const card = $('qCard');
+  card.innerHTML = '';
+  card.scrollTop = 0;
+  const head = el('div', 'qhead');
+  const title = el('div', 'qtitle');
+  const answers = el('div', 'answers');
+  if (q.type === 'same') {
+    head.append('Rösterna liknar varandra. Lyssna på några repliker från var och en.');
+    title.textContent = `Är ${nameOf(q.a)} och ${nameOf(q.b)} samma person?`;
+    const two = el('div', 'twocol');
+    two.append(quoteBox(nameOf(q.a), examples(q.a, 4), countOf(q.a), false), quoteBox(nameOf(q.b), examples(q.b, 4), countOf(q.b), false));
+    card.append(head, title, two);
+    answers.append(
+      answerButton('Ja, samma person', true, () => { mergeSpeaker(q.b, q.a); state.qChanged = true; nextQuestion(); }),
+      answerButton('Nej, två personer', false, nextQuestion),
+    );
+  } else if (q.type === 'name') {
+    head.append(`${nameOf(q.speaker)} · ${countOf(q.speaker)} repliker i mötet`);
+    title.textContent = `Är ${nameOf(q.speaker)} ${q.name}?`;
+    card.append(head, title, quoteBox(`Det här säger ${nameOf(q.speaker)}, från hela mötet`, examples(q.speaker, 5), countOf(q.speaker)));
+    const ev = (q.evidence || []).map(([i, j]) => [state.result.segments[i], state.result.segments[j]]).filter(([a, b]) => a && b);
+    if (ev.length) {
+      const box = el('div', 'quotes');
+      box.appendChild(el('div', 'qh', `Varför ${q.name}`));
+      for (const [a, b] of ev) {
+        box.appendChild(quoteRow(a, { clip: false, mark: q.name }));
+        if (b !== a) box.appendChild(quoteRow(b, { clip: false }));
+      }
+      card.appendChild(box);
+      card.appendChild(el('div', 'why', `${q.name} nämns, och ${nameOf(q.speaker)} svarar direkt efteråt.`));
+    }
+    const other = el('input');
+    other.type = 'text';
+    other.placeholder = 'Nej, det är …';
+    const setName = (n) => { if (n) { state.speakerNames[q.speaker] = n; state.qChanged = true; } nextQuestion(); };
+    other.onkeydown = (e) => { if (e.key === 'Enter') setName(other.value.trim()); };
+    answers.append(answerButton(`Ja, det är ${q.name}`, true, () => setName(q.name)), other, answerButton('Vet inte', false, nextQuestion));
+  } else if (q.type === 'word') {
+    const i = findWord(q);
+    const seg = state.result.segments[i];
+    head.append(`Vid ${seg ? fmt(seg.start) : ''}`);
+    title.textContent = `Rättade jag rätt: ”${q.to}”?`;
+    if (seg) {
+      const box = el('div', 'quotes');
+      box.appendChild(el('div', 'qh', `Taligenkänningen hörde ”${q.from}”. Korrläsningen skrev ”${q.to}”.`));
+      box.appendChild(quoteRow(seg, { clip: false, mark: q.to }));
+      card.appendChild(box);
+    }
+    card.prepend(head);
+    card.insertBefore(title, card.children[1] || null);
+    card.appendChild(el('div', 'why', 'Säger du ja läggs ordet i ordlistan, så blir det rätt nästa gång.'));
+    answers.append(
+      answerButton(`Ja, ”${q.to}”`, true, async () => { await addToVocabulary(q.to); nextQuestion(); }),
+      answerButton(`Nej, ”${q.from}”`, false, () => { if (seg) { seg.text = seg.text.replace(q.to, q.from); state.qChanged = true; } nextQuestion(); }),
+      answerButton('Vet inte', false, nextQuestion),
+    );
+  }
+  if (q.type !== 'word') { card.prepend(title); card.prepend(head); }
+  card.appendChild(answers);
+  show('questions');
+}
+
+function questionValid(q) {
+  const sp = state.result.speakers;
+  if (q.type === 'same') return sp.includes(q.a) && sp.includes(q.b);
+  if (q.type === 'name') return sp.includes(q.speaker) && nameOf(q.speaker) === q.speaker;
+  if (q.type === 'word') return findWord(q) >= 0;
+  return false;
+}
+
+// Repliken med det rättade ordet, närmast där det stod från början (rader kan ha tagits bort).
+function findWord(q) {
+  const segs = state.result.segments;
+  let best = -1;
+  segs.forEach((s, k) => { if (s.text.includes(q.to) && (best < 0 || Math.abs(k - q.index) < Math.abs(best - q.index))) best = k; });
+  return best;
+}
+
+async function addToVocabulary(word) {
+  try {
+    const s = await api.settings.get();
+    const list = String(s.vocabulary || '').split(/[\n,;]+/).map((t) => t.trim()).filter(Boolean);
+    if (!list.some((t) => t.toLowerCase() === word.toLowerCase())) await api.settings.set({ vocabulary: [...list, word].join(', ') });
+  } catch (e) { console.error(e); }
+}
+
+function nextQuestion() {
+  if (clip) { clip.audio.pause(); clip = null; }
+  state.qIndex++;
+  showQuestions();
+}
+
+function finishQuestions() {
+  if (clip) { clip.audio.pause(); clip = null; }
+  show('result');
+  renderSpeakers();
+  renderSegments();
+  fitAll();
+  updateQuestionsLeft();
+  // Namn och sammanslagna talare ska med i sammanfattningen.
+  if (state.qChanged) { state.qChanged = false; resummarize(); }
+}
+
+// Hoppade du över frågorna finns de kvar bakom en länk i resultatet.
+function updateQuestionsLeft() {
+  const left = (state.questions || []).slice(state.qIndex).filter(questionValid).length;
+  const b = $('btnQuestionsLeft');
+  b.classList.toggle('hidden', !left);
+  b.textContent = left === 1 ? '1 fråga kvar' : `${left} frågor kvar`;
+}
+$('btnQuestionsLeft').onclick = () => showQuestions();
+$('btnSkipQuestions').onclick = () => finishQuestions();
+
 // ---- Spara ----
 async function renderInboxes() {
   state.settings = await api.settings.get();
@@ -511,6 +730,7 @@ $('btnNew').onclick = async () => {
   state.saved = false;
   state.audioPath = null;
   $('title').value = '';
+  $('about').value = '';
   show('idle');
 };
 

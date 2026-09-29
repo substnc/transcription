@@ -111,6 +111,20 @@ dictate, status, llmStatus, engineInfo, warmup går dit. Bara den startar whispe
 direkt och väntar högst 2 s på status (home.js within). Tidigare: vit sida och hängande diktering under ett
 2 h-möte. Idé för senare: flytta talaruppdelningen till en worker_thread så att förloppet också rör sig.
 
+## Frågor efter mötet (byggt 29 sep 2026)
+- Nytt möte har fältet "Vad handlar mötet om, och vilka är med?" (about). Går till korrläsningen och
+  videosökningen som ämne, och till namngissningen (namn där räknas direkt).
+- src/engine/questions.js (utan språkmodell, test/questions.test.js): namn ur tilltal ("Som du sa, Per")
+  + vem som svarar inom 3 repliker/20 s, "jag heter X". Två träffar och 75 % av rösterna = namnet sätts
+  direkt (autoNames), annars fråga. Samma person: pipeline.fixSpeakerDrift sparar par med röstlikhet
+  0,45–0,6 (merge.js nearSpeakers), mappas till Talare N i similarLabels. Ord: korrläsningens ändringar
+  (server.js r.corrections) där nya ordet har stor bokstav eller siffra.
+- main.js addQuestions efter sammanfattningen. meeting.js: sektion "questions" (Innan du läser), visas bara
+  med fler än 2 talare. Kort med repliker från hela mötet och uppspelning av mötets ljudfil (CSP media-src
+  file:). Ja slår ihop / sätter namn / lägger ord i ordlistan, Nej på ord återställer. "Visa texten direkt",
+  sedan länken "N frågor kvar" i resultatet. Sammanfattningen görs om om något ändrats.
+- Provat i Electron (Linux) med påhittat möte och riktigt ljud. Inte provat på Mac.
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.

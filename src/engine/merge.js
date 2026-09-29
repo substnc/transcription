@@ -56,7 +56,7 @@ function relabelSpeakers(segments, prefix = 'Talare') {
     if (!map.has(s.speaker)) map.set(s.speaker, s.speaker === ME ? ME_LABEL : `${prefix} ${++n}`);
     return { ...s, speaker: map.get(s.speaker) };
   });
-  return { segments: out, speakers: [...map.values()] };
+  return { segments: out, speakers: [...map.values()], map };
 }
 
 function rms(x, a, b) {
@@ -186,4 +186,28 @@ function mergeSimilarSpeakers(voices, { threshold = 0.6, maxSpeakers = 0 } = {})
   return map;
 }
 
-module.exports = { mergeSimilarSpeakers, turnsFromDiarization, assignSpeakers, relabelSpeakers, coalesce, overlap, channelActivity, combineChannelDiarization, segmentsFromWords, ME, ME_LABEL };
+// Talare som låter ganska lika men inte nog för att slås ihop automatiskt. voices som i mergeSimilarSpeakers,
+// map från mergeSimilarSpeakers. Svarar [[a, b, likhet]] för likhet mellan lo och hi.
+function nearSpeakers(voices, map, { lo = 0.45, hi = 0.6 } = {}) {
+  const groups = new Map();
+  for (const [k, v] of Object.entries(voices)) {
+    if (k === ME) continue;
+    const to = map[k] !== undefined ? map[k] : k;
+    const g = groups.get(to) || { emb: null, sec: 0 };
+    const e = normalize(v.emb);
+    g.emb = g.emb ? g.emb.map((x, i) => x + e[i] * v.sec) : e.map((x) => x * v.sec);
+    g.sec += v.sec;
+    groups.set(to, g);
+  }
+  const keys = [...groups.keys()];
+  const out = [];
+  for (let i = 0; i < keys.length; i++) {
+    for (let j = i + 1; j < keys.length; j++) {
+      const sim = cosine(normalize(groups.get(keys[i]).emb), normalize(groups.get(keys[j]).emb));
+      if (sim >= lo && sim < hi) out.push([keys[i], keys[j], sim]);
+    }
+  }
+  return out;
+}
+
+module.exports = { nearSpeakers, mergeSimilarSpeakers, turnsFromDiarization, assignSpeakers, relabelSpeakers, coalesce, overlap, channelActivity, combineChannelDiarization, segmentsFromWords, ME, ME_LABEL };

@@ -128,10 +128,13 @@ const methods = {
 
   // Möte där livetexten används som den är: talare läggs på, och texten städas av den lokala
   // språkmodellen stycke för stycke (skiljetecken, tvekljud, uppenbara hörfel).
-  async meetingFromLive({ wavPath, segments, diarize, diarizer, channels, speakerCount, useLlm, vocabulary, title }, id) {
+  async meetingFromLive({ wavPath, segments, diarize, diarizer, channels, speakerCount, useLlm, vocabulary, title, about }, id) {
     const onProgress = (p) => send({ id, progress: p });
     const r = await pipeline.meetingFromLive(wavPath, { segments, diarize, diarizer, channels, speakerCount, onProgress });
     r.cleanedBy = 'rules';
+    // Vad korrläsningen ändrade, så att Speak kan fråga om namn och facktermer efteråt.
+    r.corrections = [];
+    const topic = [title, about].filter(Boolean).join('. ');
     if (useLlm && settings.ollamaModel && r.segments.length) {
       // Korrläsning: tio rader i taget, med de tre raderna före som sammanhang, så att modellen kan
       // förstå vad som menades där taligenkänningen hört fel.
@@ -145,9 +148,15 @@ const methods = {
         try {
           const fixed = await llm.correctLines(batch.map((s) => ({ speaker: s.speaker, text: s.text })), {
             context: segs.slice(Math.max(0, i - 3), i).map((s) => ({ speaker: s.speaker, text: s.text })),
-            vocabulary: vocab, topic: title, host: settings.ollamaHost, model: settings.ollamaModel,
+            vocabulary: vocab, topic, host: settings.ollamaHost, model: settings.ollamaModel,
           });
-          if (fixed) { fixed.forEach((t, k) => (batch[k].text = t)); ok++; }
+          if (fixed) {
+            fixed.forEach((t, k) => {
+              if (t !== batch[k].text) r.corrections.push({ index: i + k, before: batch[k].text, after: t });
+              batch[k].text = t;
+            });
+            ok++;
+          }
           else console.error(`[motor] korrläsning rad ${i + 1}–${i + batch.length}: svaret gick inte att lita på, texten behålls`);
         } catch (e) {
           console.error(`[motor] korrläsning rad ${i + 1}–${i + batch.length} misslyckades: ${e.message}`);
@@ -161,11 +170,11 @@ const methods = {
 
   // Video och andra klipp under mötet: rader som språkmodellen tror hör till ett klipp får aside = klippets
   // nummer. Inget tas bort här, användaren bestämmer i resultatet.
-  async findClips({ segments, useLlm, title }, id) {
+  async findClips({ segments, useLlm, title, about }, id) {
     if (!useLlm || !settings.ollamaModel || !segments.length) return segments;
     try {
       const ranges = await llm.findClips(segments.map((s) => ({ speaker: s.speaker, text: s.text })), {
-        topic: title, host: settings.ollamaHost, model: settings.ollamaModel,
+        topic: [title, about].filter(Boolean).join('. '), host: settings.ollamaHost, model: settings.ollamaModel,
         onProgress: (p) => send({ id, progress: { phase: 'cleanup', ...p, text: 'Letar efter video i mötet…' } }),
       });
       ranges.forEach(([a, b], n) => { for (let k = a; k <= b; k++) segments[k].aside = n + 1; });

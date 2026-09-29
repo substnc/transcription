@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="sv"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; script-src 'self'; connect-src 'none'; media-src 'self' file:">
 <title>Speak – Mötesläge</title>
 <link rel="stylesheet" href="../shared.css">
 <link rel="stylesheet" href="../icon.css">
@@ -34,6 +34,41 @@
   .steps .chip.active::before { background: var(--ink); box-shadow: none; }
   #processing .bar { max-width: 640px; }
   .back { position: fixed; top: 10px; left: 84px; z-index: 5; -webkit-app-region: no-drag; }
+  .abouttext { height: auto; min-height: 72px; padding: 14px 20px; line-height: 22px; resize: none; }
+  /* Innan du läser: frågekort */
+  #questions .qwrap { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 48px; flex-grow: 1; min-height: 0; }
+  #questions .qside { display: flex; flex-direction: column; gap: 20px; }
+  #questions .qside h1 { font-size: 36px; line-height: 40px; margin: 0; }
+  #questions .chips { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  #questions .chip2 { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 12px; border-radius: 999px; background: var(--tile); font-size: 13px; color: var(--ink); }
+  #questions .qmain { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+  #questions .progress { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--soft); }
+  #questions .dots { display: inline-flex; gap: 6px; align-items: center; }
+  #questions .dots i { width: 6px; height: 6px; border-radius: 999px; background: var(--off); }
+  #questions .dots i.done { background: var(--ink); }
+  #questions .dots i.now { width: 18px; background: var(--ink); }
+  #questions .stack { position: relative; flex-grow: 1; min-height: 0; }
+  #questions .stack::before, #questions .stack::after { content: ""; position: absolute; border-radius: 20px; }
+  #questions .stack::before { left: 24px; right: 24px; top: 20px; bottom: -4px; background: #f4f5f7; }
+  #questions .stack::after { left: 12px; right: 12px; top: 10px; bottom: 6px; background: #e2e3e7; }
+  #questions .qcard { position: absolute; inset: 0 0 16px 0; z-index: 1; border-radius: 20px; background: var(--tile); padding: 24px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  #questions .qhead { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--soft); }
+  #questions .qtitle { font-size: 28px; line-height: 32px; font-weight: 500; letter-spacing: -0.02em; }
+  #questions .quotes { background: #ffffff; border-radius: 16px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+  #questions .quotes .qh { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--soft); gap: 8px; }
+  #questions .quote { display: grid; grid-template-columns: 26px 60px minmax(0, 1fr); gap: 10px; align-items: center; }
+  #questions .quote .t { font-size: 13px; color: var(--soft); font-variant-numeric: tabular-nums; }
+  #questions .quote .x { font-size: 15px; line-height: 20px; }
+  #questions .quote .x.clip { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #questions .play { width: 26px; height: 26px; padding: 0; border-radius: 999px; background: var(--ink); color: #ffffff; display: inline-grid; place-items: center; }
+  #questions .play.on { background: var(--soft); }
+  #questions .twocol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  #questions .why { font-size: 13px; line-height: 18px; color: var(--soft); }
+  #questions .mark { background: var(--ink); color: #ffffff; border-radius: 4px; padding: 0 4px; }
+  #questions .answers { margin-top: auto; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #questions .answers input { flex: 1 1 180px; height: 44px; border-radius: 999px; background: #ffffff; padding: 0 20px; }
+  #questions .answers button:not(.primary) { background: #ffffff; }
+  .qleft { font-size: 13px; }
   .working { display: flex; align-items: center; gap: 20px; }
 
   .two { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 46px; align-items: start; flex-grow: 1; }
@@ -98,8 +133,10 @@
 
 <section id="idle">
   <div class="label">Mötesläge</div>
-  <div class="hero" style="font-size: 64px; line-height: 68px;">Nytt möte.<span class="dim">Spela in eller ladda upp.</span></div>
+  <div class="hero" style="font-size: 48px; line-height: 52px;">Nytt möte.<span class="dim">Spela in eller ladda upp.</span></div>
   <div style="margin-top: 24px"><label for="title">Mötets titel</label><input type="text" id="title" class="titleinput" placeholder="Till exempel Kickoff Delicato"></div>
+  <div style="margin-top: 20px"><label for="about">Vad handlar mötet om, och vilka är med? <span style="color: var(--muted)">Valfritt</span></label><textarea id="about" rows="2" class="abouttext" placeholder="Till exempel: kickoff med Delicato om sommarkampanjen. Per och Anna från byrån. Budget och leverans."></textarea>
+    <p class="status" style="margin: 6px 0 0">Speak använder det för att rätta hörfel och känna igen namn. Det stannar på datorn.</p></div>
   <div class="grid3">
     <div><label for="sourceMode">Ljudkälla</label><select id="sourceMode"><option value="both">Mikrofon och datorns ljud (videomöte)</option><option value="system">Bara datorns ljud (jag lyssnar bara)</option><option value="mic">Bara mikrofon (möte i rummet)</option></select></div>
     <div><label for="language">Språk i mötet</label><select id="language"><option value="">Som i Inställningar</option><option value="auto">Svenska och engelska</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
@@ -138,12 +175,32 @@
   <p class="status" id="progressText" style="margin: 12px 0 0">Startar…</p>
 </section>
 
+<section id="questions" class="hidden">
+  <div class="qwrap">
+    <div class="qside">
+      <div class="status" id="qMeta"></div>
+      <h1>Innan du läser.<span class="dim" id="qCount"></span></h1>
+      <p style="margin: 0; font-size: 15px; line-height: 22px">Dina svar rättar texten och sammanfattningen. Allt går att ändra efteråt.</p>
+      <div class="chips" id="qDone"></div>
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 12px">
+        <button id="btnSkipQuestions">Visa texten direkt</button>
+        <span class="status">Frågorna finns kvar om du hoppar över dem.</span>
+      </div>
+    </div>
+    <div class="qmain">
+      <div class="progress"><span class="dots" id="qDots"></span><span id="qStep"></span></div>
+      <div class="stack"><div class="qcard" id="qCard"></div></div>
+    </div>
+  </div>
+</section>
+
 <section id="result" class="hidden">
   <div class="two">
     <div class="side">
       <div class="blk">
         <div class="status" id="meta"></div>
         <h1 id="resultTitle">Möte</h1>
+        <button class="link qleft hidden" id="btnQuestionsLeft" style="align-self: flex-start"></button>
       </div>
       <div class="blk"><div class="row"><span class="label">Sammanfattning</span><button class="link" id="btnResummarize">Skapa om</button></div>
         <textarea id="summary"></textarea><span class="status" id="summaryBy"></span></div>

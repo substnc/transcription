@@ -5,7 +5,7 @@
 const path = require('path');
 const os = require('os');
 const models = require('./models');
-const { assignSpeakers, relabelSpeakers, coalesce, channelActivity, combineChannelDiarization, segmentsFromWords, mergeSimilarSpeakers } = require('./merge');
+const { assignSpeakers, relabelSpeakers, coalesce, channelActivity, combineChannelDiarization, segmentsFromWords, mergeSimilarSpeakers, nearSpeakers } = require('./merge');
 const { isHallucination, tidy } = require('./cleanup');
 const audio = require('./audio');
 const whispercpp = require('./whispercpp');
@@ -324,9 +324,10 @@ class Pipeline {
       .filter((s) => s.text && !isHallucination(s.text) && !isJunk(s.text, s.lang, s.end - s.start, policy));
     if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
+    const similar = this.similarLabels(labeled.map);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
-    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'whisper.cpp', timing, diarizer: via };
+    return { segments: merged, speakers: labeled.speakers, similar, languages, durationSec, engine: 'whisper.cpp', timing, diarizer: via };
   }
 
   // Diktering: kort ljud, ingen talarseparering.
@@ -379,9 +380,10 @@ class Pipeline {
     console.error(`[motor] klart (sherpa): talare ${timing.diarizeSec.toFixed(1)} s, taligenkänning ${timing.transcribeSec.toFixed(1)} s, totalt ${timing.totalSec.toFixed(1)} s (${timing.speed.toFixed(1)}× realtid)`);
     if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
+    const similar = this.similarLabels(labeled.map);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const languages = [...new Set(merged.map((s) => s.lang).filter(Boolean))];
-    return { segments: merged, speakers: labeled.speakers, languages, durationSec, engine: 'sherpa', timing, diarizer: via };
+    return { segments: merged, speakers: labeled.speakers, similar, languages, durationSec, engine: 'sherpa', timing, diarizer: via };
   }
 
   // ---- Talare ----
@@ -389,6 +391,7 @@ class Pipeline {
   // datorns ljud separeras. Separeringen görs med NVIDIA Nemotron 3 Diarization när den är installerad
   // (max 8 talare), annars med den inbyggda (pyannote-segmentering + röstavtryck via sherpa).
   async speakerTimeline({ wavPath, samples, diarize = true, diarizer = 'nemotron', channels, speakerCount = 0, onProgress } = {}) {
+    this.lastSimilar = [];
     if (!diarize) return { diar: [], via: 'av' };
     if (onProgress) onProgress({ phase: 'diarize', done: 0, total: 1 });
     let runs = null;
@@ -419,9 +422,18 @@ class Pipeline {
     return result;
   }
 
+  // Nästan lika talare med mötets namn (Talare 3 osv.): [{ a, b, sim }].
+  similarLabels(map) {
+    const byKey = new Map([...map.entries()].map(([k, v]) => [String(k), v]));
+    return (this.lastSimilar || [])
+      .map(([a, b, sim]) => ({ a: byKey.get(String(a)), b: byKey.get(String(b)), sim }))
+      .filter((p) => p.a && p.b && p.a !== p.b);
+  }
+
   // Röstavtryck per talare (3D-Speaker via sherpa), från talarens längsta stycken, högst 60 sekunder.
   // Talare som låter som samma person slås ihop. count: antal talare om användaren angett det.
   fixSpeakerDrift(diar, samples, count = 0) {
+    this.lastSimilar = [];
     const ids = [...new Set(diar.map((d) => d.speaker).filter((s) => s !== 'me'))];
     if (ids.length < 2 || !samples) return diar;
     const modelPath = models.auxPath(this.modelsDir, 'embedding');
@@ -448,6 +460,8 @@ class Pipeline {
     }
     const maxSpeakers = count > 0 ? count : 0;
     const map = mergeSimilarSpeakers(voices, { maxSpeakers });
+    // Talare som är nästan lika sparas, så att Speak kan fråga dig efter mötet.
+    try { this.lastSimilar = nearSpeakers(voices, map); } catch { this.lastSimilar = []; }
     const merged = Object.entries(map).filter(([a, b]) => a !== b);
     if (!merged.length) return diar;
     console.error(`[motor] röstjämförelse: slog ihop ${merged.map(([a, b]) => `${a}→${b}`).join(', ')}`);
@@ -514,8 +528,9 @@ class Pipeline {
     if (byWords) segs = segmentsFromWords(words, diar, { lang: 'sv' }).map((x) => ({ ...x, text: tidy(x.text) })).filter((x) => x.text && !isHallucination(x.text));
     else if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
+    const similar = this.similarLabels(labeled.map);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
-    return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'pianissimo', timing, diarizer: via };
+    return { segments: merged, speakers: labeled.speakers, similar, languages: ['sv'], durationSec, engine: 'pianissimo', timing, diarizer: via };
   }
 
   // Mötet är redan transkriberat under inspelningen (livetexten). Här läggs bara talare och tider på
@@ -530,10 +545,11 @@ class Pipeline {
       .filter((s) => s.text && !isHallucination(s.text));
     if (diar.length) segs = assignSpeakers(segs, diar);
     const labeled = relabelSpeakers(segs);
+    const similar = this.similarLabels(labeled.map);
     const merged = coalesce(labeled.segments, { maxGap: 1.5, maxLen: 60 });
     const totalSec = (Date.now() - t0) / 1000;
     const timing = { diarizeSec: totalSec, transcribeSec: 0, totalSec, speed: durationSec / Math.max(0.001, totalSec) };
-    return { segments: merged, speakers: labeled.speakers, languages: ['sv'], durationSec, engine: 'livetext', timing, diarizer: via };
+    return { segments: merged, speakers: labeled.speakers, similar, languages: ['sv'], durationSec, engine: 'livetext', timing, diarizer: via };
   }
 
   async dictatePy(samples) {
