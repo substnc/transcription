@@ -26,8 +26,8 @@ ${(() => {
   const B = { J: 'background:#000;color:#fff', 1: 'background:#5f5f5f;color:#fff', 2: 'border:1.5px solid #000' };
   const line = (id, ts, k, who, said) => `<div class="row" id="${id}"><span class="ts">${ts}</span><span class="b" style="${B[k]}">${k}</span><div><div class="who m">${who}</div><div class="said">${said}</div></div></div>`;
   return `
-<div class="stage" id="lyssnar"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="480" width="480" height="480"></svg><div class="pill m">${dot}Lyssnar…</div></div>${foot}</div>
-<div class="stage" id="skriver"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="480" width="480" height="480"></svg><div class="pill m">${ring}Skriver…</div></div>${foot}</div>
+<div class="stage" id="lyssnar"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="480" width="480" height="480"></svg></div>${foot}</div>
+<div class="stage" id="skriver"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:48px"><svg data-icon="480" width="480" height="480"></svg></div>${foot}</div>
 <div class="stage" id="ljud"><div class="tile" style="position:absolute;left:80px;right:80px;top:272px;height:488px;display:flex;align-items:center;justify-content:center"><svg data-meter="44,6,19,5.6"></svg></div>${foot}</div>
 <div class="stage" id="mote"><div style="position:absolute;inset:176px 80px 216px;display:flex;flex-direction:column;gap:48px">
  <div style="display:flex;align-items:flex-start;justify-content:space-between"><div class="m" style="font-size:72px;line-height:80px;letter-spacing:-0.02em">Var närvarande.<br><span class="dim">Lokal transkribering.</span></div><div class="pill m">${ring}Transkriberar…</div></div>
