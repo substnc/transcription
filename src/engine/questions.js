@@ -49,8 +49,11 @@ function selfNames(text) {
 }
 
 // Röster för namn per talare. Svarar { votes: { talare: { namn: { n, evidence: [[i, j]] } } } }.
-function nameVotes(segments, about) {
+function nameVotes(segments, about, participants = []) {
   const known = knownNames(about);
+  for (const p of participants) known.add(p);
+  // Finns en deltagarlista räknas bara de namnen (förnamnet räcker: "Per" för "Per Olsson").
+  const firstOf = new Map(participants.map((p) => [p.split(/\s+/)[0], p]));
   const votes = {};
   const add = (speaker, name, ev, w = 1) => {
     if (!speaker || speaker === ME) return;
@@ -61,8 +64,9 @@ function nameVotes(segments, about) {
   };
   const mentions = {};
   segments.forEach((s, i) => {
-    for (const name of selfNames(s.text)) add(s.speaker, name, [i, i], 2);
-    for (const name of addressedNames(s.text)) {
+    const allowed = (n) => (firstOf.size ? firstOf.get(n) : n);
+    for (const name of selfNames(s.text).map(allowed).filter(Boolean)) add(s.speaker, name, [i, i], 2);
+    for (const name of addressedNames(s.text).map(allowed).filter(Boolean)) {
       mentions[name] = (mentions[name] || 0) + 1;
       // Den som svarar: nästa replik från någon annan, inom tre repliker och 20 sekunder.
       for (let j = i + 1; j < Math.min(segments.length, i + 4); j++) {
@@ -81,8 +85,8 @@ function nameVotes(segments, about) {
   return votes;
 }
 
-function decideNames(segments, speakers, about) {
-  const votes = nameVotes(segments, about);
+function decideNames(segments, speakers, about, participants = []) {
+  const votes = nameVotes(segments, about, participants);
   const totals = {};
   for (const sp of Object.keys(votes)) for (const [name, v] of Object.entries(votes[sp])) totals[name] = (totals[name] || 0) + v.n;
   const auto = {};
@@ -137,13 +141,32 @@ function wordQuestions(corrections, max = 3) {
 }
 
 // Alla frågor för ett möte. similar: [{ a, b, sim }] (talare som låter lika). corrections: [{ index, before, after }].
-function buildQuestions({ segments = [], speakers = [], similar = [], corrections = [], about = '' } = {}) {
-  const { auto, unsure } = decideNames(segments, speakers, about);
+function buildQuestions({ segments = [], speakers = [], similar = [], corrections = [], about = '', participants = [] } = {}) {
+  const { auto, unsure } = decideNames(segments, speakers, about, participants);
   const questions = [];
+  // Deltagarlistan: namn som inte redan satts. Är det en talare och ett namn kvar hör de ihop.
+  // Annars blir det frågan "Vem är Talare 2?" med namnen som knappar, för de som pratar mest.
+  let picks = [];
+  if (participants.length) {
+    const used = new Set(Object.values(auto).map((v) => v.name));
+    const left = participants.filter((p) => !used.has(p));
+    const talk = (sp) => segments.filter((x) => x.speaker === sp).reduce((a, x) => a + (x.end - x.start), 0);
+    const open = speakers.filter((sp) => sp !== ME && !auto[sp]).sort((a, b) => talk(b) - talk(a));
+    if (open.length === 1 && left.length === 1) auto[open[0]] = { name: left[0], evidence: [] };
+    else if (open.length && left.length) {
+      // Utan eget mikrofonspår kan du själv vara en av talarna.
+      const options = speakers.includes(ME) ? left : [...left, ME];
+      picks = open.slice(0, 3).map((sp) => {
+        const u = unsure.find((x) => x.speaker === sp && left.includes(x.name));
+        return { type: 'pick', speaker: sp, options, guess: u ? u.name : null, evidence: u ? u.evidence : [] };
+      });
+    }
+  }
   for (const p of [...similar].sort((x, y) => y.sim - x.sim).slice(0, 2)) {
     if (speakers.includes(p.a) && speakers.includes(p.b) && p.a !== ME && p.b !== ME) questions.push({ type: 'same', a: p.a, b: p.b, sim: p.sim });
   }
-  for (const u of unsure.slice(0, 2)) questions.push({ type: 'name', speaker: u.speaker, name: u.name, evidence: u.evidence });
+  if (picks.length) questions.push(...picks);
+  else for (const u of unsure.slice(0, 2)) questions.push({ type: 'name', speaker: u.speaker, name: u.name, evidence: u.evidence });
   questions.push(...wordQuestions(corrections));
   return { autoNames: Object.fromEntries(Object.entries(auto).map(([sp, v]) => [sp, v.name])), autoEvidence: auto, questions };
 }

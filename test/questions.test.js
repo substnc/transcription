@@ -42,3 +42,23 @@ test('samma person och ord blir frågor', () => {
   assert.deepStrictEqual(r.questions.find((x) => x.type === 'same'), { type: 'same', a: 'Talare 3', b: 'Talare 7', sim: 0.52 });
   assert.deepStrictEqual(r.questions.find((x) => x.type === 'word'), { type: 'word', index: 0, from: 'de lika då', to: 'Delicato' });
 });
+
+test('deltagare: två personer i ett videomöte, den andra får namnet direkt', () => {
+  const s = [seg('Jag', 'Hej, välkommen.', 0), seg('Talare 1', 'Tack, kul att ses.', 3)];
+  const r = q.buildQuestions({ segments: s, speakers: ['Jag', 'Talare 1'], participants: ['Per'] });
+  assert.strictEqual(r.autoNames['Talare 1'], 'Per');
+  assert.strictEqual(r.questions.length, 0);
+});
+
+test('deltagare: flera personer blir en fråga med namnen som knappar, med gissning', () => {
+  const s = [
+    seg('Talare 1', 'Vad tycker du, Anna?', 0), seg('Talare 2', 'Jag gillar det.', 3),
+    seg('Talare 3', 'Ska vi ta budgeten, Olle?', 9), seg('Talare 3', 'Eller efter lunch.', 12),
+  ];
+  const r = q.buildQuestions({ segments: s, speakers: ['Talare 1', 'Talare 2', 'Talare 3'], participants: ['Per', 'Anna'] });
+  const picks = r.questions.filter((x) => x.type === 'pick');
+  assert.ok(picks.length >= 1);
+  const t2 = picks.find((x) => x.speaker === 'Talare 2');
+  assert.strictEqual(t2.guess, 'Anna');
+  assert.deepStrictEqual(t2.options, ['Per', 'Anna', 'Jag']);
+});

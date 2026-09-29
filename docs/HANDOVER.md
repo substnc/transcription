@@ -125,6 +125,14 @@ direkt och väntar högst 2 s på status (home.js within). Tidigare: vit sida oc
   sedan länken "N frågor kvar" i resultatet. Sammanfattningen görs om om något ändrats.
 - Provat i Electron (Linux) med påhittat möte och riktigt ljud. Inte provat på Mac.
 
+## Deltagare (29 sep 2026)
+Anthon: ett möte med två personer blev fyra talare. Nytt möte har "Vilka är med? Utom du" (ersätter
+Antal talare; ett tal går också). speakerCount = namn + 1 (du), utom med "Bara datorns ljud". Antalet låser
+talaruppdelningen och fixSpeakerDrift slår ihop överskottet. En person i datorns ljud (videomöte på två) =
+ingen uppdelning alls (pipeline speakerTimeline count===1). questions.js: bara deltagarnas namn räknas; en
+talare och ett namn kvar = namnet sätts direkt; annars kortet "Vem är Talare 2?" (type pick) med namnen som
+knappar, gissning först. Provat i Electron (Linux), inte på Mac.
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.

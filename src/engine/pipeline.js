@@ -407,6 +407,11 @@ class Pipeline {
     let result;
     if (runs && !runs.some((r) => r.source === 'sys')) {
       result = { diar: runs.map((r) => ({ start: r.start, end: r.end, speaker: 'me' })), via: 'kanaler' };
+    } else if (count === 1) {
+      // Bara en person (utöver dig i mikrofonen): ingen uppdelning behövs, allt är samma talare.
+      const dur = (target.samples ? target.samples.length : audio.readWav(target.wavPath).samples.length) / SAMPLE_RATE;
+      const one = [{ start: 0, end: dur, speaker: 0 }];
+      result = runs ? { diar: combineChannelDiarization(runs, one), via: 'kanaler, en person' } : { diar: one, via: 'en person' };
     } else {
       const d = await this.diarizeAudio(target, count, diarizer);
       result = runs ? { diar: combineChannelDiarization(runs, d.diar), via: `${d.via} + kanaler` } : d;

@@ -135,14 +135,14 @@
   <div class="label">Mötesläge</div>
   <div class="hero" style="font-size: 48px; line-height: 52px;">Nytt möte.<span class="dim">Spela in eller ladda upp.</span></div>
   <div style="margin-top: 24px"><label for="title">Mötets titel</label><input type="text" id="title" class="titleinput" placeholder="Till exempel Kickoff Delicato"></div>
-  <div style="margin-top: 20px"><label for="about">Vad handlar mötet om, och vilka är med? <span style="color: var(--muted)">Valfritt</span></label><textarea id="about" rows="2" class="abouttext" placeholder="Till exempel: kickoff med Delicato om sommarkampanjen. Per och Anna från byrån. Budget och leverans."></textarea>
+  <div style="margin-top: 20px"><label for="about">Vad handlar mötet om? <span style="color: var(--muted)">Valfritt</span></label><textarea id="about" rows="2" class="abouttext" placeholder="Till exempel: kickoff med Delicato om sommarkampanjen. Budget, storyboard och leverans."></textarea>
     <p class="status" style="margin: 6px 0 0">Speak använder det för att rätta hörfel och känna igen namn. Det stannar på datorn.</p></div>
   <div class="grid3">
     <div><label for="sourceMode">Ljudkälla</label><select id="sourceMode"><option value="both">Mikrofon och datorns ljud (videomöte)</option><option value="system">Bara datorns ljud (jag lyssnar bara)</option><option value="mic">Bara mikrofon (möte i rummet)</option></select></div>
     <div><label for="language">Språk i mötet</label><select id="language"><option value="">Som i Inställningar</option><option value="auto">Svenska och engelska</option><option value="sv">Bara svenska</option><option value="en">Bara engelska</option></select></div>
-    <div><label for="speakerCount">Antal talare, om du vet</label><input type="text" id="speakerCount" placeholder="Till exempel 4" inputmode="numeric"></div>
+    <div><label for="participants">Vilka är med? Utom du</label><input type="text" id="participants" placeholder="Till exempel Per, Anna"></div>
   </div>
-  <p class="status" style="margin: 12px 0 0">Mikrofonen dämpas automatiskt medan datorn spelar tal, så rösterna dubblas inte.</p>
+  <p class="status" style="margin: 12px 0 0">Skriver du vilka som är med blir antalet talare rätt och namnen hamnar på rätt person. Du räknas automatiskt. Ett antal går också, till exempel 3.</p>
   <div class="actions">
     <button class="primary" id="btnRecord"><span class="rec-dot"></span>Spela in</button>
     <button id="btnUpload">Ladda upp fil</button>

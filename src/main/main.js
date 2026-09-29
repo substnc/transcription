@@ -279,7 +279,8 @@ function stopMeetingRecording() {
 // Frågor efter mötet (namn, samma person, ord) och namn som Speak är säker på. Körs lokalt, utan språkmodell.
 function addQuestions(r, opts = {}) {
   try {
-    const q = buildQuestions({ segments: r.segments, speakers: r.speakers, similar: r.similar || [], corrections: r.corrections || [], about: opts.about || '' });
+    r.participants = opts.participants || [];
+    const q = buildQuestions({ segments: r.segments, speakers: r.speakers, similar: r.similar || [], corrections: r.corrections || [], about: opts.about || '', participants: r.participants });
     r.autoNames = q.autoNames;
     r.questions = q.questions;
   } catch (e) {

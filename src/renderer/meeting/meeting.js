@@ -28,13 +28,24 @@ function fmt(sec) {
   return h ? `${p(h)}:${p(m)}:${p(r)}` : `${p(m)}:${p(r)}`;
 }
 
+// "Vilka är med?": namn (utom du) eller bara ett antal. Namnen låser antalet talare och sätts på talarna.
+function participants() {
+  const v = $('participants').value.trim();
+  if (/^\d+$/.test(v)) return [];
+  return [...new Set(v.split(/[,;\n]+|\soch\s/).map((t) => t.trim()).filter(Boolean))];
+}
+
 function speakerCount() {
-  const n = parseInt($('speakerCount').value, 10);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const v = $('participants').value.trim();
+  if (/^\d+$/.test(v)) return parseInt(v, 10) || 0;
+  const n = participants().length;
+  if (!n) return 0;
+  // Du själv räknas med, utom när bara datorns ljud spelas in (då hörs du inte).
+  return n + ($('sourceMode').value === 'system' ? 0 : 1);
 }
 
 function meetingOpts() {
-  return { speakerCount: speakerCount(), language: $('language').value || undefined, title: $('title').value.trim(), about: $('about').value.trim() };
+  return { speakerCount: speakerCount(), participants: participants(), language: $('language').value || undefined, title: $('title').value.trim(), about: $('about').value.trim() };
 }
 
 function fail(msg) {
@@ -179,7 +190,7 @@ function showResult(r) {
   // Namn som Speak är säker på (tilltal och svar i samtalet) sätts direkt.
   state.speakerNames = Object.fromEntries(r.speakers.map((s) => [s, (r.autoNames && r.autoNames[s]) || s]));
   // Frågorna visas som kort innan texten, bara när fler än två talare är med.
-  state.questions = r.speakers.length > 2 ? (r.questions || []).slice() : [];
+  state.questions = r.speakers.length > 2 || (r.participants || []).length ? (r.questions || []).slice() : [];
   state.qIndex = 0;
   state.qChanged = false;
   state.picked.clear();
@@ -581,6 +592,23 @@ function showQuestions() {
     const setName = (n) => { if (n) { state.speakerNames[q.speaker] = n; state.qChanged = true; } nextQuestion(); };
     other.onkeydown = (e) => { if (e.key === 'Enter') setName(other.value.trim()); };
     answers.append(answerButton(`Ja, det är ${q.name}`, true, () => setName(q.name)), other, answerButton('Vet inte', false, nextQuestion));
+  } else if (q.type === 'pick') {
+    head.append(`${nameOf(q.speaker)} · ${countOf(q.speaker)} repliker i mötet`);
+    title.textContent = `Vem är ${nameOf(q.speaker)}?`;
+    card.append(head, title, quoteBox(`Det här säger ${nameOf(q.speaker)}, från hela mötet`, examples(q.speaker, 5), countOf(q.speaker)));
+    const ev = (q.evidence || []).map(([i, j]) => [state.result.segments[i], state.result.segments[j]]).filter(([a, b]) => a && b);
+    if (q.guess && ev.length) card.appendChild(el('div', 'why', `Speak gissar ${q.guess}: namnet nämns och ${nameOf(q.speaker)} svarar direkt efteråt.`));
+    // Namn som redan satts på någon annan visas inte.
+    const taken = new Set(Object.entries(state.speakerNames).filter(([sp, n]) => sp !== q.speaker && n !== sp).map(([, n]) => n));
+    const opts = q.options.filter((n) => !taken.has(n));
+    if (q.guess && opts.includes(q.guess)) opts.sort((a, b) => (a === q.guess ? -1 : b === q.guess ? 1 : 0));
+    const setName = (n) => { if (n) { state.speakerNames[q.speaker] = n; state.qChanged = true; } nextQuestion(); };
+    opts.forEach((n, k) => answers.append(answerButton(n === 'Jag' ? 'Det är jag' : n, k === 0 && n === q.guess, () => setName(n))));
+    const other = el('input');
+    other.type = 'text';
+    other.placeholder = 'Någon annan …';
+    other.onkeydown = (e) => { if (e.key === 'Enter') setName(other.value.trim()); };
+    answers.append(other, answerButton('Vet inte', false, nextQuestion));
   } else if (q.type === 'word') {
     const i = findWord(q);
     const seg = state.result.segments[i];
@@ -609,7 +637,7 @@ function showQuestions() {
 function questionValid(q) {
   const sp = state.result.speakers;
   if (q.type === 'same') return sp.includes(q.a) && sp.includes(q.b);
-  if (q.type === 'name') return sp.includes(q.speaker) && nameOf(q.speaker) === q.speaker;
+  if (q.type === 'name' || q.type === 'pick') return sp.includes(q.speaker) && nameOf(q.speaker) === q.speaker;
   if (q.type === 'word') return findWord(q) >= 0;
   return false;
 }
@@ -731,6 +759,7 @@ $('btnNew').onclick = async () => {
   state.audioPath = null;
   $('title').value = '';
   $('about').value = '';
+  $('participants').value = '';
   show('idle');
 };
 
