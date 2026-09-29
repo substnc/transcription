@@ -1,6 +1,6 @@
 'use strict';
 // Speak. (sub.stnc®): menyradsapp för lokal diktering och mötestranskribering.
-const { app, Tray, Menu, nativeImage, ipcMain, dialog, shell, systemPreferences, Notification, session, desktopCapturer } = require('electron');
+const { app, clipboard, Tray, Menu, nativeImage, ipcMain, dialog, shell, systemPreferences, Notification, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -411,6 +411,7 @@ function registerIpc() {
   ipcMain.handle('meeting:state', () => meetingState);
   // Stoppa från huvudsidan eller menyn: mötessidan gör det, så att resultatet hamnar där.
   ipcMain.handle('meeting:stop-from-home', () => stopFromOutside());
+  ipcMain.handle('meeting:copy-text', (_e, text) => clipboard.writeText(String(text || '')));
   ipcMain.handle('app:info', () => ({ version: app.getVersion() }));
   ipcMain.handle('test:dictate', async () => { await startDictation(); });
   ipcMain.handle('test:stop', async () => { await stopDictation(); });

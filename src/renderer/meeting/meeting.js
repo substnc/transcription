@@ -423,11 +423,19 @@ function namedSegments() {
   return state.result.segments.map((s) => ({ ...s, speaker: state.speakerNames[s.speaker] || s.speaker }));
 }
 
+// Hela transkriptet som text. Kopieras av huvudprocessen: sidan själv får inte skriva till urklipp
+// (Speak ger fönstren inga behörigheter utom mikrofonen).
 $('btnCopy').onclick = async () => {
-  const text = namedSegments().map((s) => `[${fmt(s.start)}] ${s.speaker}: ${s.text}`).join('\n');
-  await navigator.clipboard.writeText(text);
-  $('btnCopy').textContent = 'Kopierat';
-  setTimeout(() => ($('btnCopy').textContent = 'Kopiera som text'), 1200);
+  const title = $('title').value.trim();
+  const rows = namedSegments().map((s) => `[${fmt(s.start)}] ${s.speaker}: ${s.text}`).join('\n');
+  try {
+    await api.meeting.copyText(title ? `${title}\n\n${rows}` : rows);
+    $('btnCopy').textContent = 'Kopierat';
+  } catch (e) {
+    $('btnCopy').textContent = 'Gick inte att kopiera';
+    console.error(e);
+  }
+  setTimeout(() => ($('btnCopy').textContent = 'Kopiera som text'), 1500);
 };
 
 // ---- Spara ----

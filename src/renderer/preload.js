@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('diktera', {
     state: () => ipcRenderer.invoke('meeting:state'),
     onState: on('meeting:state'),
     stopFromHome: () => ipcRenderer.invoke('meeting:stop-from-home'),
+    copyText: (text) => ipcRenderer.invoke('meeting:copy-text', text),
     onProgress: on('meeting:progress'),
     onLevel: on('meeting:level'),
     onError: on('meeting:error'),
