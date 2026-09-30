@@ -95,14 +95,16 @@ function render(t){
  $('s1').style.opacity=k1; $('s1').style.transform='translateY('+(-(1-k1)*24)+'px)';
  $('s2').style.opacity=k2; $('s2').style.transform='translateY('+((t<5?1:-1)*(1-k2)*24)+'px)';
  $('s3').style.opacity=k3; $('s3').style.transform='translateY('+((1-k3)*24)+'px)';
- // Scen 1: ikonen lyssnar, texten skrivs fram, pillret byter till Inklistrat.
+ // Scen 1: ikonen lyssnar, texten klistras in, pillret byter till Inklistrat.
  show($('h1a'),io(t,0,0.4)); show($('h1b'),io(t,0.15,0.55));
- const toType=io(t,1.95,2.25);
+ // Speak lyssnar med tomt fält, bearbetar kort och klistrar sedan in hela texten på en gång.
+ const toType=io(t,1.55,1.8);
  paint(ic1,'live',t,{state:'type',k:toType});
- const n=Math.round(TEXT.length*clamp((t-0.45)/1.55));
- $('typed').textContent=TEXT.slice(0,n);
- $('caret').style.opacity=(t<2.1||Math.floor(t*2.5)%2===0)?1:0;
- const sw=io(t,2.1,2.35);
+ const pasted=io(t,1.9,2.02);
+ $('typed').textContent=t>=1.9?TEXT:'';
+ $('typed').style.opacity=pasted;
+ $('caret').style.opacity=Math.floor(t*2.5)%2===0?1:0;
+ const sw=io(t,1.9,2.1);
  show($('p1'),io(t,0.1,0.4)*(1-sw),10); show($('p2'),sw,10);
  // Scen 2: raderna kommer en i taget, sedan sammanfattningen.
  const b=3.35; show($('r1'),io(t,b+0.3,b+0.7)); show($('r2'),io(t,b+0.75,b+1.15)); show($('r3'),io(t,b+1.2,b+1.6)); if($('r4'))show($('r4'),io(t,b+1.5,b+1.9)); show($('sum'),io(t,b+1.8,b+2.2));

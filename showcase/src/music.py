@@ -31,9 +31,8 @@ pad([50, 53, 57, 60, 64], 3.2, 7.0)
 pad([46, 50, 53, 57, 60], 6.5, 8.4)
 pad([53, 57, 60, 67, 69], 8.1, 10.0, 0.045)
 bass(29, 0.0, 3.6); bass(26, 3.3, 6.9); bass(34, 6.6, 8.4); bass(29, 8.2, 10.0)
-# Scen 1: tangentknapp under skrivandet, en ton när texten är inklistrad.
-for k in range(14): tick(0.45 + k * 0.11)
-pluck(76, 2.12, 0.12); pluck(81, 2.2, 0.09, 0.6)
+# Scen 1: en ton när texten klistras in.
+pluck(76, 1.9, 0.12); pluck(81, 1.98, 0.09, 0.6)
 # Scen 2: en ton per talare och en för sammanfattningen.
 for at, m, p in ((3.7, 72, 0.35), (4.15, 76, 0.55), (4.6, 79, 0.65), (5.2, 77, 0.5)): pluck(m, at, 0.1, p)
 # Scen 3: namnet och signaturen.
