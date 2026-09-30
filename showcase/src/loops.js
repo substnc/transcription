@@ -20,7 +20,7 @@ const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><style>
 .who{font-size:18px;line-height:32px}.said{font-size:26px;line-height:36px}
 </style></head><body>
 ${(() => {
-  const foot = `<div class="label" style="position:absolute;left:80px;top:80px">Byggt med Klang Pianissimo</div><div style="position:absolute;left:80px;right:80px;bottom:80px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:144px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:24px">Made by Anthon Bäckström</span></div></div>`;
+  const foot = `<div style="position:absolute;left:80px;right:80px;bottom:80px;display:flex;justify-content:space-between;align-items:flex-end"><span class="m" style="font-size:36px;line-height:36px">Speak.</span><div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px"><img src="data:image/png;base64,${b64('signature.png')}" alt="Anthon Bäckströms signatur" style="width:144px;height:auto;display:block"><span class="label" style="font-size:18px;line-height:24px">Made by Anthon Bäckström</span></div></div>`;
   const dot = `<span style="width:12px;height:12px;border-radius:999px;background:#fff"></span>`;
   const ring = `<span style="width:12px;height:12px;border-radius:999px;border:2px solid #fff"></span>`;
   const B = { J: 'background:#000;color:#fff', 1: 'background:#5f5f5f;color:#fff', 2: 'border:1.5px solid #000' };
