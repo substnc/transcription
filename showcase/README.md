@@ -4,6 +4,7 @@
 
 - `speak-showcase-1x1.mp4` med musik, `speak-showcase-1x1-utan-ljud.mp4` utan ljud.
 - 4K (2160×2160): `speak-showcase-1x1-4k.mp4` och `speak-showcase-1x1-4k-utan-ljud.mp4`. Bygg med `SCALE=2 OUT=frames4k node shoot.js all`.
+- 4:5 stående i 4K (2160×2700), för LinkedIn i mobilen: `speak-showcase-4x5-4k.mp4` och `speak-showcase-4x5-4k-utan-ljud.mp4`. Bygg med `H=1350 node build.js` och `H=1350 SCALE=2 OUT=frames45 node shoot.js all`.
 - Alla namn och företag i videon är påhittade.
 
 ## Bygga om

@@ -1,4 +1,6 @@
 // Bygger video.html: tre scener som ritas av render(t), t i sekunder (0..10).
+// H=1350 ger stående 4:5 (1080×1350) i stället för fyrkant.
+const H = Number(process.env.H || 1080);
 const fs = require('fs');
 const art = require('./icon-art.js');
 const sig = fs.readFileSync('signature.png').toString('base64');
@@ -11,7 +13,7 @@ const html = `<!doctype html><html lang="sv"><head><meta charset="utf-8"><title>
 @font-face{font-family:Heros;font-weight:700;src:url(data:font/otf;base64,${bold})}
 *{box-sizing:border-box}
 html,body{margin:0;background:#fff}
-#stage{width:1080px;height:1080px;position:relative;overflow:hidden;background:#fff;color:#000;font-family:'Helvetica Neue',Heros,Helvetica,Arial,sans-serif}
+#stage{width:1080px;height:${H}px;position:relative;overflow:hidden;background:#fff;color:#000;font-family:'Helvetica Neue',Heros,Helvetica,Arial,sans-serif}
 .m{font-weight:400;-webkit-text-stroke:.45px currentColor}
 .scene{position:absolute;inset:0;padding:80px;display:flex;flex-direction:column;gap:48px;will-change:opacity,transform}
 .label{font-size:22px;line-height:32px;color:#5f5f5f}
@@ -52,7 +54,8 @@ html,body{margin:0;background:#fff}
  <div class="tile" style="padding:36px;display:flex;flex-direction:column;gap:24px">
   <div class="row" id="r1"><span class="ts">00:00</span><span class="b" style="background:#5f5f5f;color:#fff">1</span><div><div class="who m">Karin</div><div class="said">Ska vi börja med tredje kvartalet?</div></div></div>
   <div class="row" id="r2"><span class="ts">00:12</span><span class="b" style="background:#000;color:#fff">J</span><div><div class="who m">Jag</div><div class="said">Leveranserna ligger i fas, men budgeten behöver ses över.</div></div></div>
-  <div class="row" id="r3"><span class="ts">00:27</span><span class="b" style="border:1.5px solid #000">2</span><div><div class="who m">Omar</div><div class="said">Då tar jag fram ett nytt förslag till nästa vecka.</div></div></div>
+  <div class="row" id="r3"><span class="ts">00:27</span><span class="b" style="border:1.5px solid #000">2</span><div><div class="who m">Omar</div><div class="said">Då tar jag fram ett nytt förslag till nästa vecka.</div></div></div>${H > 1080 ? `
+  <div class="row" id="r4"><span class="ts">00:41</span><span class="b" style="background:#5f5f5f;color:#fff">1</span><div><div class="who m">Karin</div><div class="said">Bra. Vi stämmer av på måndag.</div></div></div>` : ''}
  </div>
  <div id="sum" style="display:flex;flex-direction:column;gap:9px"><span class="label">Sammanfattning</span><div class="said">Budgeten ses över. Omar tar fram ett nytt förslag till nästa vecka.</div></div>
  <div style="margin-top:auto"><span class="m" style="font-size:36px;line-height:36px">Speak.</span></div>
@@ -100,7 +103,7 @@ function render(t){
  const sw=io(t,2.1,2.35);
  show($('p1'),io(t,0.1,0.4)*(1-sw),10); show($('p2'),sw,10);
  // Scen 2: raderna kommer en i taget, sedan sammanfattningen.
- const b=3.35; show($('r1'),io(t,b+0.3,b+0.7)); show($('r2'),io(t,b+0.75,b+1.15)); show($('r3'),io(t,b+1.2,b+1.6)); show($('sum'),io(t,b+1.8,b+2.2));
+ const b=3.35; show($('r1'),io(t,b+0.3,b+0.7)); show($('r2'),io(t,b+0.75,b+1.15)); show($('r3'),io(t,b+1.2,b+1.6)); if($('r4'))show($('r4'),io(t,b+1.5,b+1.9)); show($('sum'),io(t,b+1.8,b+2.2));
  // Scen 3: ikonen skriver, namnet och raden tonar in, signaturen ritas fram.
  const c=6.6;
  paint(ic3,'type',t-c,{state:'idle',k:io(t,c+2.3,c+2.8)});
@@ -109,4 +112,4 @@ function render(t){
 }
 window.render=render; render(0);
 </script></body></html>`;
-fs.writeFileSync('video.html', html);
+fs.writeFileSync(H === 1080 ? 'video.html' : `video-${H}.html`, html);
