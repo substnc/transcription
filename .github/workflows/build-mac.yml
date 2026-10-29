@@ -58,9 +58,11 @@ jobs:
         run: npx electron-builder --mac dmg zip --arm64 --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      # Bara zip-filen (den som installeras), i 7 dagar, och bara från Anthons gren. Byggen är ~300 MB styck
+      # och GitHubs lagring för byggen tog slut när alla sparades i 90 dagar.
       - uses: actions/upload-artifact@v5
+        if: github.ref_name == 'claude/ai-dictation-app-mac-31cco2' || github.ref_name == 'main' || github.event_name == 'workflow_dispatch'
         with:
           name: Speak-arm64
-          path: |
-            dist/*.dmg
-            dist/*.zip
+          path: dist/*.zip
+          retention-days: 7
