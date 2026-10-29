@@ -171,12 +171,25 @@ class WhisperServer {
         await new Promise((r) => setTimeout(r, 100));
       }
       console.error(`[motor] whisper-server redo på ${((Date.now() - t0) / 1000).toFixed(1)} s (${path.basename(this.model)})`);
+      // En första körning på en sekund tystnad: grafikkretsen förbereder sina beräkningar (Metal) vid
+      // första anropet. Görs det nu slipper första riktiga dikteringen vänta på det.
+      try {
+        const t1 = Date.now();
+        await this.post(new Float32Array(16000), {});
+        console.error(`[motor] whisper-server uppvärmd på ${((Date.now() - t1) / 1000).toFixed(1)} s`);
+      } catch (e) {
+        console.error(`[motor] uppvärmningen av whisper-server misslyckades: ${e.message}`);
+      }
     })().catch((e) => { this.stop(); throw e; });
     return this.ready;
   }
 
-  async transcribe(samples, { language = 'auto', prompt } = {}) {
+  async transcribe(samples, opts = {}) {
     await this.start();
+    return this.post(samples, opts);
+  }
+
+  async post(samples, { language = 'auto', prompt } = {}) {
     const form = new FormData();
     form.append('file', new Blob([wavBuffer(samples)], { type: 'audio/wav' }), 'diktering.wav');
     form.append('response_format', 'verbose_json');

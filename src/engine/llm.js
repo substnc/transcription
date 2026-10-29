@@ -41,10 +41,15 @@ async function available(host = DEFAULT_HOST) {
 
 // numCtx: hur mycket text modellen ser på en gång. Ollamas standard är liten (ett par tusen ord), så ett
 // långt möte måste få större kontext, annars läser modellen bara början.
+// Hur länge Ollama håller modellen laddad efter senaste anropet. Ollamas standard är 5 minuter, och då
+// måste den laddas om (flera sekunder) varje gång det gått en stund mellan två dikteringar.
+const KEEP_ALIVE = '30m';
+
 async function chat({ host = DEFAULT_HOST, model, system, user, format, timeoutMs = 120000, temperature = 0.2, numCtx }) {
   const r = await request(host, '/api/chat', {
     model,
     stream: false,
+    keep_alive: KEEP_ALIVE,
     format,
     options: numCtx ? { temperature, num_ctx: numCtx } : { temperature },
     messages: [
@@ -53,6 +58,15 @@ async function chat({ host = DEFAULT_HOST, model, system, user, format, timeoutM
     ],
   }, timeoutMs);
   return (r.message && r.message.content) || '';
+}
+
+// Laddar modellen i förväg (ett anrop utan text), så att första dikteringen efter start inte väntar på det.
+async function warm({ host = DEFAULT_HOST, model } = {}) {
+  if (!model) return false;
+  const t0 = Date.now();
+  await request(host, '/api/generate', { model, keep_alive: KEEP_ALIVE }, 120000);
+  console.error(`[motor] språkmodellen ${model} laddad på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  return true;
 }
 
 async function cleanupText(text, { host, model, timeoutMs } = {}) {
@@ -178,4 +192,4 @@ async function summarize(transcriptText, { host, model, timeoutMs, onProgress } 
   };
 }
 
-module.exports = { DEFAULT_HOST, available, chat, cleanupText, correctLines, findClips, parseClips, mergeRanges, summarize, splitText, assertLocal };
+module.exports = { DEFAULT_HOST, available, chat, warm, cleanupText, correctLines, findClips, parseClips, mergeRanges, summarize, splitText, assertLocal };

@@ -693,10 +693,11 @@ app.whenReady().then(async () => {
   // Ikonen först, så att appen alltid syns även om motorn strular.
   buildTray();
   try {
+    // Dikteringsmotorn först: den ska vara redo så fort som möjligt efter att datorn startat.
+    await dictEngine.start();
+    await dictEngine.call('init', { ...engineSettings(), warmLlm: settings.get('useLlm') && settings.get('llmDictation') });
     await engine.start();
     await engine.call('init', engineSettings('meeting'));
-    await dictEngine.start();
-    await dictEngine.call('init', engineSettings());
     await ensureLlmModel();
   } catch (e) {
     console.error('Motorn kunde inte starta:', e.message);

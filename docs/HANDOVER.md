@@ -133,6 +133,21 @@ ingen uppdelning alls (pipeline speakerTimeline count===1). questions.js: bara d
 talare och ett namn kvar = namnet sätts direkt; annars kortet "Vem är Talare 2?" (type pick) med namnen som
 knappar, gissning först. Provat i Electron (Linux), inte på Mac.
 
+## Långsam första diktering efter omstart (29 okt 2026)
+Orsaker: llmDictation är på som standard, och Ollama laddade modellen (flera GB) vid första dikteringen och
+släppte den igen efter 5 minuter (Ollamas standard). Dessutom förbereder Metal sina beräkningar vid första
+anropet till whisper-server. Rättat: keep_alive 30m på alla Ollama-anrop, llm.warm() vid dikteringsmotorns start,
+whisper-server kör en sekund tystnad direkt efter start, och dikteringsmotorn startas före mötesmotorn.
+dictation.log: "språkmodellen … laddad på", "whisper-server uppvärmd på", "språkmodellen städade på".
+
+## Nytt från Klang (okt 2026), inte inbyggt
+- Pianissimo finns som MLX (Apple-grafikkretsen) och ONNX, även kvantiserade (28 sep). MLX 8-bit: 759 MB,
+  ordfel 4,51 % (CV) mot 4,46 % original, 151× realtid på M5 Pro. Kan ersätta PyTorch/NeMo-arbetaren
+  (2,5 GB modell + stor installation). ONNX int8 660 MB, 74× på Mac (CPU), via onnx-asr.
+- Egen ordlista för Pianissimo (1 okt), även i MLX och ONNX. Alpha 1.0: 39 % → 64 % rätt stavade namn.
+  Skiftlägeskänslig. Då kan Speaks ordlista användas med Pianissimo också.
+- whisper.cpp: README nämner ANEForge (encodern på Neural Engine), ej verifierat.
+
 ## Utseende (sub.stnc® light, designfil https://claude.ai/artifact/6tMosir28LYzsB4kAJAxU2, sidan "sub.stnc® light")
 - Vitt, svart, grå #818181 i stora rubriker, #5f5f5f i liten text, ytor #ebecef med 16 px rundning,
   knappar som piller, av/på-reglage. Helvetica Neue.

@@ -26,7 +26,11 @@ const methods = {
     pipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: settings.whisper, numThreads: settings.numThreads, whisperCli: settings.whisperCli });
     livePipeline = null;
     // Bara dikteringsmotorn håller dikteringsmodellen laddad (whisper-server). Mötesmotorn behöver den inte.
-    if (p.role !== 'meeting') pipeline.warmDictation();
+    if (p.role !== 'meeting') {
+      pipeline.warmDictation();
+      // Städar språkmodellen dikteringen? Ladda den nu, inte vid första dikteringen.
+      if (p.warmLlm && settings.ollamaModel) llm.warm({ host: settings.ollamaHost, model: settings.ollamaModel }).catch((e) => console.error(`[motor] språkmodellen kunde inte laddas i förväg: ${e.message}`));
+    }
     return models.status(settings.modelsDir);
   },
   async configure(p) {
@@ -104,12 +108,14 @@ const methods = {
     let text = cleanup(raw.text, { voiceCommands });
     let cleanedBy = 'rules';
     if (useLlm && text && settings.ollamaModel) {
+      const t0 = Date.now();
       try {
         const t = await llm.cleanupText(text, { host: settings.ollamaHost, model: settings.ollamaModel, timeoutMs: settings.llmTimeoutMs || 45000 });
         if (t) { text = t; cleanedBy = 'llm'; }
       } catch (e) {
         cleanedBy = `rules (språkmodell misslyckades: ${e.message})`;
       }
+      console.error(`[motor] diktering: språkmodellen städade på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     }
     return { text, raw: raw.text, languages: raw.languages, cleanedBy };
   },
