@@ -20,6 +20,7 @@ const DIARIZE_THRESHOLD = 0.85;
 const MIN_AUTO_LANG_SEC = 3;
 // Livetext: kortare talstycken så att texten dyker upp snabbt medan mötet pågår.
 const LIVE_MAX_SPEECH_SEC = 12;
+const LIVE_PREROLL_SEC = 0.4; // ljud före den punkt där röstdetektorn hörde talet börja
 
 
 // Ett trasigt modellfil får onnxruntime att avsluta hela processen. Kontrollera innan.
@@ -581,13 +582,16 @@ class Pipeline {
       sileroVad: { model, threshold: 0.5, minSilenceDuration: 0.4, minSpeechDuration: 0.25, windowSize: VAD_WINDOW, maxSpeechDuration: LIVE_MAX_SPEECH_SEC },
       sampleRate: SAMPLE_RATE, numThreads: 1, provider: 'cpu', debug: 0,
     }, 60);
-    this.live = { vad, rest: new Float32Array(0) };
+    // hist: det senaste ljudet, så att varje talstycke kan få med en stund före den punkt där
+    // röstdetektorn hörde talet börja. Annars tappas ofta första ordet ("ja", "okej").
+    this.live = { vad, rest: new Float32Array(0), hist: new Float32Array(0), histStart: 0 };
     return true;
   }
 
   async liveFeed(samples) {
     if (!this.live) return [];
     const { vad } = this.live;
+    this.remember(samples);
     const all = new Float32Array(this.live.rest.length + samples.length);
     all.set(this.live.rest, 0);
     all.set(samples, this.live.rest.length);
@@ -595,6 +599,29 @@ class Pipeline {
     for (; i + VAD_WINDOW <= all.length; i += VAD_WINDOW) vad.acceptWaveform(all.subarray(i, i + VAD_WINDOW));
     this.live.rest = all.slice(i);
     return this.liveDrain();
+  }
+
+  remember(samples) {
+    const l = this.live;
+    const keep = (LIVE_MAX_SPEECH_SEC + 10) * SAMPLE_RATE;
+    const both = new Float32Array(l.hist.length + samples.length);
+    both.set(l.hist, 0);
+    both.set(samples, l.hist.length);
+    const drop = Math.max(0, both.length - keep);
+    l.hist = drop ? both.slice(drop) : both;
+    l.histStart += drop;
+  }
+
+  // Talstycket med en kort bit ljud före (LIVE_PREROLL_SEC), om den finns kvar i minnet.
+  withPreroll(f) {
+    const l = this.live;
+    const pre = Math.min(Math.round(LIVE_PREROLL_SEC * SAMPLE_RATE), Math.max(0, f.start - l.histStart));
+    if (!pre) return { start: f.start / SAMPLE_RATE, samples: f.samples };
+    const from = f.start - pre - l.histStart;
+    const out = new Float32Array(pre + f.samples.length);
+    out.set(l.hist.subarray(from, from + pre), 0);
+    out.set(f.samples, pre);
+    return { start: (f.start - pre) / SAMPLE_RATE, samples: out };
   }
 
   async liveStop() {
@@ -610,7 +637,7 @@ class Pipeline {
     const pieces = [];
     while (!vad.isEmpty()) {
       const f = vad.front(false);
-      pieces.push({ start: f.start / SAMPLE_RATE, samples: f.samples });
+      pieces.push(this.withPreroll(f));
       vad.pop();
     }
     const out = [];

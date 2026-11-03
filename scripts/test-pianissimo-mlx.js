@@ -72,6 +72,7 @@ function check(cond, msg) { if (!cond) throw new Error(msg); }
   p.boost = ['Zylvana'];
   const withBoost = (await p.dictatePy(name)).text;
   console.log(`ordlista: utan "${without}" · med "${withBoost}"`);
+  check(/skicka/i.test(without), 'första ordet ("Skicka") tappades');
 
   // 4. Livetext
   const live = new Pipeline({ modelsDir, whisper: NAME, sherpa });
@@ -81,6 +82,16 @@ function check(cond, msg) { if (!cond) throw new Error(msg); }
   got.push(...(await live.liveStop()));
   console.log('livetext:', got.map((s) => `[${s.start.toFixed(1)}] ${s.text}`).join(' | '));
   check(got.length >= 2, 'för få talstycken i livetexten');
+  check(/^Vi\b/.test(got[0].text) && got.some((s) => /^Anna\b/.test(s.text)), 'livetexten tappade första ordet');
+  // Ett kort "Ja," i början av ett stycke mitt i en inspelning.
+  const ja = concat(silence(1.5), say(sv, 'Ja, det låter bra. Vi kör på det.'), silence(1));
+  const live2 = new Pipeline({ modelsDir, whisper: NAME, sherpa });
+  await live2.liveStart();
+  const got2 = [];
+  for (let i = 0; i < ja.length; i += 16000) got2.push(...(await live2.liveFeed(ja.subarray(i, i + 16000))));
+  got2.push(...(await live2.liveStop()));
+  console.log('livetext, ja:', got2.map((s) => s.text).join(' | '));
+  check(/^Ja\b/i.test((got2[0] || {}).text || ''), '"Ja" i början tappades');
 
   pianissimo.stopAll();
 })().catch((e) => { console.error(e); pianissimo.stopAll(); process.exit(1); });

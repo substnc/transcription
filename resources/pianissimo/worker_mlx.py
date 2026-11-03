@@ -32,6 +32,7 @@ sys.stdout = sys.stderr
 
 REPO = os.environ.get("SPEAK_MLX_REPO", "KlangAI/pianissimo-sv-mlx-8bit")
 REVISION = os.environ.get("SPEAK_MLX_REVISION") or None
+PAD_SEC = 0.3
 
 
 def send(obj):
@@ -87,11 +88,16 @@ def transcribe(m, np, req):
     model = m.get()
     if len(audio) < 1600:  # under en tiondels sekund: inget att höra
         return {"text": "", "segments": [], "words": []}
-    result = m.lib.transcribe(model, audio, boost=boost)
+    # Modellen tappar gärna första ordet när ljudet börjar mitt i tal. En kort tystnad före och
+    # efter hjälper; tiderna flyttas tillbaka efteråt.
+    pad = np.zeros(int(PAD_SEC * 16000), np.float32)
+    result = m.lib.transcribe(model, np.concatenate([pad, audio, pad]), boost=boost)
     out = {"text": (result.text or "").strip()}
     if req.get("timestamps"):
-        out["segments"] = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in result.sentences]
-        out["words"] = words_from(result.sentences)
+        end = len(audio) / 16000
+        at = lambda x: min(end, max(0.0, x - PAD_SEC))  # noqa: E731
+        out["segments"] = [{"start": at(s.start), "end": at(s.end), "text": s.text.strip()} for s in result.sentences]
+        out["words"] = [{**w, "start": at(w["start"]), "end": at(w["end"])} for w in words_from(result.sentences)]
     return out
 
 
