@@ -198,3 +198,15 @@ Pianissimo 4,46 / 6,51 / 4,85 %. KB-Whisper large 3,91 / 5,08 / 2,30 %. Pianissi
 2. Anthon testar MPS: är Pianissimo snabbare, står "mps" i loggen?
 3. Anthon testar korrläsningen på ett riktigt möte. Överväg större Ollama-modell (t.ex. qwen2.5:14b) om svenskan brister.
 4. Eventuellt: röstprofiler för återkommande personer, talare i livetexten, ordlista för Pianissimo.
+
+## Pianissimo för Mac (MLX) (3 nov 2026)
+
+Nytt modellval `pianissimo-mlx` i Inställningar. Klangs 8-bitarsversion (`KlangAI/pianissimo-sv-mlx-8bit`,
+låst till revision 7b4d528) körs på grafikkretsen med Apples MLX, utan PyTorch och NeMo. Installationen
+(uv, egen Python, `parakeet-mlx==0.5.2`, modellen) tar cirka 1,4 GB på disk. Arbetaren är
+`resources/pianissimo/worker_mlx.py` och talar samma protokoll som NeMo-arbetaren, så möten, diktering och
+livetext fungerar likadant. Ordlistan skickas med som `boost` (förstärkta stavningar, högst 200 ord).
+
+Mätt i CI (virtuell Mac, svagare grafik än en riktig M-dator): modellen laddas på 1–4 s, en diktering på
+4 s tar 0,2–0,3 s, ett möte på 3 minuter tar 5 s. Testet: `.github/workflows/test-pianissimo-mlx.yml`.
+Den gamla `pianissimo-sv` (NeMo) och Nemotron 3 Diarization finns kvar; Nemotron kräver fortfarande NeMo.
