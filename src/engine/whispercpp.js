@@ -31,6 +31,13 @@ function vocabularyPrompt(text) {
   return out ? out + '.' : '';
 }
 
+// Ordlistan som lista för Pianissimo (MLX). Modellen förstärker just de stavningarna, stora och små
+// bokstäver som de står. Högst 200 ord, så att en jättelista inte gör igenkänningen långsam.
+function boostList(text) {
+  const terms = String(text || '').split(/[\n,;]+/).map((t) => t.trim()).filter(Boolean);
+  return [...new Set(terms)].slice(0, 200);
+}
+
 // Gör om whisper.cpp:s JSON till våra segment.
 function parseResult(json) {
   const list = (json && json.transcription) || [];
@@ -213,4 +220,4 @@ class WhisperServer {
   }
 }
 
-module.exports = { findBinary, findServer, WhisperServer, wavBuffer, parseResult, vocabularyPrompt, transcribeWav, transcribeSamples };
+module.exports = { findBinary, findServer, WhisperServer, wavBuffer, parseResult, vocabularyPrompt, boostList, transcribeWav, transcribeSamples };

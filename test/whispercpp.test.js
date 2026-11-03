@@ -17,7 +17,7 @@ test('en obefintlig sökväg används aldrig', () => {
   assert.ok(b === null || (typeof b === 'string' && b !== '/finns/inte'));
 });
 
-const { vocabularyPrompt, transcribeWav } = require('../src/engine/whispercpp');
+const { vocabularyPrompt, boostList, transcribeWav } = require('../src/engine/whispercpp');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -30,6 +30,12 @@ test('ordlistan blir en kort prompt utan dubbletter', () => {
   const p = vocabularyPrompt(long);
   assert.ok(p.length <= 601, 'kapas till max 600 tecken');
   assert.ok(p.startsWith('Term0, Term1'), 'de första orden behålls');
+});
+
+test('ordlistan blir en lista för Pianissimo (MLX)', () => {
+  assert.deepStrictEqual(boostList(''), []);
+  assert.deepStrictEqual(boostList('sub.stnc\nBerghs\n\n  Berghs \nsonic branding, Anthon'), ['sub.stnc', 'Berghs', 'sonic branding', 'Anthon']);
+  assert.strictEqual(boostList(Array.from({ length: 300 }, (_, i) => `T${i}`).join('\n')).length, 200);
 });
 
 test('ordlistan skickas som --prompt till whisper-cli', async () => {

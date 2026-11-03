@@ -19,6 +19,8 @@ const WHISPER_MODELS = {
   'kb-large-metal': { size: '3 GB', note: 'KB-Whisper large. Noggrannast på svenska, för möten. Importeras.', manual: true, ggml: true },
   // Körs med NeMo i Python, som modellkortet beskriver. Installeras med en knapp (Python, PyTorch, NeMo, modellen).
   'pianissimo-sv': { size: '4.5 GB', note: 'Klang Pianissimo. Bara svenska, mycket snabb. Körs med NeMo (Python). För livetext och möten.', python: true },
+  // Samma modell för Mac (MLX, 8 bitar): på grafikkretsen, utan PyTorch och NeMo, och följer ordlistan.
+  'pianissimo-mlx': { size: '1 GB', note: 'Klang Pianissimo för Mac. Bara svenska. Körs på grafikkretsen (MLX), mindre och snabbare än NeMo-versionen. Följer ordlistan. För livetext, diktering och möten.', python: true, component: 'mlx' },
 };
 
 // Mappnamn per modelltyp: whisper i ONNX (sherpa) eller whisper i ggml (whisper.cpp).
@@ -77,7 +79,7 @@ function findFile(dir, patterns) {
 function whisperFiles(modelsDir, name) {
   if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) {
     const dir = pyDir(modelsDir, name);
-    return pianissimo.isInstalled(dir) ? { py: true, dir } : null;
+    return pianissimo.isInstalled(dir, WHISPER_MODELS[name].component) ? { py: true, dir } : null;
   }
   const gdir = ggmlDir(modelsDir, name);
   const ggml = findFile(gdir, [/^ggml-model\.bin$/, /^ggml-model-f16\.bin$/, /^ggml-model-q5_0\.bin$/, /^ggml-.*\.bin$/]);
@@ -98,7 +100,7 @@ function status(modelsDir) {
   const whisper = {};
   for (const name of Object.keys(WHISPER_MODELS)) {
     const files = whisperFiles(modelsDir, name);
-    whisper[name] = { ...WHISPER_MODELS[name], installed: !!files, ggml: !!(files && files.ggml) || !!WHISPER_MODELS[name].ggml, py: !!WHISPER_MODELS[name].python };
+    whisper[name] = { ...WHISPER_MODELS[name], installed: !!files, ggml: !!(files && files.ggml) || !!WHISPER_MODELS[name].ggml, py: !!WHISPER_MODELS[name].python, mlx: WHISPER_MODELS[name].component === 'mlx' };
   }
   // Egna importerade modeller som inte finns i katalogen visas också.
   if (fs.existsSync(modelsDir)) {
@@ -164,7 +166,7 @@ async function installWhisper(modelsDir, name, onProgress) {
   if (WHISPER_MODELS[name].manual) throw new Error('Den här modellen laddas inte ner automatiskt. Använd Importera modell.');
   fs.mkdirSync(modelsDir, { recursive: true });
   if (WHISPER_MODELS[name].python) {
-    await pianissimo.install(pyDir(modelsDir, name), { download, onProgress });
+    await pianissimo.install(pyDir(modelsDir, name), { download, onProgress, component: WHISPER_MODELS[name].component });
     return;
   }
   if (WHISPER_MODELS[name].ggml) {
@@ -239,7 +241,7 @@ async function importWhisper(modelsDir, sourcePath) {
 function removeWhisper(modelsDir, name) {
   fs.rmSync(whisperDir(modelsDir, name), { recursive: true, force: true });
   fs.rmSync(ggmlDir(modelsDir, name), { recursive: true, force: true });
-  if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) pianissimo.uninstall(pyDir(modelsDir, name), 'asr');
+  if (WHISPER_MODELS[name] && WHISPER_MODELS[name].python) pianissimo.uninstall(pyDir(modelsDir, name), WHISPER_MODELS[name].component || 'asr');
 }
 
 // NVIDIA Nemotron 3 Diarization: talarseparering med NeMo, i samma Python-miljö som Pianissimo.

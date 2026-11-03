@@ -1,0 +1,39 @@
+name: Testa Pianissimo för Mac (MLX)
+
+# Installerar Klang Pianissimo för Mac (MLX, 8 bitar) precis som appen gör (uv, egen Python, parakeet-mlx,
+# modellen) på en Apple Silicon-Mac och kör möte, diktering, livetext och ordlistan genom appens motor.
+on:
+  workflow_dispatch:
+  push:
+    branches: ["claude/**"]
+    paths:
+      - src/engine/pianissimo.js
+      - src/engine/pipeline.js
+      - resources/pianissimo/worker_mlx.py
+      - scripts/test-pianissimo-mlx.js
+      - .github/workflows/test-pianissimo-mlx.yml
+
+permissions:
+  contents: read
+
+jobs:
+  mac:
+    runs-on: macos-latest   # Apple Silicon, som din Mac
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Förbered
+        run: |
+          npm install --no-save sherpa-onnx-node@1.13.8 >/dev/null
+          B=https://github.com/k2-fsa/sherpa-onnx/releases/download
+          curl -sSL $B/tts-models/vits-piper-sv_SE-nst-medium.tar.bz2 | tar xj
+          curl -sSL -o silero_vad.onnx $B/asr-models/silero_vad.onnx
+          mkdir -p mlx-models
+      - name: Installera och kör Pianissimo (MLX) genom appens kod
+        run: node scripts/test-pianissimo-mlx.js mlx-models vits-piper-sv_SE-nst-medium
+      - name: Diskutrymme för installationen
+        if: always()
+        run: du -sh mlx-models/pianissimo-mlx/* 2>/dev/null || true

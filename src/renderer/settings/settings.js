@@ -81,7 +81,7 @@ function progressLine(key) {
 async function renderEngine() {
   const el = $('engineStatus');
   try {
-    const describe = (info) => (!info.installed ? 'inte installerad' : info.ggml ? 'Metal' : info.py ? 'CPU (NeMo, Python)' : 'CPU (ONNX)');
+    const describe = (info) => (!info.installed ? 'inte installerad' : info.ggml ? 'Metal' : info.mlx ? 'Metal (MLX)' : info.py ? 'CPU (NeMo, Python)' : 'CPU (ONNX)');
     const d = await api.models.engineInfo(S.whisperDictation || S.whisperMeeting);
     const m = await api.models.engineInfo(S.whisperMeeting || S.whisperDictation);
     if ((d.ggml || m.ggml) && !d.whisperCli) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; return; }
@@ -121,7 +121,7 @@ async function renderModels() {
     const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = name;
     left.append(nm);
     const mid = document.createElement('div');
-    mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : m.py ? 'NeMo · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
+    mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : m.mlx ? 'MLX · ' : m.py ? 'NeMo · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
     const key = `whisper:${name}`;
     if (progress[key]) {
       const bar = document.createElement('div'); bar.className = 'bar';
@@ -134,6 +134,7 @@ async function renderModels() {
     if (progress[key]) { btn.textContent = m.py ? 'Installerar…' : 'Laddar ner…'; btn.disabled = true; }
     else if (m.installed) { btn.textContent = 'Ta bort'; btn.className = 'danger'; btn.onclick = async () => { if (confirm(`Ta bort whisper-${name}?`)) { await api.models.remove(name); S = await api.settings.get(); renderModels(); } }; }
     else if (m.manual) { btn.textContent = 'Importera'; btn.onclick = importModel; }
+    else if (m.mlx) { btn.textContent = 'Installera'; btn.onclick = () => { if (confirm('Pianissimo för Mac installeras med en egen Python och Apples MLX, som modellkortet beskriver. Det hämtar cirka 1 GB en gång. Sedan körs allt utan nät. Fortsätt?')) install('whisper', name); }; }
     else if (m.py) { btn.textContent = 'Installera'; btn.onclick = () => { if (confirm('Pianissimo installeras med Python, PyTorch och NeMo, som modellkortet beskriver. Det hämtar cirka 4,5 GB en gång och tar några minuter. Sedan körs allt utan nät. Fortsätt?')) install('whisper', name); }; }
     else { btn.textContent = 'Ladda ner'; btn.onclick = () => install('whisper', name); }
     right.appendChild(btn);

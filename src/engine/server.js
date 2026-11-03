@@ -8,7 +8,7 @@ const llm = require('./llm');
 const { heuristicSummary } = require('./summarize');
 const { transcriptAsText } = require('./markdown');
 const { cleanup } = require('./cleanup');
-const { vocabularyPrompt } = require('./whispercpp');
+const { vocabularyPrompt, boostList } = require('./whispercpp');
 
 let pipeline = null;
 let livePipeline = null; // egen instans för livetext, så att den inte krockar med den noggranna körningen
@@ -40,12 +40,13 @@ const methods = {
   },
 
   // ---- Livetext ----
-  async liveStart({ model }) {
+  async liveStart({ model, vocabulary }) {
     if (!model) throw new Error('Ingen modell vald för livetext.');
     if (!models.whisperFiles(settings.modelsDir, model)) throw new Error(`Modellen ${model} är inte installerad.`);
     if (!livePipeline || livePipeline.whisperName !== model) {
       livePipeline = new Pipeline({ modelsDir: settings.modelsDir, whisper: model, numThreads: Math.max(2, Math.min(4, require('os').cpus().length - 2)), whisperCli: settings.whisperCli, sherpa: pipeline && pipeline.sherpa });
     }
+    livePipeline.boost = boostList(vocabulary);
     await livePipeline.liveStart();
     return true;
   },
@@ -67,7 +68,7 @@ const methods = {
   // Motorinfo per modell: körs den med whisper.cpp (ggml) eller sherpa (ONNX)? Utan namn: den laddade.
   async engineInfo({ name } = {}) {
     const files = name ? models.whisperFiles(settings.modelsDir, name) : null;
-    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), py: !!(files && files.py), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
+    return { ggml: name ? !!(files && files.ggml) : !!pipeline.ggmlModel(), py: !!(files && files.py), mlx: !!(files && files.py && models.WHISPER_MODELS[name]?.component === 'mlx'), installed: name ? !!files : true, whisperCli: require('./whispercpp').findBinary(settings.whisperCli) };
   },
   async llmStatus() {
     return llm.available(settings.ollamaHost);
@@ -103,6 +104,7 @@ const methods = {
     if (whisper) pipeline.setWhisper(whisper);
     const f32 = samples instanceof Float32Array ? samples : new Float32Array(samples);
     const prompt = vocabularyPrompt(vocabulary);
+    pipeline.boost = boostList(vocabulary);
     const raw = pipeline.pyWorker() ? await pipeline.dictatePy(f32)
       : pipeline.ggmlModel() ? await pipeline.dictateCpp(f32, { policy, prompt }) : pipeline.dictate(f32, { policy });
     let text = cleanup(raw.text, { voiceCommands });
@@ -126,6 +128,7 @@ const methods = {
     const onProgress = (p) => send({ id, progress: p });
     const prompt = vocabularyPrompt(vocabulary);
     const speakers = { diarize, diarizer, channels, speakerCount };
+    pipeline.boost = boostList(vocabulary);
     if (pipeline.pyWorker()) return pipeline.meetingPy(wavPath, { ...speakers, onProgress });
     return pipeline.ggmlModel()
       ? pipeline.meetingCpp(wavPath, { policy, prompt, ...speakers, onProgress })

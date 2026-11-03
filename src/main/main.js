@@ -189,7 +189,7 @@ function startLive() {
   // segs: allt som livetexten hunnit ta fram. Används som mötets text när mötet stoppas (om inställt så).
   const live = { chunks: [], busy: false, timer: null, segs: [], ok: false };
   rec.live = live;
-  engine.call('liveStart', { model }).then(() => {
+  engine.call('liveStart', { model, vocabulary: settings.get('vocabulary') }).then(() => {
     if (rec.live !== live) return;
     live.ok = true;
     sendToMeeting('meeting:live-status', { on: true, text: 'Utkast. Den färdiga texten kommer när du stoppar.' });

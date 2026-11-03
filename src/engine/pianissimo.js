@@ -16,9 +16,13 @@ const readline = require('readline');
 const audio = require('./audio');
 
 const MODEL = 'KlangAI/pianissimo-sv';
+// Pianissimo för Mac (MLX): samma modell, kvantiserad till 8 bitar (759 MB), körs på grafikkretsen med
+// Apples MLX i stället för PyTorch och NeMo. Låst till en version av repot, så att laddaren inte ändras under oss.
+const MLX_PACKAGES = ['parakeet-mlx==0.5.2', 'huggingface_hub', 'sentencepiece', 'numpy'];
 const COMPONENTS = {
   asr: { repo: 'KlangAI/pianissimo-sv', label: 'Pianissimo' },
   diar: { repo: 'nvidia/Nemotron-3-Diarization', label: 'Nemotron 3 Diarization' },
+  mlx: { repo: 'KlangAI/pianissimo-sv-mlx-8bit', revision: '7b4d528bfb7ce3c66e2a187904f8d86ac39bc6de', label: 'Pianissimo för Mac (MLX)', packages: MLX_PACKAGES, script: 'worker_mlx.py' },
 };
 const PYTHON_VERSION = '3.11';
 // NeMo låst till en version från huvudgrenen: Nemotron 3 Diarization använder "rope"-attention, som den senaste
@@ -51,11 +55,11 @@ function isInstalled(dir, component = 'asr') {
 }
 
 // Var arbetarskriptet ligger: paketerad app (Resources/pianissimo) eller repot (resources/pianissimo).
-function workerScript() {
+function workerScript(file = 'worker.py') {
   const candidates = [
-    process.env.SPEAK_PIANISSIMO_WORKER,
-    process.resourcesPath ? path.join(process.resourcesPath, 'pianissimo', 'worker.py') : null,
-    path.join(__dirname, '..', '..', 'resources', 'pianissimo', 'worker.py'),
+    file === 'worker.py' ? process.env.SPEAK_PIANISSIMO_WORKER : null,
+    process.resourcesPath ? path.join(process.resourcesPath, 'pianissimo', file) : null,
+    path.join(__dirname, '..', '..', 'resources', 'pianissimo', file),
   ].filter(Boolean);
   return candidates.find((p) => fs.existsSync(p)) || null;
 }
@@ -110,22 +114,24 @@ async function install(dir, { download, onProgress = () => {}, component = 'asr'
     await run(l.uv, ['venv', '--python', PYTHON_VERSION, '--python-preference', 'only-managed', path.join(dir, 'venv')], { env });
   }
 
-  step('Installerar PyTorch och NeMo (cirka 2 GB första gången, tar några minuter)…');
+  const packages = comp.packages || PACKAGES;
+  step(comp.packages ? 'Installerar MLX…' : 'Installerar PyTorch och NeMo (cirka 2 GB första gången, tar några minuter)…');
   // --upgrade så att en befintlig miljö får en NeMo-version som klarar den nya modellen.
-  await run(l.uv, ['pip', 'install', '--upgrade', '--python', l.python, ...PACKAGES], {
+  await run(l.uv, ['pip', 'install', '--upgrade', '--python', l.python, ...packages], {
     env,
     onLine: (line) => { if (/^(Downloading|Installed|Prepared|Resolved)/.test(line)) onProgress({ phase: 'setup', text: `Installerar: ${line}` }); },
   });
 
   step(`Hämtar ${comp.label} från Hugging Face…`);
-  await run(l.python, ['-c', `from huggingface_hub import snapshot_download; print(snapshot_download("${comp.repo}"))`], { env });
+  const rev = comp.revision ? `, revision="${comp.revision}"` : '';
+  await run(l.python, ['-c', `from huggingface_hub import snapshot_download; print(snapshot_download("${comp.repo}"${rev}))`], { env });
 
   step(`Provkör ${comp.label}…`);
   stopAll(); // en arbetare som redan kör kan ha en äldre NeMo laddad
-  const w = new Worker(dir);
+  const w = new Worker(dir, { component });
   try {
     await w.start();
-    const r = await w.load(component);
+    const r = await w.load(component === 'diar' ? 'diar' : 'asr');
     step(`Klar. ${comp.label} laddades på ${r.load_sec} s.`);
   } finally {
     w.stop();
@@ -134,7 +140,7 @@ async function install(dir, { download, onProgress = () => {}, component = 'asr'
   fs.rmSync(env.UV_CACHE_DIR, { recursive: true, force: true });
   const prev = readMarker(dir);
   const components = [...new Set([...(prev ? prev.components : []), component])];
-  fs.writeFileSync(l.marker, JSON.stringify({ components, python: PYTHON_VERSION, packages: PACKAGES, installedAt: new Date().toISOString() }, null, 2));
+  fs.writeFileSync(l.marker, JSON.stringify({ components, python: PYTHON_VERSION, packages, installedAt: new Date().toISOString() }, null, 2));
 }
 
 // Tar bort en komponent. Den delade Python-miljön tas bort först när ingen komponent finns kvar.
@@ -150,12 +156,14 @@ function uninstall(dir, component) {
 
 // ---- Arbetaren: en Python-process som har modellen laddad ----
 class Worker {
-  constructor(dir, { threads, command, args } = {}) {
+  constructor(dir, { threads, command, args, component } = {}) {
     const l = layout(dir);
+    // En installation med bara MLX-versionen körs av worker_mlx.py, annars av worker.py (NeMo).
+    const comp = COMPONENTS[component || (readMarker(dir)?.components.includes('mlx') ? 'mlx' : 'asr')];
     this.dir = dir;
     this.command = command || l.python;
-    this.args = args || [workerScript()];
-    this.env = { HF_HOME: l.hfHome, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', PYTHONUNBUFFERED: '1', PYTORCH_ENABLE_MPS_FALLBACK: '1', SPEAK_THREADS: String(threads || Math.max(2, Math.min(8, os.cpus().length - 2))) };
+    this.args = args || [workerScript(comp.script)];
+    this.env = { SPEAK_MLX_REPO: COMPONENTS.mlx.repo, SPEAK_MLX_REVISION: COMPONENTS.mlx.revision, HF_HOME: l.hfHome, HF_HUB_OFFLINE: '1', TRANSFORMERS_OFFLINE: '1', HF_HUB_DISABLE_TELEMETRY: '1', PYTHONUNBUFFERED: '1', PYTORCH_ENABLE_MPS_FALLBACK: '1', SPEAK_THREADS: String(threads || Math.max(2, Math.min(8, os.cpus().length - 2))) };
     this.proc = null;
     this.readyPromise = null;
     this.nextId = 1;
@@ -213,8 +221,9 @@ class Worker {
     return this.request({ cmd: 'load', what });
   }
 
-  transcribe(wavPath, { timestamps = false } = {}) {
-    return this.request({ cmd: 'transcribe', path: wavPath, timestamps });
+  // boost: ordlistan (namn och facktermer). Bara MLX-versionen använder den, NeMo-arbetaren bryr sig inte.
+  transcribe(wavPath, { timestamps = false, boost } = {}) {
+    return this.request({ cmd: 'transcribe', path: wavPath, timestamps, ...(boost && boost.length ? { boost } : {}) });
   }
 
   // Nemotron 3 Diarization på en hel fil. Returnerar [{ start, end, speaker }].

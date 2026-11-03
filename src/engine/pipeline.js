@@ -100,7 +100,8 @@ class Pipeline {
   }
 
 
-  // Pianissimo (NeMo i Python)? Returnerar arbetaren, annars null.
+  // Pianissimo (NeMo eller MLX i Python)? Returnerar arbetaren, annars null.
+  // this.boost är ordlistan; MLX-versionen använder den så att namnen stavas rätt.
   pyWorker() {
     const files = models.whisperFiles(this.modelsDir, this.whisperName);
     return files && files.py ? pianissimo.worker(files.dir) : null;
@@ -512,7 +513,7 @@ class Pipeline {
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       if (onProgress) onProgress({ phase: 'transcribe', unit: 'percent', done: (i / parts.length) * 100, total: 100 });
-      const one = parts.length === 1 ? await w.transcribe(wavPath, { timestamps: true }) : await w.transcribeSamples(part.samples, { timestamps: true });
+      const one = parts.length === 1 ? await w.transcribe(wavPath, { timestamps: true, boost: this.boost }) : await w.transcribeSamples(part.samples, { timestamps: true, boost: this.boost });
       const shift = (x) => ({ ...x, start: x.start != null ? x.start + part.start : x.start, end: x.end != null ? x.end + part.start : x.end });
       r.segments.push(...(one.segments || []).map(shift));
       r.words.push(...(one.words || []).map(shift));
@@ -559,7 +560,7 @@ class Pipeline {
 
   async dictatePy(samples) {
     const t0 = Date.now();
-    const r = await this.pyWorker().transcribeSamples(samples);
+    const r = await this.pyWorker().transcribeSamples(samples, { boost: this.boost });
     console.error(`[motor] diktering (Pianissimo): ${(samples.length / SAMPLE_RATE).toFixed(1)} s ljud på ${((Date.now() - t0) / 1000).toFixed(1)} s`);
     const text = tidy(r.text || '');
     const segs = text && !isHallucination(text) ? [{ start: 0, end: samples.length / SAMPLE_RATE, text, lang: 'sv' }] : [];
@@ -619,7 +620,7 @@ class Pipeline {
       let text;
       const w = this.pyWorker();
       if (w) {
-        text = (await w.transcribeSamples(p.samples)).text || '';
+        text = (await w.transcribeSamples(p.samples, { boost: this.boost })).text || '';
       } else if (this.ggmlModel()) {
         const segs = await whispercpp.transcribeSamples(p.samples, { binary: this.whisperCli, model: this.ggmlModel(), language: 'sv', threads: this.numThreads });
         text = segs.map((s) => s.text).join(' ');
