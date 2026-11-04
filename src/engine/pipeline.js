@@ -406,6 +406,14 @@ class Pipeline {
       target = { wavPath: channels.sys, samples: sys };
       count = speakerCount > 1 ? speakerCount - 1 : 0; // du själv räknas inte i datorns ljud
     }
+    // Inget ljud från datorn men fler än du med i mötet: de andra sitter i rummet och hörs i mikrofonen.
+    // Då räcker inte kanalerna, rösterna i mikrofonen måste skiljas åt.
+    if (runs && !runs.some((r) => r.source === 'sys') && speakerCount > 1) {
+      console.error('[motor] inget ljud från datorn men flera deltagare: skiljer rösterna i mikrofonen');
+      runs = null;
+      target = { wavPath, samples };
+      count = speakerCount;
+    }
     let result;
     if (runs && !runs.some((r) => r.source === 'sys')) {
       result = { diar: runs.map((r) => ({ start: r.start, end: r.end, speaker: 'me' })), via: 'kanaler' };
@@ -415,7 +423,21 @@ class Pipeline {
       const one = [{ start: 0, end: dur, speaker: 0 }];
       result = runs ? { diar: combineChannelDiarization(runs, one), via: 'kanaler, en person' } : { diar: one, via: 'en person' };
     } else {
-      const d = await this.diarizeAudio(target, count, diarizer);
+      let d = await this.diarizeAudio(target, count, diarizer);
+      // Du har sagt hur många som var med, men färre röster hittades (t.ex. två som låter lika):
+      // dela upp i exakt så många med den inbyggda talarigenkänningen.
+      const found = new Set(d.diar.map((x) => x.speaker)).size;
+      if (count > 1 && found < count) {
+        try {
+          const s = target.samples || audio.readWav(target.wavPath).samples;
+          const forced = this.ensureDiarizer(count).process(s);
+          const n = new Set(forced.map((x) => x.speaker)).size;
+          console.error(`[motor] hittade ${found} av ${count} talare, delade upp i ${n} med den inbyggda`);
+          if (n > found) d = { diar: forced, via: `${d.via}, uppdelad i ${count}` };
+        } catch (e) {
+          console.error('[motor] kunde inte dela upp i fler talare:', e.message);
+        }
+      }
       result = runs ? { diar: combineChannelDiarization(runs, d.diar), via: `${d.via} + kanaler` } : d;
     }
     // Samma person kan få ett nytt nummer mitt i ett långt möte. Jämför rösterna och slå ihop.
@@ -466,7 +488,7 @@ class Pipeline {
       if (sum && used >= 2) voices[id] = { emb: sum, sec: used };
     }
     const maxSpeakers = count > 0 ? count : 0;
-    const map = mergeSimilarSpeakers(voices, { maxSpeakers });
+    const map = mergeSimilarSpeakers(voices, { maxSpeakers, minSpeakers: maxSpeakers });
     // Talare som är nästan lika sparas, så att Speak kan fråga dig efter mötet.
     try { this.lastSimilar = nearSpeakers(voices, map); } catch { this.lastSimilar = []; }
     const merged = Object.entries(map).filter(([a, b]) => a !== b);

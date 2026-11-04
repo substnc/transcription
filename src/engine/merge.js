@@ -159,7 +159,8 @@ function normalize(v) {
   n = Math.sqrt(n) || 1;
   return Float32Array.from(v, (x) => x / n);
 }
-function mergeSimilarSpeakers(voices, { threshold = 0.6, maxSpeakers = 0 } = {}) {
+// minSpeakers: du har sagt hur många som var med, så slå aldrig ihop till färre än så.
+function mergeSimilarSpeakers(voices, { threshold = 0.6, maxSpeakers = 0, minSpeakers = 0 } = {}) {
   const map = {};
   const live = new Map(Object.entries(voices).filter(([k]) => k !== ME).map(([k, v]) => [k, { emb: normalize(v.emb), sec: v.sec }]));
   for (const k of live.keys()) map[k] = k;
@@ -175,6 +176,7 @@ function mergeSimilarSpeakers(voices, { threshold = 0.6, maxSpeakers = 0 } = {})
     if (!best) break;
     const tooMany = maxSpeakers > 0 && live.size > maxSpeakers;
     if (best.sim < threshold && !tooMany) break;
+    if (!tooMany && minSpeakers > 0 && live.size <= minSpeakers) break;
     const A = live.get(best.a), B = live.get(best.b);
     const [keep, drop] = A.sec >= B.sec ? [best.a, best.b] : [best.b, best.a];
     const K = live.get(keep), D = live.get(drop);

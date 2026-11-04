@@ -27,3 +27,9 @@ test('med angivet antal talare slås de mest lika ihop tills antalet stämmer', 
   }, { maxSpeakers: 2 });
   assert.strictEqual(new Set(Object.values(map)).size, 2);
 });
+
+test('två lika röster slås inte ihop när du sagt att ni var två', () => {
+  const voices = { 0: { emb: v(1, 0, 0), sec: 100 }, 1: { emb: v(0.95, 0.2, 0), sec: 60 } };
+  assert.strictEqual(new Set(Object.values(mergeSimilarSpeakers(voices))).size, 1);
+  assert.strictEqual(new Set(Object.values(mergeSimilarSpeakers(voices, { maxSpeakers: 2, minSpeakers: 2 }))).size, 2);
+});
