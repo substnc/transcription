@@ -370,7 +370,6 @@ function registerIpc() {
     const after = settings.set(patch);
     if (patch.hotkey !== undefined || patch.hotkeyMode !== undefined) hotkey.restart({ hotkey: after.hotkey, hotkeyMode: after.hotkeyMode });
     if (patch.launchAtLogin !== undefined) app.setLoginItemSettings({ openAtLogin: !!patch.launchAtLogin });
-    if (patch.showInDock !== undefined && app.dock) (patch.showInDock ? app.dock.show() : app.dock.hide());
     if (patch.whisperDictation !== undefined || patch.whisperMeeting !== undefined || patch.liveModel !== undefined || patch.ollamaModel !== undefined || patch.ollamaHost !== undefined) {
       await engine.call('configure', engineSettings('meeting'));
       await dictEngine.call('configure', engineSettings());
@@ -594,7 +593,7 @@ function setIconState(state) {
   anim.state = state;
   clearInterval(anim.timer);
   anim.timer = null;
-  const dockOn = process.platform === 'darwin' && app.dock && settings.get('showInDock');
+  const dockOn = process.platform === 'darwin' && app.dock;
   if (state === 'idle') {
     if (tray) tray.setImage(trayIcon());
     if (dockOn) app.dock.setIcon(dockIcon());
@@ -681,7 +680,8 @@ async function firstRunCheck() {
 }
 
 app.whenReady().then(async () => {
-  if (process.platform === 'darwin' && app.dock && !settings.get('showInDock')) app.dock.hide();
+  // Speak syns alltid i Dock, med en prick under när appen kör.
+  if (process.platform === 'darwin' && app.dock) app.dock.show();
 
   // Bara vårt eget osynliga fönster får mikrofonen. Inga andra behörigheter beviljas.
   session.defaultSession.setPermissionRequestHandler((wc, permission, cb) => {
