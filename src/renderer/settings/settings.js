@@ -2,6 +2,18 @@ const $ = (id) => document.getElementById(id);
 const api = window.diktera;
 let S = null;
 const progress = {};
+let lastStatus = null;
+
+// ---- Flikar ----
+function showTab(id) {
+  for (const t of document.querySelectorAll('.tab')) t.setAttribute('aria-current', t.dataset.tab === id ? 'page' : 'false');
+  for (const p of document.querySelectorAll('.pane')) p.classList.toggle('on', p.dataset.pane === id);
+  try { localStorage.setItem('settingsTab', id); } catch {}
+}
+for (const t of document.querySelectorAll('.tab')) t.onclick = () => showTab(t.dataset.tab);
+let firstTab = 'dikt';
+try { firstTab = localStorage.getItem('settingsTab') || 'dikt'; } catch {}
+showTab(document.querySelector(`.tab[data-tab="${firstTab}"]`) ? firstTab : 'dikt');
 
 async function load() {
   S = await api.settings.get();
@@ -14,12 +26,11 @@ async function load() {
   hk.value = S.hotkey;
   $('hotkeyMode').value = S.hotkeyMode;
   $('language').value = S.language;
-  $('diarizer').value = S.diarizer || 'nemotron';
-  $('meetingSource').value = S.meetingSource || 'live';
-  $('vocabulary').value = S.vocabulary || '';
+  $('fullRerun').checked = S.meetingSource === 'full';
   $('llmMode').value = !S.useLlm ? 'off' : S.llmDictation ? 'all' : 'meetings';
-  for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) $(id).checked = !!S[id];
+  for (const id of TOGGLES) $(id).checked = !!S[id];
   renderInboxes();
+  renderWords();
   await Promise.all([renderModels(), renderLlm(), renderPerms()]);
 }
 
@@ -29,13 +40,53 @@ function bindSimple(id, key, type = 'value') {
     S = { ...S, ...(await api.settings.set({ [key]: v })) };
   };
 }
+const TOGGLES = ['autoPaste', 'voiceCommands', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin'];
 bindSimple('hotkey', 'hotkey');
 bindSimple('hotkeyMode', 'hotkeyMode');
-bindSimple('language', 'language');
-bindSimple('diarizer', 'diarizer');
-bindSimple('meetingSource', 'meetingSource');
-bindSimple('vocabulary', 'vocabulary');
-for (const id of ['autoPaste', 'voiceCommands', 'diarize', 'keepRecordings', 'captureSystemAudio', 'launchAtLogin', 'showInDock']) bindSimple(id, id, 'checked');
+for (const id of TOGGLES) bindSimple(id, id, 'checked');
+$('language').onchange = async () => {
+  S = { ...S, ...(await api.settings.set({ language: $('language').value })) };
+  if (lastStatus) await chooseModels(lastStatus);
+};
+$('fullRerun').onchange = async () => { S = { ...S, ...(await api.settings.set({ meetingSource: $('fullRerun').checked ? 'full' : 'live' })) }; };
+
+// Speak väljer modeller själv: Pianissimo för Mac för svenska (diktering, livetext och möten),
+// whisper turbo när du dikterar på engelska. Talare separeras alltid.
+async function chooseModels(st) {
+  const has = (n) => st.whisper[n] && st.whisper[n].installed;
+  const sv = has('pianissimo-mlx') ? 'pianissimo-mlx' : null;
+  const en = has('turbo-metal') ? 'turbo-metal' : null;
+  const lang = S.language;
+  $('langNote').textContent = !sv ? 'Installera Pianissimo för Mac under Avancerat för snabbast svenska.'
+    : lang === 'sv' ? 'Pianissimo för Mac skriver allt. Snabbast.'
+    : lang === 'auto' ? 'Diktering med whisper turbo, som klarar båda språken. Möten med Pianissimo för Mac.'
+    : 'Engelska skrivs med whisper turbo.';
+  if (!sv) return;
+  const want = { diarize: true, whisperMeeting: lang === 'en' && en ? en : sv, liveModel: lang === 'en' && en ? en : sv, whisperDictation: lang === 'sv' || !en ? sv : en };
+  const diff = Object.fromEntries(Object.entries(want).filter(([k, v]) => S[k] !== v));
+  if (Object.keys(diff).length) S = { ...S, ...(await api.settings.set(diff)) };
+}
+
+// ---- Ordlista: ett ord per rad i inställningarna, lappar här ----
+function words() { return String(S.vocabulary || '').split(/[\n,;]+/).map((w) => w.trim()).filter(Boolean); }
+async function saveWords(list) { S = { ...S, ...(await api.settings.set({ vocabulary: [...new Set(list)].join('\n') })) }; renderWords(); }
+function renderWords() {
+  const el = $('wordChips');
+  el.innerHTML = '';
+  for (const w of words()) {
+    const chip = document.createElement('span'); chip.className = 'word'; chip.textContent = w;
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', `Ta bort ${w}`);
+    x.onclick = () => { chip.classList.add('leaving'); setTimeout(() => saveWords(words().filter((v) => v !== w)), 160); };
+    chip.appendChild(x);
+    el.appendChild(chip);
+  }
+}
+$('wordForm').onsubmit = (e) => {
+  e.preventDefault();
+  const w = $('newWord').value.trim();
+  if (w) saveWords([...words(), w]);
+  $('newWord').value = '';
+};
 $('llmMode').onchange = async () => {
   const m = $('llmMode').value;
   S = { ...S, ...(await api.settings.set({ useLlm: m !== 'off', llmDictation: m === 'all' })) };
@@ -54,6 +105,9 @@ async function renderPerms() {
   $('permAcc').className = 'chip ' + (p.accessibility ? 'ok' : 'warn');
   $('permHook').textContent = p.hotkeyActive ? 'Aktiv' : 'Inaktiv' + (p.hotkeyError ? ` (${p.hotkeyError})` : '');
   $('permHook').className = 'chip ' + (p.hotkeyActive ? 'ok' : 'warn');
+  const missing = [p.microphone === 'granted', p.accessibility, p.hotkeyActive, p.screen === 'granted'].filter((x) => !x).length;
+  $('permSummary').textContent = !missing ? 'Allt är klart.' : missing === 1 ? 'En saknas.' : `${missing} saknas.`;
+  $('permDot').classList.toggle('hidden', !missing);
 }
 $('btnMic').onclick = async () => { await api.perm.request('microphone'); renderPerms(); };
 $('btnAcc').onclick = async () => { await api.perm.request('accessibility'); api.open.external('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'); };
@@ -86,42 +140,31 @@ async function renderEngine() {
     const m = await api.models.engineInfo(S.whisperMeeting || S.whisperDictation);
     if ((d.ggml || m.ggml) && !d.whisperCli) { el.textContent = 'whisper-cli saknas i appen. Installera om från senaste bygget.'; el.className = 'chip bad'; return; }
     el.textContent = `Diktering: ${describe(d)} · Möten: ${describe(m)}`;
-    el.className = 'chip ' + (d.installed && m.installed && d.ggml && m.ggml ? 'ok' : 'warn');
+    el.className = 'chip ' + (d.installed && m.installed ? 'ok' : 'warn');
   } catch (e) {
     el.textContent = 'Kunde inte läsa motorstatus: ' + e.message; el.className = 'chip bad';
   }
 }
 
-// De två valen: en snabb modell för diktering, en noggrann för möten. Bara installerade går att välja.
-function renderSlots(st) {
-  for (const key of ['whisperDictation', 'whisperMeeting', 'liveModel']) {
-    const id = key;
-    const sel = $(id);
-    sel.innerHTML = '';
-    const installed = Object.entries(st.whisper).filter(([, m]) => m.installed).map(([n]) => n);
-    if (key === 'liveModel') sel.add(new Option('Av', ''));
-    else if (!installed.length) sel.add(new Option('Ingen modell installerad', ''));
-    for (const n of installed) sel.add(new Option(n, n));
-    if (S[key] && !installed.includes(S[key])) sel.add(new Option(S[key] + ' (saknas)', S[key]));
-    sel.value = S[key] || '';
-    sel.onchange = async () => { S = { ...S, ...(await api.settings.set({ [key]: sel.value })) }; renderEngine(); };
-  }
-}
+const LABELS = { 'pianissimo-mlx': 'Pianissimo för Mac', 'turbo-metal': 'whisper turbo (engelska)', 'pianissimo-sv': 'Pianissimo (äldre, NeMo)', 'kb-large-metal': 'KB-Whisper large' };
 
 async function renderModels() {
   const st = await api.models.status();
-  renderSlots(st);
+  lastStatus = st;
+  await chooseModels(st);
   renderEngine();
   const wl = $('whisperList');
   wl.innerHTML = '';
-  for (const [name, m] of Object.entries(st.whisper)) {
+  // Bara de två som Speak använder, plus andra som redan ligger på datorn (så att de går att ta bort).
+  for (const [name, m] of Object.entries(st.whisper).filter(([n, x]) => ['pianissimo-mlx', 'turbo-metal'].includes(n) || x.installed)) {
     const row = document.createElement('div');
     row.className = 'model';
     const left = document.createElement('div');
-    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = name;
+    const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = LABELS[name] || name;
     left.append(nm);
-    const mid = document.createElement('div');
-    mid.innerHTML = `<div class="note">${m.ggml ? 'Metal · ' : m.mlx ? 'MLX · ' : m.py ? 'NeMo · ' : ''}${m.note}${m.size ? ' (' + m.size + ')' : ''}</div>`;
+    const mid = left;
+    const note = document.createElement('div'); note.className = 'note'; note.textContent = `${m.note}${m.size ? ' (' + m.size + ')' : ''}`;
+    mid.append(note);
     const key = `whisper:${name}`;
     if (progress[key]) {
       const bar = document.createElement('div'); bar.className = 'bar';
@@ -138,7 +181,7 @@ async function renderModels() {
     else if (m.py) { btn.textContent = 'Installera'; btn.onclick = () => { if (confirm('Pianissimo installeras med Python, PyTorch och NeMo, som modellkortet beskriver. Det hämtar cirka 4,5 GB en gång och tar några minuter. Sedan körs allt utan nät. Fortsätt?')) install('whisper', name); }; }
     else { btn.textContent = 'Ladda ner'; btn.onclick = () => install('whisper', name); }
     right.appendChild(btn);
-    row.append(left, mid, right);
+    row.append(left, right);
     wl.appendChild(row);
   }
   // Nemotron 3 Diarization (NeMo i Python).
@@ -188,7 +231,6 @@ async function importModel() {
     alert('Import misslyckades: ' + e.message);
   }
 }
-$('btnImport').onclick = importModel;
 
 let renderTimer = null;
 api.models.onProgress((p) => {
@@ -232,7 +274,6 @@ function renderInboxes() {
 }
 
 $('btnRecordingsDir').onclick = async () => { const p = await api.settings.chooseRecordings(); if (p) { S = await api.settings.get(); $('recordingsDir').textContent = p; } };
-$('btnMeeting').onclick = () => api.open.meeting();
 $('btnRecordings').onclick = () => api.open.path(S.recordingsDir);
 $('btnLogs').onclick = () => api.open.logs();
 

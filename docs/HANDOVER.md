@@ -210,3 +210,15 @@ livetext fungerar likadant. Ordlistan skickas med som `boost` (förstärkta stav
 Mätt i CI (virtuell Mac, svagare grafik än en riktig M-dator): modellen laddas på 1–4 s, en diktering på
 4 s tar 0,2–0,3 s, ett möte på 3 minuter tar 5 s. Testet: `.github/workflows/test-pianissimo-mlx.yml`.
 Den gamla `pianissimo-sv` (NeMo) och Nemotron 3 Diarization finns kvar; Nemotron kräver fortfarande NeMo.
+
+## Inställningar som sidopanel och mjuka animeringar (4 nov 2026)
+
+Inställningarna följer förslag B i designfilen: flikarna Diktering, Möten, Ordlista, Behörigheter (prick när
+något saknas) och Avancerat. Modellvalen är borta ur gränssnittet: med Pianissimo för Mac installerad väljer
+`chooseModels` i `settings.js` själv (svenska: MLX överallt; "Svenska och engelska": whisper turbo för
+diktering, MLX för möten; engelska: turbo). Talare separeras alltid. Ordlistan visas som lappar men sparas som
+förut (ett ord per rad i `vocabulary`). Borttaget ur gränssnittet: modellslotarna, Importera modell, valet av
+talarmodell, "Separera talare", "Visa i Dock" och "Öppna mötesläge". Inställningarna finns kvar i filen.
+
+Animeringar i `shared.css`: bara opacitet och förflyttning, under en halv sekund, och avstängda när
+"Minska rörelse" är på i macOS. Dikteringsrutan (overlay) är orörd.
