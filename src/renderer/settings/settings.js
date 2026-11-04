@@ -156,7 +156,7 @@ async function renderModels() {
   const wl = $('whisperList');
   wl.innerHTML = '';
   // Bara de två som Speak använder, plus andra som redan ligger på datorn (så att de går att ta bort).
-  for (const [name, m] of Object.entries(st.whisper).filter(([n, x]) => ['pianissimo-mlx', 'turbo-metal'].includes(n) || x.installed)) {
+  for (const [name, m] of Object.entries(st.whisper).filter(([n, x]) => ['pianissimo-mlx', 'turbo-metal'].includes(n) || x.installed).sort(([a], [b]) => (b === 'pianissimo-mlx') - (a === 'pianissimo-mlx'))) {
     const row = document.createElement('div');
     row.className = 'model';
     const left = document.createElement('div');
